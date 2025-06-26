@@ -2,6 +2,14 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axon.Telegram", "src\Axon.Telegram\Axon.Telegram.csproj", "{94BB0A93-B360-4F4B-8503-4EAE2F213904}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{28030632-1FE8-4F45-AD8A-019ECA127712}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{3103A79E-82D0-40CF-8CE7-C84330FCEF9B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axon.Telegram.Sample", "samples\Axon.Telegram.Sample\Axon.Telegram.Sample.csproj", "{D9720DC9-8324-4E13-82A6-7C25C4C0C662}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axon.Telegram.Commands", "src\Axon.Telegram.Commands\Axon.Telegram.Commands.csproj", "{86D77300-BB42-471C-B5A4-30C40170CF36}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +20,18 @@ Global
 		{94BB0A93-B360-4F4B-8503-4EAE2F213904}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{94BB0A93-B360-4F4B-8503-4EAE2F213904}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{94BB0A93-B360-4F4B-8503-4EAE2F213904}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D9720DC9-8324-4E13-82A6-7C25C4C0C662}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D9720DC9-8324-4E13-82A6-7C25C4C0C662}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D9720DC9-8324-4E13-82A6-7C25C4C0C662}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D9720DC9-8324-4E13-82A6-7C25C4C0C662}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86D77300-BB42-471C-B5A4-30C40170CF36}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86D77300-BB42-471C-B5A4-30C40170CF36}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86D77300-BB42-471C-B5A4-30C40170CF36}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86D77300-BB42-471C-B5A4-30C40170CF36}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{94BB0A93-B360-4F4B-8503-4EAE2F213904} = {28030632-1FE8-4F45-AD8A-019ECA127712}
+		{D9720DC9-8324-4E13-82A6-7C25C4C0C662} = {3103A79E-82D0-40CF-8CE7-C84330FCEF9B}
+		{86D77300-BB42-471C-B5A4-30C40170CF36} = {28030632-1FE8-4F45-AD8A-019ECA127712}
 	EndGlobalSection
 EndGlobal
