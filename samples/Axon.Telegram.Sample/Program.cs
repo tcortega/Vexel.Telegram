@@ -1,0 +1,33 @@
+﻿using Axon.Telegram.Commands.Extensions;
+using Axon.Telegram.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Remora.Commands.Extensions;
+using Axon.Telegram.Sample.Commands;
+using Axon.Telegram.Sample.Responders;
+
+var host = Host.CreateDefaultBuilder(args)
+    .ConfigureServices((_, services) =>
+    {
+        services.AddTelegramBot(_ => "<TOKEN>");
+        
+        services.AddResponder<MessageResponder>();
+
+        services.AddTelegramCommandHandling();
+        
+        services.AddCommandTree()
+            .WithCommandGroup<GeneralCommands>();
+    })
+    .ConfigureLogging(logging =>
+    {
+        logging.ClearProviders();
+        logging.AddSimpleConsole(options =>
+        {
+            options.IncludeScopes = true;
+            options.SingleLine = true;
+            options.TimestampFormat = "hh:mm:ss ";
+        });
+    })
+    .Build();
+
+await host.RunAsync();
