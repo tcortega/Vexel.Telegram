@@ -1,6 +1,7 @@
+using Axon.Telegram.Commands.Contexts;
 using Remora.Results;
 
-namespace Axon.Telegram.Commands.Services.Execution;
+namespace Axon.Telegram.Commands.Execution;
 
 /// <summary>
 /// Represents the public interface of a service that can perform a post-execution event.

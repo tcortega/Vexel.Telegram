@@ -1,20 +1,22 @@
-﻿using Axon.Telegram.Commands.Extensions;
-using Axon.Telegram.Extensions;
+﻿using Axon.Telegram.Client.Extensions;
+using Axon.Telegram.Commands.Extensions;
+using Axon.Telegram.Hosting.Extensions;
+using Axon.Telegram.Sample.Commands;
+using Axon.Telegram.Sample.Responders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Remora.Commands.Extensions;
-using Axon.Telegram.Sample.Commands;
-using Axon.Telegram.Sample.Responders;
 
 var host = Host.CreateDefaultBuilder(args)
+    .AddTelegramService(_ => "<TOKEN_HERE>")
     .ConfigureServices((_, services) =>
     {
-        services.AddTelegramBot(_ => "<TOKEN>");
-        
+        services.AddTelegramCommands();
+
+        // Add custom responders
         services.AddResponder<MessageResponder>();
 
-        services.AddTelegramCommandHandling();
-        
+        // Register command groups
         services.AddCommandTree()
             .WithCommandGroup<GeneralCommands>();
     })

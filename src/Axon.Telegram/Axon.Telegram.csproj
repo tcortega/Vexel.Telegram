@@ -13,4 +13,11 @@
       <PackageReference Include="Telegram.Bot" Version="22.5.1" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\Axon.Telegram.Abstractions\Axon.Telegram.Abstractions.csproj" />
+      <ProjectReference Include="..\Axon.Telegram.Client\Axon.Telegram.Client.csproj" />
+      <ProjectReference Include="..\Axon.Telegram.Commands\Axon.Telegram.Commands.csproj" />
+      <ProjectReference Include="..\Axon.Telegram.Hosting\Axon.Telegram.Hosting.csproj" />
+    </ItemGroup>
+
 </Project>

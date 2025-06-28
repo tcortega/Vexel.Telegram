@@ -1,35 +1,27 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Text;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Remora.Commands.Services;
 using Remora.Commands.Trees.Nodes;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
-namespace Axon.Telegram.Commands.Services;
+namespace Axon.Telegram.Commands.Registration;
 
 /// <summary>
-/// A hosted service that registers commands with Telegram on startup by traversing the command tree.
+/// Service that registers commands with Telegram by traversing the command tree.
 /// </summary>
-public class CommandRegistrationService(
-    ILogger<CommandRegistrationService> logger,
+public sealed class CommandRegistrar(
+    ILogger<CommandRegistrar> logger,
     CommandService commandService,
-    ITelegramBotClient botClient,
-    IOptions<CommandOptions> options)
-    : IHostedService
+    ITelegramBotClient botClient)
 {
-    private readonly CommandOptions _options = options.Value;
-
-    public async Task StartAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Registers all discovered commands with Telegram.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    public async Task RegisterCommandsAsync(CancellationToken cancellationToken = default)
     {
-        if (_options.Prefix != "/" || !_options.RegisterCommands)
-        {
-            logger.LogDebug("Skipping command registration because prefix is not '/' or registration is disabled.");
-            return;
-        }
-
         // The CommandService holds a TreeAccessor, which is the correct way to get command trees.
         // We get the default tree by passing `null` as the name.
         if (!commandService.TreeAccessor.TryGetNamedTree(null, out var tree))
@@ -102,6 +94,4 @@ public class CommandRegistrationService(
             path.Length = currentPathLength;
         }
     }
-
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

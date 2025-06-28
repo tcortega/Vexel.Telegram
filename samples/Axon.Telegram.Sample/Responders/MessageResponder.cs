@@ -1,4 +1,4 @@
-﻿using Axon.Telegram.Responders;
+﻿using Axon.Telegram.Abstractions.Responders;
 using Microsoft.Extensions.Logging;
 using Remora.Results;
 using Telegram.Bot;

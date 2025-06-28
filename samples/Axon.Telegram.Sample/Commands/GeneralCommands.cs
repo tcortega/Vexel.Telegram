@@ -1,5 +1,5 @@
 ﻿using System.ComponentModel;
-using Axon.Telegram.Commands.Services;
+using Axon.Telegram.Commands.Contexts;
 using Remora.Commands.Attributes;
 using Remora.Commands.Groups;
 using Remora.Results;
@@ -10,19 +10,16 @@ namespace Axon.Telegram.Sample.Commands;
 /// <summary>
 /// A command group containing general-purpose commands.
 /// </summary>
-public class GeneralCommands(ITelegramBotClient botClient, ICommandContext context) : CommandGroup
+public class GeneralCommands(ITelegramBotClient botClient, ITextCommandContext context) : CommandGroup
 {
     [Command("ping"), Description("Checks if the bot is responsive.")]
     public async Task<IResult> PingAsync()
     {
-        // We can safely access the context because the framework guarantees it's available here.
-        var telegramContext = (TelegramCommandContext)context;
-
         await botClient.SendMessage
         (
-            chatId: telegramContext.Message.Chat.Id,
+            chatId: context.Message.Chat.Id,
             text: "Pong!",
-            replyParameters: telegramContext.Message.MessageId,
+            replyParameters: context.Message.MessageId,
             cancellationToken: CancellationToken
         );
 
@@ -32,13 +29,11 @@ public class GeneralCommands(ITelegramBotClient botClient, ICommandContext conte
     [Command("echo"), Description("Repeats the text you provide.")]
     public async Task<IResult> EchoAsync([Greedy] string text)
     {
-        var telegramContext = (TelegramCommandContext)context;
-
         await botClient.SendMessage
         (
-            chatId: telegramContext.Message.Chat.Id,
+            chatId: context.Message.Chat.Id,
             text: $"You said: {text}",
-            replyParameters: telegramContext.Message.MessageId,
+            replyParameters: context.Message.MessageId,
             cancellationToken: CancellationToken
         );
 

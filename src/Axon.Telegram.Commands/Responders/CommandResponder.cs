@@ -1,9 +1,14 @@
-﻿using Axon.Telegram.Commands.Services;
-using Axon.Telegram.Commands.Services.Execution;
-using Axon.Telegram.Responders;
+﻿using Axon.Telegram.Abstractions.Responders;
+using Axon.Telegram.Commands.Contexts;
+using Axon.Telegram.Commands.Execution;
+using Axon.Telegram.Commands.Extensions;
+using Axon.Telegram.Commands.Prefix;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Remora.Commands.Services;
+using Remora.Commands.Tokenization;
+using Remora.Commands.Trees;
 using Remora.Results;
 using Telegram.Bot.Types;
 
@@ -17,44 +22,97 @@ public class CommandResponder(
     CommandService commandService,
     ContextInjectionService contextInjector,
     ExecutionEventCollectorService eventCollector,
-    IServiceProvider services, // We keep the service provider to pass to the context.
-    IOptions<CommandOptions> options)
+    IServiceProvider services,
+    IOptions<TokenizerOptions> tokenizerOptions,
+    IOptions<TreeSearchOptions> treeSearchOptions)
     : IResponder<Message>
 {
-    private readonly CommandOptions _options = options.Value;
+    private readonly TokenizerOptions _tokenizerOptions = tokenizerOptions.Value;
+    private readonly TreeSearchOptions _treeSearchOptions = treeSearchOptions.Value;
 
     /// <inheritdoc />
     public async Task<Result> RespondAsync(Message message, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(message.Text) || !message.Text.StartsWith(_options.Prefix))
+        if (string.IsNullOrWhiteSpace(message.Text))
         {
             return Result.FromSuccess();
         }
 
-        var commandText = message.Text[_options.Prefix.Length..];
+        var context = new MessageContext(message);
+        contextInjector.Context = context;
 
-        // 1. Set the context on the scoped injection service. This makes the context available
-        //    to any other service within this same scope (e.g., post-execution events).
-        contextInjector.Context = new TelegramCommandContext(message, ct);
+        var prefixMatcher = services.GetRequiredService<ICommandPrefixMatcher>();
+        var checkPrefix = await prefixMatcher.MatchesPrefixAsync(message.Text, ct);
+        if (!checkPrefix.IsDefined(out var check))
+        {
+            return (Result)checkPrefix;
+        }
 
-        // 2. The command is executed using the correct, per-update service provider.
-        //    The CommandService is injected directly into our constructor.
-        var result = await commandService.TryExecuteAsync(commandText, services, ct: ct);
+        if (!check.Matches)
+        {
+            return Result.FromSuccess();
+        }
 
-        // 3. All post-execution logic is delegated to the collector service, which is also
-        //    injected directly. We pass the IServiceProvider for event handlers to use.
-        await eventCollector.RunPostExecutionEventsAsync
+        var content = message.Text[check.ContentStartIndex..];
+
+        return await TryExecuteCommandAsync(context, content, ct);
+    }
+
+    private async Task<Result> TryExecuteCommandAsync(MessageContext context, string content,
+        CancellationToken ct)
+    {
+        var prepareCommand = await commandService.TryPrepareCommandAsync
         (
+            content,
             services,
-            contextInjector.Context,
-            result.IsSuccess ? result.Entity : result,
+            _tokenizerOptions,
+            _treeSearchOptions,
+            null,
             ct
         );
 
-        // 4. The original result from the command execution is returned.
-        if (result.IsSuccess) return Result.FromSuccess();
+        if (!prepareCommand.IsSuccess)
+        {
+            var preparationError = await eventCollector.RunPreparationErrorEvents
+            (
+                services,
+                context,
+                prepareCommand,
+                ct
+            );
 
-        logger.LogTrace("Command execution failed: {Error}", result.Error.Message);
-        return Result.FromError(result.Error);
+            if (!preparationError.IsSuccess && !Equals(preparationError.Error, prepareCommand.Error))
+            {
+                return preparationError;
+            }
+
+            if (prepareCommand.Error.IsUserOrEnvironmentError())
+            {
+                return Result.FromSuccess();
+            }
+
+            return (Result)prepareCommand;
+        }
+
+        var preparedCommand = prepareCommand.Entity;
+
+        var commandContext = new TextCommandContext(context.Message, preparedCommand, ct);
+        contextInjector.Context = commandContext;
+
+        var preExecution = await eventCollector.RunPreExecutionEvents(services, commandContext, ct);
+        if (!preExecution.IsSuccess)
+        {
+            return preExecution;
+        }
+
+        var executionResult = await commandService.TryExecuteAsync(preparedCommand, services, ct);
+
+        return await eventCollector.RunPostExecutionEvents
+        (
+            services,
+            commandContext,
+            executionResult.IsSuccess ? executionResult.Entity : executionResult,
+            ct
+        );
     }
 }

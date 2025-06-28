@@ -1,68 +1,196 @@
-﻿using Axon.Telegram.Commands.Responders;
-using Axon.Telegram.Commands.Services;
-using Axon.Telegram.Commands.Services.Execution;
-using Axon.Telegram.Extensions;
+using Axon.Telegram.Abstractions.Responders;
+using Axon.Telegram.Client.Extensions;
+using Axon.Telegram.Commands.Contexts;
+using Axon.Telegram.Commands.Execution;
+using Axon.Telegram.Commands.Prefix;
+using Axon.Telegram.Commands.Registration;
+using Axon.Telegram.Commands.Responders;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Remora.Commands.Extensions;
+using Remora.Commands.Tokenization;
+using Remora.Commands.Trees;
+using Remora.Extensions.Options.Immutable;
 
 namespace Axon.Telegram.Commands.Extensions;
 
 /// <summary>
-/// Provides extension methods for setting up command handling.
+/// Defines extension methods for the <see cref="IServiceCollection"/> interface.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Adds and configured Telegram command handling services.
-    /// This is the primary entry point for setting up the command system.
+    /// Adds all services required for Telegram-integrated commands.
     /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="configure">An optional action to configure command options.</param>
-    /// <returns>The service collection.</returns>
-    public static IServiceCollection AddTelegramCommandHandling(this IServiceCollection services,
-        Action<CommandOptions>? configure = null)
+    /// <param name="serviceCollection">The service collection.</param>
+    /// <param name="useDefaultCommandResponder">Whether to add a default command responder.</param>
+    /// <returns>The service collection, with Telegram commands.</returns>
+    public static IServiceCollection AddTelegramCommands
+    (
+        this IServiceCollection serviceCollection,
+        bool useDefaultCommandResponder = true
+    )
     {
-        services.AddCommands();
+        serviceCollection
+            .TryAddScoped<ContextInjectionService>();
 
-        services.Configure(configure ?? (_ => { }));
+        // Set up context injection
+        serviceCollection
+            .TryAddTransient
+            (s =>
+                {
+                    var injectionService = s.GetRequiredService<ContextInjectionService>();
+                    return injectionService.Context ?? throw new InvalidOperationException
+                    (
+                        "No operation context has been set for this scope."
+                    );
+                }
+            );
 
-        services.AddResponder<CommandResponder>();
+        serviceCollection
+            .TryAddTransient
+            (s =>
+                {
+                    var injectionService = s.GetRequiredService<ContextInjectionService>();
+                    return injectionService.Context as ICommandContext ?? throw new InvalidOperationException
+                    (
+                        "No command context has been set for this scope."
+                    );
+                }
+            );
 
-        services.TryAddScoped<ContextInjectionService>();
+        serviceCollection
+            .TryAddTransient
+            (s =>
+                {
+                    var injectionService = s.GetRequiredService<ContextInjectionService>();
+                    return injectionService.Context as IMessageContext ?? throw new InvalidOperationException
+                    (
+                        "No message context has been set for this scope."
+                    );
+                }
+            );
 
-        services.TryAddSingleton<ExecutionEventCollectorService>();
+        serviceCollection
+            .TryAddTransient
+            (s =>
+                {
+                    var injectionService = s.GetRequiredService<ContextInjectionService>();
+                    return injectionService.Context as ITextCommandContext ?? throw new InvalidOperationException
+                    (
+                        "No text command context has been set for this scope."
+                    );
+                }
+            );
 
-        services.TryAddScoped<ICommandContext>
-        (sp =>
-            {
-                var injector = sp.GetRequiredService<ContextInjectionService>();
-                return injector.Context
-                       ?? throw new InvalidOperationException
-                       (
-                           "The command context was not available from the injection service. " +
-                           "This indicates a framework bug or that the service was resolved outside of a command execution scope."
-                       );
-            }
+        // Configure option types
+        serviceCollection.Configure<TokenizerOptions>(opt => opt);
+        serviceCollection.Configure<TreeSearchOptions>
+        (opt => opt with { KeyComparison = StringComparison.OrdinalIgnoreCase }
         );
 
-        services.AddHostedService<CommandRegistrationService>();
+        serviceCollection.AddCommands();
 
-        return services;
+        // Add the default prefix matcher if the end user hasn't already registered one
+        serviceCollection.TryAddTransient<ICommandPrefixMatcher, SimplePrefixMatcher>();
+
+        if (useDefaultCommandResponder)
+        {
+            serviceCollection.AddCommandResponder();
+        }
+
+        serviceCollection.TryAddSingleton<ExecutionEventCollectorService>();
+
+        // Add the command registrar service
+        serviceCollection.TryAddTransient<CommandRegistrar>();
+
+        return serviceCollection;
     }
 
     /// <summary>
-    /// Adds a post-execution event handler to the service collection.
-    /// This allows developers to easily extend the framework with custom logic
-    /// that runs after a command is executed.
+    /// Adds the command responder to the system.
     /// </summary>
     /// <param name="serviceCollection">The service collection.</param>
-    /// <typeparam name="TEvent">The type of the event handler, which must implement IPostExecutionEvent.</typeparam>
-    /// <returns>The service collection, with the event handler added.</returns>
-    public static IServiceCollection AddPostExecutionEvent<TEvent>(this IServiceCollection serviceCollection)
+    /// <param name="optionsConfigurator">The option configurator.</param>
+    /// <returns>The collection, with the command responder.</returns>
+    public static IServiceCollection AddCommandResponder
+    (
+        this IServiceCollection serviceCollection,
+        Action<CommandResponderOptions>? optionsConfigurator = null
+    )
+    {
+        optionsConfigurator ??= _ => { };
+
+        serviceCollection.AddResponder<CommandResponder>();
+        serviceCollection.Configure(optionsConfigurator);
+
+        return serviceCollection;
+    }
+
+    /// <summary>
+    /// Adds a preparation error event to the service collection.
+    /// </summary>
+    /// <param name="serviceCollection">The service collection.</param>
+    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <returns>The collection, with the event.</returns>
+    public static IServiceCollection AddPreparationErrorEvent<TEvent>
+    (
+        this IServiceCollection serviceCollection
+    )
+        where TEvent : class, IPreparationErrorEvent
+    {
+        serviceCollection.AddScoped<IPreparationErrorEvent, TEvent>();
+        return serviceCollection;
+    }
+
+    /// <summary>
+    /// Adds a pre-execution event to the service collection.
+    /// </summary>
+    /// <param name="serviceCollection">The service collection.</param>
+    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <returns>The collection, with the event.</returns>
+    public static IServiceCollection AddPreExecutionEvent<TEvent>
+    (
+        this IServiceCollection serviceCollection
+    )
+        where TEvent : class, IPreExecutionEvent
+    {
+        serviceCollection.AddScoped<IPreExecutionEvent, TEvent>();
+        return serviceCollection;
+    }
+
+    /// <summary>
+    /// Adds a post-execution event to the service collection.
+    /// </summary>
+    /// <param name="serviceCollection">The service collection.</param>
+    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <returns>The collection, with the event.</returns>
+    public static IServiceCollection AddPostExecutionEvent<TEvent>
+    (
+        this IServiceCollection serviceCollection
+    )
         where TEvent : class, IPostExecutionEvent
     {
         serviceCollection.AddScoped<IPostExecutionEvent, TEvent>();
+        return serviceCollection;
+    }
+
+    /// <summary>
+    /// Adds a pre- and post-execution event to the service collection.
+    /// </summary>
+    /// <param name="serviceCollection">The service collection.</param>
+    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <returns>The collection, with the event.</returns>
+    public static IServiceCollection AddExecutionEvent<TEvent>
+    (
+        this IServiceCollection serviceCollection
+    )
+        where TEvent : class, IPreExecutionEvent, IPostExecutionEvent
+    {
+        serviceCollection
+            .AddPreExecutionEvent<TEvent>()
+            .AddPostExecutionEvent<TEvent>();
+
         return serviceCollection;
     }
 }
