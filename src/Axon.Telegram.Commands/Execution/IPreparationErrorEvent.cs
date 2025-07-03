@@ -1,4 +1,4 @@
-﻿using Axon.Telegram.Commands.Contexts;
+using Axon.Telegram.Commands.Contexts;
 using Remora.Results;
 
 namespace Axon.Telegram.Commands.Execution;
@@ -8,13 +8,13 @@ namespace Axon.Telegram.Commands.Execution;
 /// </summary>
 public interface IPreparationErrorEvent
 {
-    /// <summary>
-    /// Runs when attempted preparation of a command fails.
-    /// </summary>
-    /// <param name="context">The operation context.</param>
-    /// <param name="preparationResult">The result of the command preparation.</param>
-    /// <param name="ct">The cancellation token of the current operation.</param>
-    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<Result> PreparationFailed(IOperationContext context, IResult preparationResult,
-        CancellationToken ct = default);
+	/// <summary>
+	/// Runs when attempted preparation of a command fails.
+	/// </summary>
+	/// <param name="context">The operation context.</param>
+	/// <param name="preparationResult">The result of the command preparation.</param>
+	/// <param name="ct">The cancellation token of the current operation.</param>
+	/// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+	Task<Result> PreparationFailed(IOperationContext context, IResult preparationResult,
+		CancellationToken ct = default);
 }

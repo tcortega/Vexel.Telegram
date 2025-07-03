@@ -1,4 +1,4 @@
-﻿using Telegram.Bot.Types;
+using Telegram.Bot.Types;
 
 namespace Axon.Telegram.Commands.Contexts;
 
@@ -7,10 +7,10 @@ namespace Axon.Telegram.Commands.Contexts;
 /// </summary>
 public interface IMessageContext : IOperationContext
 {
-    /// <summary>
-    /// Gets the message associated with the context.
-    /// </summary>
-    public Message Message { get; }
+	/// <summary>
+	/// Gets the message associated with the context.
+	/// </summary>
+	Message Message { get; }
 }
 
 /// <summary>

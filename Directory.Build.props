@@ -1,45 +1,45 @@
 <Project>
-  <PropertyGroup>
-    <LegalAuthor>Tarcisio Ortega</LegalAuthor>
-    <LegalEmail>github.squishier824@passmail.net</LegalEmail>
-    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
-  </PropertyGroup>
+	<PropertyGroup>
+		<LegalAuthor>Tarcisio Ortega</LegalAuthor>
+		<LegalEmail>github.squishier824@passmail.net</LegalEmail>
+		<ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+	</PropertyGroup>
 
-  <PropertyGroup>
-	<LangVersion>latest</LangVersion>
+	<PropertyGroup>
+		<TargetFrameworks>netstandard2.1;net8.0;net9.0</TargetFrameworks>
+		<LangVersion>latest</LangVersion>
 
-	<Nullable>enable</Nullable>
-	<WarningsAsErrors>$(WarningsAsErrors);nullable;</WarningsAsErrors>
+		<Nullable>enable</Nullable>
+		<WarningsAsErrors>$(WarningsAsErrors);nullable;</WarningsAsErrors>
 
-	<ImplicitUsings>enable</ImplicitUsings>
+		<ImplicitUsings>enable</ImplicitUsings>
 
-	<AnalysisLevel>latest-all</AnalysisLevel>
-	<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+		<AnalysisLevel>latest-all</AnalysisLevel>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
-	<GenerateDocumentationFile>true</GenerateDocumentationFile>
-	<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
-	<IsPackable>false</IsPackable>
-	<WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
-  </PropertyGroup>
+		<IsPackable>false</IsPackable>
+		<WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
+	</PropertyGroup>
 
-  <!-- NuGet-related properties -->
-  <PropertyGroup>
-    <RepositoryUrl>https://github.com/tcortega/Axon.Telegram</RepositoryUrl>
-    <RepositoryBranch>master</RepositoryBranch>
+	<PropertyGroup Label="Nuget">
+		<RepositoryUrl>https://github.com/tcortega/Axon.Telegram</RepositoryUrl>
+		<RepositoryBranch>master</RepositoryBranch>
 
-    <PackageProjectUrl>https://github.com/tcortega/Axon.Telegram</PackageProjectUrl>
-    <PackageTags>axon;telegram;bot;api;</PackageTags>
-  </PropertyGroup>
+		<PackageProjectUrl>https://github.com/tcortega/Axon.Telegram</PackageProjectUrl>
+		<PackageTags>axon;telegram;bot;api;</PackageTags>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Remora.Results.Analyzers" PrivateAssets="all" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Remora.Results.Analyzers" PrivateAssets="all"/>
+	</ItemGroup>
 
-  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
-	<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-	<EmbedUntrackedSources>true</EmbedUntrackedSources>
-	<CollectCoverage>true</CollectCoverage>
-	<CoverletOutputFormat>opencover</CoverletOutputFormat>
-  </PropertyGroup>
+	<PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+		<CollectCoverage>true</CollectCoverage>
+		<CoverletOutputFormat>opencover</CoverletOutputFormat>
+	</PropertyGroup>
 </Project>

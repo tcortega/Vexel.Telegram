@@ -1,6 +1,6 @@
-﻿using Axon.Telegram.Commands.Contexts;
-using Telegram.Bot.Types;
+using Axon.Telegram.Commands.Contexts;
 using OneOf;
+using Telegram.Bot.Types;
 
 namespace Axon.Telegram.Interactivity.Contexts;
 
@@ -9,13 +9,13 @@ namespace Axon.Telegram.Interactivity.Contexts;
 /// </summary>
 public interface IInteractionContext : IOperationContext
 {
-    /// <summary>
-    /// Gets the interaction.
-    /// </summary>
-    OneOf<CallbackQuery, InlineQuery, ChosenInlineResult> Interaction { get; }
+	/// <summary>
+	/// Gets the interaction.
+	/// </summary>
+	OneOf<CallbackQuery, InlineQuery, ChosenInlineResult> Interaction { get; }
 
-    /// <summary>
-    /// Gets the user who initiated the interaction.
-    /// </summary>
-    User User { get; }
+	/// <summary>
+	/// Gets the user who initiated the interaction.
+	/// </summary>
+	User User { get; }
 }

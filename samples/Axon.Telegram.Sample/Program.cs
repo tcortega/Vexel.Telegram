@@ -12,33 +12,33 @@ using Microsoft.Extensions.Logging;
 using Remora.Commands.Extensions;
 
 var host = Host.CreateDefaultBuilder(args)
-    .AddTelegramService(_ => "<TOKEN_HERE>")
-    .ConfigureServices((_, services) =>
-    {
-        services.AddTelegramCommands();
-        services.AddTelegramInteractivity();
+	.AddTelegramService(_ => "7147223926:AAHCusb8jLfbcIahOTefzHz3RMFRPDTt2SU")
+	.ConfigureServices((ctx, services) =>
+	{
+		_ = services.AddTelegramCommands();
+		_ = services.AddTelegramInteractivity();
 
-        // Add custom responders
-        services.AddResponder<MessageResponder>();
+		// Add custom responders
+		_ = services.AddResponder<MessageResponder>();
 
-        // Register command groups
-        services.AddCommandTree()
-            .WithCommandGroup<GeneralCommands>();
+		// Register command groups
+		_ = services.AddCommandTree()
+			.WithCommandGroup<GeneralCommands>();
 
-        // Register interaction groups
-        services.AddInteractionGroup<SampleInteractions>();
-    })
-    .ConfigureLogging(logging =>
-    {
-        logging.ClearProviders();
-        logging.AddSimpleConsole(options =>
-        {
-            options.IncludeScopes = true;
-            options.SingleLine = true;
-            options.TimestampFormat = "hh:mm:ss ";
-        });
-    })
-    .Build();
+		// Register interaction groups
+		_ = services.AddInteractionGroup<SampleInteractions>();
+	})
+	.ConfigureLogging(logging =>
+	{
+		_ = logging.ClearProviders();
+		_ = logging.AddSimpleConsole(options =>
+		{
+			options.IncludeScopes = true;
+			options.SingleLine = true;
+			options.TimestampFormat = "hh:mm:ss ";
+		});
+	})
+	.Build();
 
 await using var scope = host.Services.CreateAsyncScope();
 var registrar = scope.ServiceProvider.GetService<CommandRegistrar>()!;

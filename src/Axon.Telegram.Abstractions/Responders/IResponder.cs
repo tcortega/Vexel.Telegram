@@ -1,4 +1,4 @@
-﻿using Remora.Results;
+using Remora.Results;
 
 namespace Axon.Telegram.Abstractions.Responders;
 
@@ -20,11 +20,11 @@ public interface IResponder;
 /// </remarks>
 public interface IResponder<in TUpdate> : IResponder
 {
-    /// <summary>
-    /// Responds to a given Telegram update.
-    /// </summary>
-    /// <param name="update">The update event to respond to.</param>
-    /// <param name="ct">A cancellation token for the operation.</param>
-    /// <returns>A <see cref="Task"/> that represents the asynchronous operation. The task result contains a <see cref="Result"/> indicating success or failure.</returns>
-    Task<Result> RespondAsync(TUpdate update, CancellationToken ct = default);
+	/// <summary>
+	/// Responds to a given Telegram update.
+	/// </summary>
+	/// <param name="update">The update event to respond to.</param>
+	/// <param name="ct">A cancellation token for the operation.</param>
+	/// <returns>A <see cref="Task"/> that represents the asynchronous operation. The task result contains a <see cref="Result"/> indicating success or failure.</returns>
+	Task<Result> RespondAsync(TUpdate update, CancellationToken ct = default);
 }

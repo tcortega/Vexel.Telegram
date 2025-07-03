@@ -1,4 +1,4 @@
-﻿namespace Axon.Telegram.Commands.Contexts;
+namespace Axon.Telegram.Commands.Contexts;
 
 /// <summary>
 /// Marker interface for various context types related to commands and interactions.
