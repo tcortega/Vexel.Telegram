@@ -6,7 +6,7 @@
 	</PropertyGroup>
 
 	<PropertyGroup>
-		<TargetFrameworks>netstandard2.1;net8.0;net9.0</TargetFrameworks>
+		<TargetFrameworks>net8.0;net9.0</TargetFrameworks>
 		<LangVersion>latest</LangVersion>
 
 		<Nullable>enable</Nullable>
@@ -34,12 +34,12 @@
 
 	<ItemGroup>
 		<PackageReference Include="Remora.Results.Analyzers" PrivateAssets="all"/>
+		<PackageReference Include="PolySharp" PrivateAssets="All" />
 	</ItemGroup>
 
-	<PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
-		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-		<EmbedUntrackedSources>true</EmbedUntrackedSources>
-		<CollectCoverage>true</CollectCoverage>
-		<CoverletOutputFormat>opencover</CoverletOutputFormat>
+	<PropertyGroup Label="MinVer">
+		<MinVerAutoIncrement>minor</MinVerAutoIncrement>
+		<MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
+		<MinVerTagPrefix>v</MinVerTagPrefix>
 	</PropertyGroup>
 </Project>

@@ -1,9 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
+			<IsPackable>true</IsPackable>
     </PropertyGroup>
 
     <ItemGroup>
@@ -12,6 +10,7 @@
       <PackageReference Include="Remora.Extensions.Options.Immutable" />
       <PackageReference Include="Remora.Results" />
       <PackageReference Include="Telegram.Bot" />
+			<PackageReference Include="MinVer" PrivateAssets="all"/>
     </ItemGroup>
 
     <ItemGroup>

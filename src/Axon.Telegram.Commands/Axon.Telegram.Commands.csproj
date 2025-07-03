@@ -1,16 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <AssemblyName>Axon.Telegram.Commands</AssemblyName>
-        <RootNamespace>Axon.Telegram.Commands</RootNamespace>
+			<IsPackable>true</IsPackable>
     </PropertyGroup>
 
     <ItemGroup>
       <PackageReference Include="Remora.Commands" />
       <PackageReference Include="Remora.Extensions.Options.Immutable" />
+			<PackageReference Include="MinVer" PrivateAssets="all"/>
     </ItemGroup>
 
     <ItemGroup>
