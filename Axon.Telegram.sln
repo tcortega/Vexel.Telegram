@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axon.Telegram.Hosting", "sr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axon.Telegram.Interactivity", "src\Axon.Telegram.Interactivity\Axon.Telegram.Interactivity.csproj", "{D7689B6E-A67C-4E82-9328-DD977F54BC55}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axon.Telegram.Extensions", "src\Axon.Telegram.Extensions\Axon.Telegram.Extensions.csproj", "{3D38B390-BB74-460F-9CE6-1C05EA42AF5E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,6 +54,10 @@ Global
 		{D7689B6E-A67C-4E82-9328-DD977F54BC55}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D7689B6E-A67C-4E82-9328-DD977F54BC55}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D7689B6E-A67C-4E82-9328-DD977F54BC55}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3D38B390-BB74-460F-9CE6-1C05EA42AF5E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D38B390-BB74-460F-9CE6-1C05EA42AF5E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D38B390-BB74-460F-9CE6-1C05EA42AF5E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D38B390-BB74-460F-9CE6-1C05EA42AF5E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{94BB0A93-B360-4F4B-8503-4EAE2F213904} = {28030632-1FE8-4F45-AD8A-019ECA127712}
@@ -61,5 +67,6 @@ Global
 		{87F46996-D209-41C4-8603-768940DE1F42} = {28030632-1FE8-4F45-AD8A-019ECA127712}
 		{524638A7-83E5-4079-996B-9D7026DEE1A0} = {28030632-1FE8-4F45-AD8A-019ECA127712}
 		{D7689B6E-A67C-4E82-9328-DD977F54BC55} = {28030632-1FE8-4F45-AD8A-019ECA127712}
+		{3D38B390-BB74-460F-9CE6-1C05EA42AF5E} = {28030632-1FE8-4F45-AD8A-019ECA127712}
 	EndGlobalSection
 EndGlobal

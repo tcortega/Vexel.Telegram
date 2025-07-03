@@ -5,9 +5,15 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
     </PropertyGroup>
-
+    
     <ItemGroup>
-      <PackageReference Include="Remora.Results" Version="8.0.0" />
+      <ProjectReference Include="..\Axon.Telegram.Abstractions\Axon.Telegram.Abstractions.csproj" />
+      <ProjectReference Include="..\Axon.Telegram.Commands\Axon.Telegram.Commands.csproj" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <PackageReference Include="JetBrains.Annotations" Version="2024.3.0" />
+      <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.6" />
     </ItemGroup>
 
 </Project>

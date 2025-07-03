@@ -12,6 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\src\Axon.Telegram.Interactivity\Axon.Telegram.Interactivity.csproj" />
       <ProjectReference Include="..\..\src\Axon.Telegram\Axon.Telegram.csproj" />
     </ItemGroup>
 

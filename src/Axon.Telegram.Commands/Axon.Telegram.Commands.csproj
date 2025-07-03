@@ -11,7 +11,6 @@
     <ItemGroup>
       <PackageReference Include="Remora.Commands" Version="11.0.2" />
       <PackageReference Include="Remora.Extensions.Options.Immutable" Version="2.0.0" />
-      <PackageReference Include="Telegram.Bot" Version="22.5.1" />
     </ItemGroup>
 
     <ItemGroup>

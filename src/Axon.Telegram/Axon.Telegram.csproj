@@ -2,22 +2,22 @@
 
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
+        <Description>Metapackage for Axon.Telegram's various components</Description>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+
+        <!-- No need for build output, since this is a metapackage -->
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+        <NoPackageAnalysis>true</NoPackageAnalysis>
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.6" />
-      <PackageReference Include="Remora.Commands" Version="11.0.2" />
-      <PackageReference Include="Remora.Results" Version="8.0.0" />
-      <PackageReference Include="Telegram.Bot" Version="22.5.1" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <ProjectReference Include="..\Axon.Telegram.Abstractions\Axon.Telegram.Abstractions.csproj" />
-      <ProjectReference Include="..\Axon.Telegram.Client\Axon.Telegram.Client.csproj" />
-      <ProjectReference Include="..\Axon.Telegram.Commands\Axon.Telegram.Commands.csproj" />
-      <ProjectReference Include="..\Axon.Telegram.Hosting\Axon.Telegram.Hosting.csproj" />
+        <ProjectReference Include="..\Axon.Telegram.Abstractions\Axon.Telegram.Abstractions.csproj"/>
+        <ProjectReference Include="..\Axon.Telegram.Client\Axon.Telegram.Client.csproj"/>
+        <ProjectReference Include="..\Axon.Telegram.Commands\Axon.Telegram.Commands.csproj"/>
+        <ProjectReference Include="..\Axon.Telegram.Interactivity\Axon.Telegram.Interactivity.csproj"/>
+        <ProjectReference Include="..\Axon.Telegram.Extensions\Axon.Telegram.Extensions.csproj"/>
+        <ProjectReference Include="..\Axon.Telegram.Hosting\Axon.Telegram.Hosting.csproj"/>
     </ItemGroup>
 
 </Project>
