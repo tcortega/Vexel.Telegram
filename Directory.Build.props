@@ -30,7 +30,12 @@
 
 		<PackageProjectUrl>https://github.com/tcortega/Vexel.Telegram</PackageProjectUrl>
 		<PackageTags>vexel;telegram;bot;api;</PackageTags>
+		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\..\images\icon.png" Pack="true" PackagePath="\"/>
+	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Remora.Results.Analyzers" PrivateAssets="all"/>
