@@ -1,0 +1,45 @@
+<Project>
+  <PropertyGroup>
+    <LegalAuthor>Tarcisio Ortega</LegalAuthor>
+    <LegalEmail>github.squishier824@passmail.net</LegalEmail>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+  </PropertyGroup>
+
+  <PropertyGroup>
+	<LangVersion>latest</LangVersion>
+
+	<Nullable>enable</Nullable>
+	<WarningsAsErrors>$(WarningsAsErrors);nullable;</WarningsAsErrors>
+
+	<ImplicitUsings>enable</ImplicitUsings>
+
+	<AnalysisLevel>latest-all</AnalysisLevel>
+	<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+	<GenerateDocumentationFile>true</GenerateDocumentationFile>
+	<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+	<IsPackable>false</IsPackable>
+	<WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
+  </PropertyGroup>
+
+  <!-- NuGet-related properties -->
+  <PropertyGroup>
+    <RepositoryUrl>https://github.com/tcortega/Axon.Telegram</RepositoryUrl>
+    <RepositoryBranch>master</RepositoryBranch>
+
+    <PackageProjectUrl>https://github.com/tcortega/Axon.Telegram</PackageProjectUrl>
+    <PackageTags>axon;telegram;bot;api;</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Remora.Results.Analyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+	<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+	<EmbedUntrackedSources>true</EmbedUntrackedSources>
+	<CollectCoverage>true</CollectCoverage>
+	<CoverletOutputFormat>opencover</CoverletOutputFormat>
+  </PropertyGroup>
+</Project>
