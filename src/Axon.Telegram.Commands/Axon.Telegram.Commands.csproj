@@ -1,18 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-			<IsPackable>true</IsPackable>
-    </PropertyGroup>
+	<PropertyGroup>
+		<IsPackable>true</IsPackable>
+	</PropertyGroup>
 
-    <ItemGroup>
-      <PackageReference Include="Remora.Commands" />
-      <PackageReference Include="Remora.Extensions.Options.Immutable" />
-			<PackageReference Include="MinVer" PrivateAssets="all"/>
-    </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Remora.Commands"/>
+		<PackageReference Include="Remora.Extensions.Options.Immutable"/>
+	</ItemGroup>
 
-    <ItemGroup>
-      <ProjectReference Include="..\Axon.Telegram.Abstractions\Axon.Telegram.Abstractions.csproj" />
-      <ProjectReference Include="..\Axon.Telegram.Client\Axon.Telegram.Client.csproj" />
-    </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Axon.Telegram.Abstractions\Axon.Telegram.Abstractions.csproj"/>
+		<ProjectReference Include="..\Axon.Telegram.Client\Axon.Telegram.Client.csproj"/>
+	</ItemGroup>
+
+	<PropertyGroup Label="MinVer">
+		<MinVerAutoIncrement>minor</MinVerAutoIncrement>
+		<MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
+		<MinVerTagPrefix>v</MinVerTagPrefix>
+	</PropertyGroup>
 
 </Project>
