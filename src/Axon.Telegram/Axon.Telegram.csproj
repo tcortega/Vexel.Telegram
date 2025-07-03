@@ -11,10 +11,6 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="MinVer" PrivateAssets="all"/>
-	</ItemGroup>
-
-	<ItemGroup>
 		<ProjectReference Include="..\Axon.Telegram.Abstractions\Axon.Telegram.Abstractions.csproj"/>
 		<ProjectReference Include="..\Axon.Telegram.Client\Axon.Telegram.Client.csproj"/>
 		<ProjectReference Include="..\Axon.Telegram.Commands\Axon.Telegram.Commands.csproj"/>
@@ -23,4 +19,11 @@
 		<ProjectReference Include="..\Axon.Telegram.Hosting\Axon.Telegram.Hosting.csproj"/>
 	</ItemGroup>
 
+
+	<PropertyGroup Label="MinVer">
+		<MinVerAutoIncrement>minor</MinVerAutoIncrement>
+		<MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
+		<MinVerTagPrefix>v</MinVerTagPrefix>
+	</PropertyGroup>
+	
 </Project>
