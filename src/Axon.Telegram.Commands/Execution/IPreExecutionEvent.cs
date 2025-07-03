@@ -1,4 +1,4 @@
-﻿using Axon.Telegram.Commands.Contexts;
+using Axon.Telegram.Commands.Contexts;
 using Remora.Results;
 
 namespace Axon.Telegram.Commands.Execution;
@@ -8,11 +8,11 @@ namespace Axon.Telegram.Commands.Execution;
 /// </summary>
 public interface IPreExecutionEvent
 {
-    /// <summary>
-    /// Runs before the attempted execution of a command.
-    /// </summary>
-    /// <param name="context">The command context.</param>
-    /// <param name="ct">The cancellation token of the current operation.</param>
-    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<Result> BeforeExecutionAsync(ICommandContext context, CancellationToken ct = default);
+	/// <summary>
+	/// Runs before the attempted execution of a command.
+	/// </summary>
+	/// <param name="context">The command context.</param>
+	/// <param name="ct">The cancellation token of the current operation.</param>
+	/// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+	Task<Result> BeforeExecutionAsync(ICommandContext context, CancellationToken ct = default);
 }

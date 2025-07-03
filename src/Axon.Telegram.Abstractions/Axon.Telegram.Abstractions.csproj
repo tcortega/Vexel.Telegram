@@ -1,14 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
-    <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-    </PropertyGroup>
-
-    <ItemGroup>
-      <PackageReference Include="Remora.Results" Version="8.0.0" />
-      <PackageReference Include="Telegram.Bot" Version="22.5.1" />
-    </ItemGroup>
+	
+	<ItemGroup>
+		<PackageReference Include="Remora.Results"/>
+		<PackageReference Include="Telegram.Bot"/>
+	</ItemGroup>
 
 </Project>

@@ -1,4 +1,4 @@
-﻿using Axon.Telegram.Client;
+using Axon.Telegram.Client;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -9,15 +9,15 @@ namespace Axon.Telegram.Hosting;
 /// </summary>
 public sealed class AxonService(AxonClient client, ILogger<AxonService> logger) : BackgroundService
 {
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        try
-        {
-            await client.RunAsync(stoppingToken);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "An error occurred while running the Axon Telegram client.");
-        }
-    }
+	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+	{
+		try
+		{
+			await client.RunAsync(stoppingToken);
+		}
+		catch (Exception ex)
+		{
+			logger.LogError(ex, "An error occurred while running the Axon Telegram client.");
+		}
+	}
 }

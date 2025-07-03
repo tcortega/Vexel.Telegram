@@ -1,4 +1,4 @@
-﻿using Remora.Commands.Services;
+using Remora.Commands.Services;
 using Telegram.Bot.Types;
 
 namespace Axon.Telegram.Commands.Contexts;
@@ -15,6 +15,6 @@ public interface ITextCommandContext : IMessageContext, ICommandContext;
 /// <param name="Command">The command associated with the context.</param>
 /// <param name="CancellationToken">The cancellation token associated with the context.</param>
 public sealed record TextCommandContext(
-    Message Message,
-    PreparedCommand Command,
-    CancellationToken CancellationToken) : ITextCommandContext;
+	Message Message,
+	PreparedCommand Command,
+	CancellationToken CancellationToken) : ITextCommandContext;

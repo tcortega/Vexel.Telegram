@@ -1,4 +1,4 @@
-﻿using Axon.Telegram.Abstractions.Responders;
+using Axon.Telegram.Abstractions.Responders;
 
 namespace Axon.Telegram.Client.Responders;
 

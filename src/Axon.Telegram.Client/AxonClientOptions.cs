@@ -1,4 +1,4 @@
-﻿using Telegram.Bot.Polling;
+using Telegram.Bot.Polling;
 
 namespace Axon.Telegram.Client;
 
@@ -7,14 +7,11 @@ namespace Axon.Telegram.Client;
 /// </summary>
 public record AxonClientOptions
 {
-    /// <summary>
-    /// Gets or sets the options for the update receiver.
-    /// </summary>
-    /// <remarks>
-    /// Defaults to <see cref="ReceiverOptions"/> with <c>DropPendingUpdates</c> set to <c>true</c>.
-    /// </remarks>
-    public ReceiverOptions ReceiverOptions { get; set; } = new()
-    {
-        DropPendingUpdates = true
-    };
+	/// <summary>
+	/// Gets or sets the options for the update receiver.
+	/// </summary>
+	/// <remarks>
+	/// Defaults to <see cref="ReceiverOptions"/> with <c>DropPendingUpdates</c> set to <c>true</c>.
+	/// </remarks>
+	public ReceiverOptions ReceiverOptions { get; set; } = new() { DropPendingUpdates = true, };
 }
