@@ -6,7 +6,7 @@ on:
     branches:
       - 'master'
     paths-ignore:
-      - '**/readme.md'
+      - '**/*.md'
   pull_request:
     types: [ opened, synchronize, reopened ]
 
