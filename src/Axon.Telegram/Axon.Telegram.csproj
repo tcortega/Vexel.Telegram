@@ -3,8 +3,6 @@
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
         <Description>Metapackage for Axon.Telegram's various components</Description>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
 
         <!-- No need for build output, since this is a metapackage -->
         <IncludeBuildOutput>false</IncludeBuildOutput>

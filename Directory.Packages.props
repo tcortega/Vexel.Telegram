@@ -1,0 +1,15 @@
+<Project>
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.6" />
+        <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.6" />
+        <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.6" />
+        <PackageVersion Include="Remora.Extensions.Options.Immutable" Version="2.0.0" />
+        <PackageVersion Include="Remora.Results" Version="8.0.0" />
+        <PackageVersion Include="Remora.Commands" Version="11.0.2" />
+        <PackageVersion Include="Telegram.Bot" Version="22.5.1" />
+    </ItemGroup>
+</Project>
