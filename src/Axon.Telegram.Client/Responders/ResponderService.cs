@@ -51,7 +51,7 @@ public class ResponderService : IResponderTypeRepository
 				ResponderGroup.Early => _registeredEarlyResponderTypes,
 				ResponderGroup.Normal => _registeredResponderTypes,
 				ResponderGroup.Late => _registeredLateResponderTypes,
-				_ => throw new ArgumentOutOfRangeException(nameof(group), group, null)
+				_ => throw new ArgumentOutOfRangeException(nameof(group), group, "Invalid responder group."),
 			};
 
 			if (!registeredTypes.TryGetValue(responderInterface, out var responderTypeList))

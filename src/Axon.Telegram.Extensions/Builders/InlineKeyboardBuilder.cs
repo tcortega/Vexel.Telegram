@@ -108,9 +108,4 @@ public class InlineKeyboardBuilder : BuilderBase<InlineKeyboardMarkup>
 	{
 		return new(_rows);
 	}
-
-	public InlineKeyboardBuilder AddUrlButton(string text, Uri url)
-	{
-		throw new NotImplementedException();
-	}
 }

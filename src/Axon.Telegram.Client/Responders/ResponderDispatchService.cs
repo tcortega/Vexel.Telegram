@@ -197,8 +197,8 @@ public class ResponderDispatchService : IAsyncDisposable, IResponderDispatchServ
 				UpdateType.EditedBusinessMessage => DispatchUpdateAsync(update.EditedBusinessMessage!),
 				UpdateType.DeletedBusinessMessages => DispatchUpdateAsync(update.DeletedBusinessMessages!),
 				UpdateType.PurchasedPaidMedia => DispatchUpdateAsync(update.PurchasedPaidMedia!),
-				UpdateType.Unknown => throw new NotImplementedException(),
-				_ => LogAndReturnUnhandled(update.Type)
+				UpdateType.Unknown => throw new NotSupportedException("Unknown update type received."),
+				_ => LogAndReturnUnhandled(update.Type),
 			};
 
 			return responderTask;
@@ -218,7 +218,7 @@ public class ResponderDispatchService : IAsyncDisposable, IResponderDispatchServ
 		var responderGroups = new[]
 		{
 			_responderTypeRepository.GetEarlyResponderTypes<TUpdate>(), _responderTypeRepository.GetResponderTypes<TUpdate>(),
-			_responderTypeRepository.GetLateResponderTypes<TUpdate>()
+			_responderTypeRepository.GetLateResponderTypes<TUpdate>(),
 		};
 
 		var results = new List<Result>();

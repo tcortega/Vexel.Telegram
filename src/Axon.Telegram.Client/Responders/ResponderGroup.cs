@@ -19,5 +19,5 @@ public enum ResponderGroup
 	/// <summary>
 	/// This responder runs after all other groups.
 	/// </summary>
-	Late
+	Late,
 }

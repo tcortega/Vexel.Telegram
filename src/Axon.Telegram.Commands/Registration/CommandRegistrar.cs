@@ -11,7 +11,7 @@ namespace Axon.Telegram.Commands.Registration;
 /// <summary>
 /// Service that registers commands with Telegram by traversing the command tree.
 /// </summary>
-public sealed class CommandRegistrar(
+public class CommandRegistrar(
 	ILogger<CommandRegistrar> logger,
 	CommandService commandService,
 	ITelegramBotClient botClient)
@@ -24,7 +24,7 @@ public sealed class CommandRegistrar(
 	{
 		// The CommandService holds a TreeAccessor, which is the correct way to get command trees.
 		// We get the default tree by passing `null` as the name.
-		if (!commandService.TreeAccessor.TryGetNamedTree(null, out var tree))
+		if (!commandService.TreeAccessor.TryGetNamedTree(treeName: null, out var tree))
 		{
 			logger.LogWarning("Could not find the default command tree. Commands will not be registered.");
 			return;
@@ -72,16 +72,12 @@ public sealed class CommandRegistrar(
 			{
 				// The description is found by looking for a DescriptionAttribute in the node's Attributes list.
 				var description = commandNode.Attributes
-									  .OfType<DescriptionAttribute>()
-									  .FirstOrDefault()
-									  ?.Description
-								  ?? "No description available.";
+						.OfType<DescriptionAttribute>()
+						.FirstOrDefault()
+						?.Description
+					?? "No description available.";
 
-				discoveredCommands.Add(new()
-				{
-					Command = path.ToString().ToLowerInvariant(),
-					Description = description
-				});
+				discoveredCommands.Add(new() { Command = path.ToString().ToLowerInvariant(), Description = description });
 			}
 
 			// If the node is a group, we continue traversing its children.

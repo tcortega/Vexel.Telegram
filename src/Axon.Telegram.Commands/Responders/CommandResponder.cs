@@ -64,7 +64,7 @@ public class CommandResponder(
 			services,
 			_tokenizerOptions,
 			_treeSearchOptions,
-			null,
+			treeName: null,
 			ct
 		);
 

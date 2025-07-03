@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Axon.Telegram.Interactivity;
 
 /// <summary>
 /// Provides helper methods for working with interaction IDs.
 /// </summary>
+[SuppressMessage("Usage", "MA0015:Specify the parameter name in ArgumentException")]
 public static class InteractionIdHelper
 {
 	/// <summary>
