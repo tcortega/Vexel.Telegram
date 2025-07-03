@@ -106,7 +106,7 @@ public class SampleInteractions(ITelegramBotClient botClient, IInteractionComman
 			"yellow" => "🟡",
 			"purple" => "🟣",
 			"orange" => "🟠",
-			_ => "⚪"
+			_ => "⚪",
 		};
 
 		await botClient.AnswerCallbackQuery(
@@ -173,7 +173,7 @@ public class SampleInteractions(ITelegramBotClient botClient, IInteractionComman
 	{
 		var callbackQuery = context.Interaction.AsT0;
 
-		if (!int.TryParse(countStr, out var count))
+		if (!int.TryParse(countStr, CultureInfo.CurrentCulture, out var count))
 		{
 			count = 0;
 		}
@@ -272,7 +272,7 @@ public class SampleInteractions(ITelegramBotClient botClient, IInteractionComman
 				id: "random",
 				title: "Random Number",
 				inputMessageContent: new InputTextMessageContent($"🎲 Random number: **{Random.Shared.Next(1, 100)}**")
-			)
+			),
 		};
 
 		await botClient.AnswerInlineQuery(

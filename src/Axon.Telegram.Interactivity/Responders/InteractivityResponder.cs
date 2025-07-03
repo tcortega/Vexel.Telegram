@@ -96,7 +96,7 @@ internal sealed partial class InteractivityResponder(
 
 		commandPath = ExtractState(commandPath, out var state);
 
-		var parameters = new Dictionary<string, IReadOnlyList<string>>();
+		var parameters = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
 		if (state is not null)
 		{
 			parameters.Add("state", [state]);
@@ -107,7 +107,7 @@ internal sealed partial class InteractivityResponder(
 
 	private static string[] ExtractState(string[] commandPath, out string? state)
 	{
-		if (commandPath.Length <= 0 || !commandPath[0].StartsWith(Constants.StatePrefix, StringComparison.OrdinalIgnoreCase))
+		if (commandPath.Length <= 0 || !commandPath[0].StartsWith(Constants.StatePrefix, StringComparison.Ordinal))
 		{
 			state = null;
 			return commandPath;

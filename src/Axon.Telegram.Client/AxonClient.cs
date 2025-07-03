@@ -58,7 +58,7 @@ public class AxonClient(
 		{
 			ApiRequestException apiRequestException =>
 				$"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n{apiRequestException.Message}",
-			_ => exception.ToString()
+			_ => exception.ToString(),
 		};
 
 		logger.LogError(exception, "A polling error occurred: {ErrorMessage}", errorMessage);

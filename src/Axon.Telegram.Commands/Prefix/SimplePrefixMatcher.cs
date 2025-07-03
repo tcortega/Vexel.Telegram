@@ -27,7 +27,7 @@ public class SimplePrefixMatcher(IOptions<CommandResponderOptions> options) : IC
 			return new((true, 0));
 		}
 
-		if (!content.StartsWith(_options.Prefix, StringComparison.OrdinalIgnoreCase))
+		if (!content.StartsWith(_options.Prefix, StringComparison.Ordinal))
 		{
 			return new((false, -1));
 		}
