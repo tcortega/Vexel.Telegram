@@ -297,7 +297,7 @@ dotnet_diagnostic.CS1998.severity = error # CS1998: Async method lacks 'await' o
 dotnet_diagnostic.CS4014.severity = error # CS4014: Because this call is not awaited, execution of the current method continues before the call is completed
 dotnet_diagnostic.CA2007.severity = none # CA2007: Consider calling ConfigureAwait on the awaited task
 
-# Axon.Telegram.Command relies on nested types
+# Vexel.Telegram.Command relies on nested types
 dotnet_diagnostic.CA1034.severity = none # CA1034: Nested types should not be visible
 
 # No need for cryptographically secure anything in this project
@@ -318,7 +318,7 @@ dotnet_diagnostic.MA0048.severity = none
 dotnet_diagnostic.MA0051.severity = none
 dotnet_diagnostic.MA0053.severity = none # The performance gain is negligible comparible to the extensability the project gains
 
-# Axon.Telegram relies heavily on abstractions
+# Vexel.Telegram relies heavily on abstractions
 dotnet_diagnostic.CA1000.severity = none
 dotnet_diagnostic.CA1040.severity = none # CA1040: Avoid empty interfaces
 
