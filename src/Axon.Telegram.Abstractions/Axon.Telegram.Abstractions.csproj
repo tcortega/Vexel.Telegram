@@ -1,8 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-	
+	<PropertyGroup>
+		<IsPackable>true</IsPackable>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<PackageReference Include="Remora.Results"/>
 		<PackageReference Include="Telegram.Bot"/>
+		<PackageReference Include="MinVer" PrivateAssets="all"/>
 	</ItemGroup>
 
 </Project>

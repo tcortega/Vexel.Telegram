@@ -342,3 +342,4 @@ dotnet_diagnostic.CA1054.severity = suggestion
 dotnet_diagnostic.CA2234.severity = none # CA2234: Pass system uri objects instead of strings
 
 dotnet_diagnostic.CA1016.severity = none
+dotnet_diagnostic.IDE0055.severity = none

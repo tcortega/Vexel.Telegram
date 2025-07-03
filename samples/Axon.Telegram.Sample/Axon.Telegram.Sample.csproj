@@ -1,19 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <OutputType>Exe</OutputType>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-    </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
 
-    <ItemGroup>
-      <PackageReference Include="Microsoft.Extensions.Hosting" />
-    </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Hosting"/>
+	</ItemGroup>
 
-    <ItemGroup>
-      <ProjectReference Include="..\..\src\Axon.Telegram.Interactivity\Axon.Telegram.Interactivity.csproj" />
-      <ProjectReference Include="..\..\src\Axon.Telegram\Axon.Telegram.csproj" />
-    </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Axon.Telegram.Interactivity\Axon.Telegram.Interactivity.csproj"/>
+		<ProjectReference Include="..\..\src\Axon.Telegram\Axon.Telegram.csproj"/>
+	</ItemGroup>
 
 </Project>
