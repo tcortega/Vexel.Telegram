@@ -8,8 +8,9 @@
 [![GitHub Actions](https://github.com/tcortega/Vexel.Telegram/actions/workflows/build.yml/badge.svg)](https://github.com/tcortega/Vexel.Telegram/actions)
 ---
 
-Vexel.Telegram is a C# library for building Telegram bots using the Vexel framework. It is built to fulfill a need for
-robust, feature-complete, highly available and concurrent bots.
+Vexel.Telegram is a C# library for building Telegram bots using
+the [Telegram.Bot](https://github.com/TelegramBots/Telegram.Bot) library.
+It is built to fulfill a need for robust, feature-complete, highly available and concurrent bots.
 
 It is heavily based on [Remora.Discord](https://github.com/Remora/Remora.Discord), a Discord bot framework, and shares
 many of its design principles and philosophies.
