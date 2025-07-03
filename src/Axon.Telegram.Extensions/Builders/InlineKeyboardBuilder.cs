@@ -1,12 +1,13 @@
-using Axon.Telegram.Interactivity.Attributes;
+using Axon.Telegram.Interactivity;
+using Remora.Results;
 using Telegram.Bot.Types.ReplyMarkups;
 
-namespace Axon.Telegram.Interactivity.Builders;
+namespace Axon.Telegram.Extensions.Builders;
 
 /// <summary>
 /// Builder for creating inline keyboards with interaction support.
 /// </summary>
-public class InlineKeyboardBuilder
+public class InlineKeyboardBuilder : BuilderBase<InlineKeyboardMarkup>
 {
     private readonly List<List<InlineKeyboardButton>> _rows;
     private List<InlineKeyboardButton>? _currentRow;
@@ -104,7 +105,7 @@ public class InlineKeyboardBuilder
     /// Builds the inline keyboard markup.
     /// </summary>
     /// <returns>The inline keyboard markup.</returns>
-    public InlineKeyboardMarkup Build()
+    public override InlineKeyboardMarkup Build()
     {
         return new(_rows);
     }

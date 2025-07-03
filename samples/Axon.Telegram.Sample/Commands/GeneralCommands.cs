@@ -1,12 +1,11 @@
 ﻿using System.ComponentModel;
 using Axon.Telegram.Commands.Contexts;
-using Axon.Telegram.Interactivity.Builders;
+using Axon.Telegram.Extensions.Builders;
 using Remora.Commands.Attributes;
 using Remora.Commands.Groups;
 using Remora.Results;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.ReplyMarkups;
 
 namespace Axon.Telegram.Sample.Commands;
 
