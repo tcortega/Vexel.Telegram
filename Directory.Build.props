@@ -25,11 +25,11 @@
 	</PropertyGroup>
 
 	<PropertyGroup Label="Nuget">
-		<RepositoryUrl>https://github.com/tcortega/Axon.Telegram</RepositoryUrl>
+		<RepositoryUrl>https://github.com/tcortega/Vexel.Telegram</RepositoryUrl>
 		<RepositoryBranch>master</RepositoryBranch>
 
-		<PackageProjectUrl>https://github.com/tcortega/Axon.Telegram</PackageProjectUrl>
-		<PackageTags>axon;telegram;bot;api;</PackageTags>
+		<PackageProjectUrl>https://github.com/tcortega/Vexel.Telegram</PackageProjectUrl>
+		<PackageTags>vexel;telegram;bot;api;</PackageTags>
 	</PropertyGroup>
 
 	<ItemGroup>
