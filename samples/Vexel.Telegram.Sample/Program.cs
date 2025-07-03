@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 using Remora.Commands.Extensions;
 
 var host = Host.CreateDefaultBuilder(args)
-	.AddTelegramService(_ => "7147223926:AAHCusb8jLfbcIahOTefzHz3RMFRPDTt2SU")
+	.AddTelegramService(_ => "<BOT_TOKEN>")
 	.ConfigureServices((ctx, services) =>
 	{
 		_ = services.AddTelegramCommands();
