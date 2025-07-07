@@ -32,8 +32,7 @@ public class ConversationStateService(IMemoryCache cache) : IConversationStateSe
 	}
 
 	/// <summary>
-	/// Builds the key used for caching purposes only, is not related to the
-	/// resolved handler ID & path. 
+	/// Builds the key used for caching purposes only, is not related to the resolved handler ID and path.
 	/// </summary>
 	/// <param name="chatId">The chat ID.</param>
 	/// <param name="userId">The user ID.</param>
