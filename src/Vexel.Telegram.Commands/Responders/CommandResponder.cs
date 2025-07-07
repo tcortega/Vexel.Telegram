@@ -93,7 +93,7 @@ public class CommandResponder(
 
 		var preparedCommand = prepareCommand.Entity;
 
-		var commandContext = new TextCommandContext(context.Message, preparedCommand, ct);
+		var commandContext = new TextCommandContext(context.Message, preparedCommand);
 		contextInjector.Context = commandContext;
 
 		var preExecution = await ExecutionEventCollectorService.RunPreExecutionEvents(services, commandContext, ct);

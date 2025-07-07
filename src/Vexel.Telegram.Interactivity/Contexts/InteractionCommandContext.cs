@@ -10,10 +10,8 @@ namespace Vexel.Telegram.Interactivity.Contexts;
 /// <param name="Interaction">The actual update payload.</param>
 /// <param name="User">The user who triggered the interaction.</param>
 /// <param name="Command">The command associated with the context.</param>
-/// <param name="CancellationToken">The cancellation token associated with the context.</param>
 public record InteractionCommandContext(
 	OneOf<CallbackQuery, InlineQuery, ChosenInlineResult> Interaction,
 	User User,
-	PreparedCommand Command,
-	CancellationToken CancellationToken
+	PreparedCommand Command
 ) : InteractionContext(Interaction, User), IInteractionCommandContext;
