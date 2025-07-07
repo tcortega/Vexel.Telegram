@@ -6,6 +6,7 @@ using Remora.Commands.Groups;
 using Remora.Results;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
+using Vexel.Telegram.Sample.Interactions;
 
 namespace Vexel.Telegram.Sample.Commands;
 
@@ -79,8 +80,27 @@ public class GeneralCommands(ITelegramBotClient botClient, ITextCommandContext c
 		(
 			chatId: context.Message.Chat.Id,
 			text: "🔍 **Inline Query Demo**\n\nClick the buttons below to try inline queries!\n\n" +
-				  "You can also try typing `@yourbotname query` in any chat to use inline mode.",
+			"You can also try typing `@yourbotname query` in any chat to use inline mode.",
 			parseMode: ParseMode.Markdown,
+			replyMarkup: keyboard,
+			cancellationToken: CancellationToken
+		);
+
+		return Result.FromSuccess();
+	}
+
+	[Command("payment"), Description("Starts a sample payment workflow with the TextResponse usage")]
+	public async Task<IResult> PaymentAsync()
+	{
+		var keyboard = new InlineKeyboardBuilder()
+			.AddRow()
+			.AddCallbackButton("💳 Start Payment", nameof(PaymentInteractions.StartPaymentAsync))
+			.Build();
+
+		_ = await botClient.SendMessage
+		(
+			chatId: context.Message.Chat.Id,
+			text: "This sample payment workflow demonstrates how you can capture text inputs and route them to the proper handlers.",
 			replyMarkup: keyboard,
 			cancellationToken: CancellationToken
 		);

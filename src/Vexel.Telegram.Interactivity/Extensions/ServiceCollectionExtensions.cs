@@ -5,6 +5,7 @@ using Vexel.Telegram.Interactivity.Responders;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Remora.Commands.Extensions;
+using Vexel.Telegram.Interactivity.Conversation;
 
 namespace Vexel.Telegram.Interactivity.Extensions;
 
@@ -22,6 +23,8 @@ public static class ServiceCollectionExtensions
 	{
 		_ = services.AddMemoryCache();
 		_ = services.AddResponder<InteractivityResponder>();
+
+		services.TryAddSingleton<IConversationStateService, ConversationStateService>();
 
 		services
 			.TryAddTransient
