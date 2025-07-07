@@ -11,9 +11,4 @@ public interface ICommandContext : IOperationContext
 	/// Gets the command associated with the context.
 	/// </summary>
 	PreparedCommand Command { get; }
-
-	/// <summary>
-	/// Gets a cancellation token for the current operation.
-	/// </summary>
-	CancellationToken CancellationToken { get; }
 }

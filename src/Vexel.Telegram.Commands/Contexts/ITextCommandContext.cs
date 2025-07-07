@@ -13,8 +13,7 @@ public interface ITextCommandContext : IMessageContext, ICommandContext;
 /// </summary>
 /// <param name="Message">The message that triggered the command.</param>
 /// <param name="Command">The command associated with the context.</param>
-/// <param name="CancellationToken">The cancellation token associated with the context.</param>
 public sealed record TextCommandContext(
 	Message Message,
-	PreparedCommand Command,
-	CancellationToken CancellationToken) : ITextCommandContext;
+	PreparedCommand Command
+) : ITextCommandContext;

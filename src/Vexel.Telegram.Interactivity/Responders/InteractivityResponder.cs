@@ -69,7 +69,7 @@ internal sealed partial class InteractivityResponder(
 		var preparedCommand = prepareCommand.Entity;
 
 		var commandContext =
-			new InteractionCommandContext(operationContext.Interaction, operationContext.User, preparedCommand, ct);
+			new InteractionCommandContext(operationContext.Interaction, operationContext.User, preparedCommand);
 
 		contextInjection.Context = commandContext;
 		var preExecution = await ExecutionEventCollectorService.RunPreExecutionEvents(services, commandContext, ct);
