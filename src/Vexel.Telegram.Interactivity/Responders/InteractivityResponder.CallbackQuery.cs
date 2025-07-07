@@ -1,9 +1,8 @@
 using Vexel.Telegram.Abstractions.Responders;
-using Vexel.Telegram.Interactivity.Contexts;
 using Remora.Results;
 using Telegram.Bot.Types;
 
-namespace Vexel.Telegram.Interactivity.Responders;
+namespace Vexel.Telegram.Interactivity;
 
 internal partial class InteractivityResponder : IResponder<CallbackQuery>
 {

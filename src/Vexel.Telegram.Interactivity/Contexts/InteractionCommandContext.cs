@@ -2,7 +2,7 @@ using OneOf;
 using Remora.Commands.Services;
 using Telegram.Bot.Types;
 
-namespace Vexel.Telegram.Interactivity.Contexts;
+namespace Vexel.Telegram.Interactivity;
 
 /// <summary>
 /// Represents contextual information about an ongoing command operation on an interaction.

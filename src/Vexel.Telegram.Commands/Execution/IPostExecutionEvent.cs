@@ -1,7 +1,6 @@
-using Vexel.Telegram.Commands.Contexts;
 using Remora.Results;
 
-namespace Vexel.Telegram.Commands.Execution;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Represents the public interface of a service that can perform a post-execution event.

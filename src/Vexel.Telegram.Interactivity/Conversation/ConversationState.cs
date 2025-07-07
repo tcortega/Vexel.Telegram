@@ -1,4 +1,4 @@
-﻿namespace Vexel.Telegram.Interactivity.Conversation;
+﻿namespace Vexel.Telegram.Interactivity;
 
 /// <summary>
 /// Represents the state of an ongoing conversation, indicating which text response is being awaited.

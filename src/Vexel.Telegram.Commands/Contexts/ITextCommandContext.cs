@@ -1,7 +1,7 @@
 using Remora.Commands.Services;
 using Telegram.Bot.Types;
 
-namespace Vexel.Telegram.Commands.Contexts;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Represents contextual information about a currently executing text-based command.

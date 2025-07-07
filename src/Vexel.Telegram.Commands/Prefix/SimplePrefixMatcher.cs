@@ -1,8 +1,7 @@
-using Vexel.Telegram.Commands.Responders;
 using Microsoft.Extensions.Options;
 using Remora.Results;
 
-namespace Vexel.Telegram.Commands.Prefix;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Provides simple static prefix matching.

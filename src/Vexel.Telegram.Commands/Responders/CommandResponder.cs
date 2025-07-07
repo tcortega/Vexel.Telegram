@@ -1,8 +1,5 @@
 using Vexel.Telegram.Abstractions.Responders;
-using Vexel.Telegram.Commands.Contexts;
-using Vexel.Telegram.Commands.Execution;
 using Vexel.Telegram.Commands.Extensions;
-using Vexel.Telegram.Commands.Prefix;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Remora.Commands.Services;
@@ -11,7 +8,7 @@ using Remora.Commands.Trees;
 using Remora.Results;
 using Telegram.Bot.Types;
 
-namespace Vexel.Telegram.Commands.Responders;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// A responder that listens for messages and executes commands.

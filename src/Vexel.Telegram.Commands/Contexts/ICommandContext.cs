@@ -1,6 +1,6 @@
 using Remora.Commands.Services;
 
-namespace Vexel.Telegram.Commands.Contexts;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Represents the context of a command's execution.
