@@ -18,15 +18,13 @@ var host = Host.CreateDefaultBuilder(args)
 		_ = services.AddTelegramCommands();
 		_ = services.AddTelegramInteractivity();
 
-		// Add custom responders
 		_ = services.AddResponder<MessageResponder>();
 
-		// Register command groups
 		_ = services.AddCommandTree()
 			.WithCommandGroup<GeneralCommands>();
 
-		// Register interaction groups
 		_ = services.AddInteractionGroup<SampleInteractions>();
+		_ = services.AddInteractionGroup<PaymentInteractions>();
 	})
 	.ConfigureLogging(logging =>
 	{

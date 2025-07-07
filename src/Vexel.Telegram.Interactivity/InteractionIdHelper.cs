@@ -47,6 +47,19 @@ public static class InteractionIdHelper
 	public static string CreateInlineQueryId(string id, string? state = null, params string[] path)
 		=> FormatId(Constants.InlineQueryPrefix, id, state, path);
 
+	/// <summary>
+	/// Creates the ID for a future text message.
+	/// </summary>
+	/// <param name="id">The ID of the handler.</param>
+	/// <param name="state">Optional state data.</param>
+	/// <param name="path">
+	/// The group path to the component; that is, the outer groups that must be traversed before reaching the group
+	/// where the component's handler is declared.
+	/// </param>
+	/// <returns>The formatted message ID.</returns>
+	public static string CreateTextResponseId(string id, string? state = null, params string[] path)
+		=> FormatId(Constants.TextResponsePrefix, id, state, path);
+
 	private static string FormatId(string type, string name, string? state, string[] path)
 	{
 		ValidateParameters(type, name, state, path);

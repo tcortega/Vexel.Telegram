@@ -7,6 +7,7 @@ using Remora.Commands.Services;
 using Remora.Commands.Tokenization;
 using Remora.Commands.Trees;
 using Remora.Results;
+using Vexel.Telegram.Interactivity.Conversation;
 using PathAndParameters =
 	(string[] CommandPath,
 	System.Collections.Generic.Dictionary<string, System.Collections.Generic.IReadOnlyList<string>> Parameters);
@@ -14,9 +15,10 @@ using PathAndParameters =
 namespace Vexel.Telegram.Interactivity.Responders;
 
 internal sealed partial class InteractivityResponder(
-	CommandService commandService,
 	IServiceProvider services,
+	CommandService commandService,
 	ContextInjectionService contextInjection,
+	IConversationStateService conversationStateService,
 	IOptions<TokenizerOptions> tokenizerOptions,
 	IOptions<TreeSearchOptions> treeSearchOptions
 )

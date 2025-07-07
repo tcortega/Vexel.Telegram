@@ -12,7 +12,7 @@ public interface IInteractionContext : IOperationContext
 	/// <summary>
 	/// Gets the interaction.
 	/// </summary>
-	OneOf<CallbackQuery, InlineQuery, ChosenInlineResult> Interaction { get; }
+	OneOf<CallbackQuery, InlineQuery, ChosenInlineResult, Message> Interaction { get; }
 
 	/// <summary>
 	/// Gets the user who initiated the interaction.

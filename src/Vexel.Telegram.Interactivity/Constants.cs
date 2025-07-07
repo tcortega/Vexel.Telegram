@@ -29,4 +29,9 @@ public static class Constants
 	/// Gets the prefix used for inline queries.
 	/// </summary>
 	public const string InlineQueryPrefix = "inline";
+
+	/// <summary>
+	/// Gets the prefix used for inline queries.
+	/// </summary>
+	public const string TextResponsePrefix = "textresponse";
 }

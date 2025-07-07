@@ -8,5 +8,5 @@ namespace Vexel.Telegram.Interactivity.Contexts;
 /// </summary>
 /// <param name="Interaction">The actual update payload.</param>
 /// <param name="User">The user who triggered the interaction.</param>
-public record InteractionContext(OneOf<CallbackQuery, InlineQuery, ChosenInlineResult> Interaction, User User)
+public record InteractionContext(OneOf<CallbackQuery, InlineQuery, ChosenInlineResult, Message> Interaction, User User)
 	: IInteractionContext;

@@ -11,7 +11,7 @@ namespace Vexel.Telegram.Interactivity.Contexts;
 /// <param name="User">The user who triggered the interaction.</param>
 /// <param name="Command">The command associated with the context.</param>
 public record InteractionCommandContext(
-	OneOf<CallbackQuery, InlineQuery, ChosenInlineResult> Interaction,
+	OneOf<CallbackQuery, InlineQuery, ChosenInlineResult, Message> Interaction,
 	User User,
 	PreparedCommand Command
 ) : InteractionContext(Interaction, User), IInteractionCommandContext;
