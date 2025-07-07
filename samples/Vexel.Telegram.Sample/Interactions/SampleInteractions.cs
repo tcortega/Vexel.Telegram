@@ -2,8 +2,6 @@ using System.ComponentModel;
 using System.Globalization;
 using Vexel.Telegram.Extensions.Builders;
 using Vexel.Telegram.Interactivity;
-using Vexel.Telegram.Interactivity.Attributes;
-using Vexel.Telegram.Interactivity.Contexts;
 using Remora.Commands.Attributes;
 using Remora.Results;
 using Telegram.Bot;

@@ -1,6 +1,6 @@
 ﻿using Remora.Results;
 
-namespace Vexel.Telegram.Interactivity.Conversation;
+namespace Vexel.Telegram.Interactivity;
 
 /// <summary>
 /// Defines a service for managing the state of ongoing user conversations.

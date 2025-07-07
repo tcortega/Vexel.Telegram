@@ -1,6 +1,6 @@
 using Telegram.Bot.Types;
 
-namespace Vexel.Telegram.Commands.Contexts;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Represents contextual information about an ongoing operation on a message.

@@ -1,8 +1,7 @@
-using Vexel.Telegram.Commands.Contexts;
 using Microsoft.Extensions.DependencyInjection;
 using Remora.Results;
 
-namespace Vexel.Telegram.Commands.Execution;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Collects execution event services for simpler conjoined execution.

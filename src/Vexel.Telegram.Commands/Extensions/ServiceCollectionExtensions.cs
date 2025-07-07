@@ -1,9 +1,4 @@
 using Vexel.Telegram.Client.Extensions;
-using Vexel.Telegram.Commands.Contexts;
-using Vexel.Telegram.Commands.Execution;
-using Vexel.Telegram.Commands.Prefix;
-using Vexel.Telegram.Commands.Registration;
-using Vexel.Telegram.Commands.Responders;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Remora.Commands.Extensions;

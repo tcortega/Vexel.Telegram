@@ -1,4 +1,4 @@
-namespace Vexel.Telegram.Commands.Contexts;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Assists with injection of an <see cref="IOperationContext"/> into a service provider.

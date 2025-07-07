@@ -1,18 +1,15 @@
-using Vexel.Telegram.Commands.Contexts;
-using Vexel.Telegram.Commands.Execution;
+using Vexel.Telegram.Commands;
 using Vexel.Telegram.Commands.Extensions;
-using Vexel.Telegram.Interactivity.Contexts;
 using Microsoft.Extensions.Options;
 using Remora.Commands.Services;
 using Remora.Commands.Tokenization;
 using Remora.Commands.Trees;
 using Remora.Results;
-using Vexel.Telegram.Interactivity.Conversation;
 using PathAndParameters =
 	(string[] CommandPath,
 	System.Collections.Generic.Dictionary<string, System.Collections.Generic.IReadOnlyList<string>> Parameters);
 
-namespace Vexel.Telegram.Interactivity.Responders;
+namespace Vexel.Telegram.Interactivity;
 
 internal sealed partial class InteractivityResponder(
 	IServiceProvider services,

@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 using Remora.Results;
 
-namespace Vexel.Telegram.Interactivity.Conversation;
+namespace Vexel.Telegram.Interactivity;
 
 /// <inheritdoc />
 public class ConversationStateService(IMemoryCache cache) : IConversationStateService

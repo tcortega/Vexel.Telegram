@@ -1,6 +1,6 @@
-using Vexel.Telegram.Commands.Contexts;
+using Vexel.Telegram.Commands;
 
-namespace Vexel.Telegram.Interactivity.Contexts;
+namespace Vexel.Telegram.Interactivity;
 
 /// <summary>
 /// Represents contextual information about a currently executing interaction-based command.

@@ -6,7 +6,7 @@ using Remora.Commands.Trees.Nodes;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
-namespace Vexel.Telegram.Commands.Registration;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Service that registers commands with Telegram by traversing the command tree.

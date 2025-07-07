@@ -1,6 +1,6 @@
 using Remora.Results;
 
-namespace Vexel.Telegram.Commands.Prefix;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Provides matching logic for text-based command prefixes.

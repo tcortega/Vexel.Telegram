@@ -1,7 +1,7 @@
 using OneOf;
 using Telegram.Bot.Types;
 
-namespace Vexel.Telegram.Interactivity.Contexts;
+namespace Vexel.Telegram.Interactivity;
 
 /// <summary>
 /// Represents contextual information about an ongoing operation on an interaction.

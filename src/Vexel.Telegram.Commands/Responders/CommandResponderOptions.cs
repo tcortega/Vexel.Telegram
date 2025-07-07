@@ -1,4 +1,4 @@
-namespace Vexel.Telegram.Commands.Responders;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Represents a set of options relevant to a command responder.

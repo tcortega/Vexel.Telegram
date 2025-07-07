@@ -1,6 +1,6 @@
 ﻿using Vexel.Telegram.Client.Extensions;
 using Vexel.Telegram.Commands.Extensions;
-using Vexel.Telegram.Commands.Registration;
+using Vexel.Telegram.Commands;
 using Vexel.Telegram.Hosting.Extensions;
 using Vexel.Telegram.Interactivity.Extensions;
 using Vexel.Telegram.Sample.Commands;

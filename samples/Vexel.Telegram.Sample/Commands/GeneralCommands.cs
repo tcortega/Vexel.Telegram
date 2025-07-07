@@ -1,5 +1,5 @@
 using System.ComponentModel;
-using Vexel.Telegram.Commands.Contexts;
+using Vexel.Telegram.Commands;
 using Vexel.Telegram.Extensions.Builders;
 using Remora.Commands.Attributes;
 using Remora.Commands.Groups;
