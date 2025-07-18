@@ -3,6 +3,7 @@ using Vexel.Telegram.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Remora.Commands.Extensions;
+using Vexel.Telegram.Commands.Contexts;
 
 namespace Vexel.Telegram.Interactivity.Extensions;
 
