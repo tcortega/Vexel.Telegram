@@ -66,20 +66,27 @@ await host.RunAsync();
 Create a Command by adding the following code to your project:
 
 ```csharp
-public sealed class ExampleCommands(ITelegramBotClient botClient, ITextCommandContext context) : CommandGroup
+using Vexel.Telegram.Commands;
+
+public sealed class ExampleCommands(IFeedbackService feedbackService, ITextCommandContext context) : CommandGroup
 {
 	[Command("ping"), Description("Replies with 'Pong!'")]
 	public async Task<IResult> PingAsync() 
 	{
-		_ = await botClient.SendMessage
-		(
-			chatId: context.Message.Chat.Id,
-			text: "Pong!",
-			replyParameters: context.Message.MessageId,
-			cancellationToken: CancellationToken
-		);
-
-		return Result.FromSuccess();
+		var options = new FeedbackMessageOptions 
+		{ 
+			ReplyParameters = new ReplyParameters { MessageId = context.Message.MessageId } 
+		};
+		
+		var result = await feedbackService.SendContextualMessageAsync("Pong!", options: options, ct: CancellationToken);
+		return result.IsSuccess ? Result.FromSuccess() : Result.FromError(result.Error);
+	}
+	
+	[Command("success"), Description("Sends a success message")]
+	public async Task<IResult> SuccessAsync() 
+	{
+		var result = await feedbackService.SendContextualSuccessAsync("Operation completed successfully!", ct: CancellationToken);
+		return result.IsSuccess ? Result.FromSuccess() : Result.FromError(result.Error);
 	}
 	
 	[Command("pay"), Description("Starts a payment process with the given amount")]
@@ -90,7 +97,7 @@ public sealed class ExampleCommands(ITelegramBotClient botClient, ITextCommandCo
 }
 ```
 
-You can access everything you may need, such as the `ITelegramBotClient` and the `ITextCommandContext`, through
+You can access everything you may need, such as the `IFeedbackService` and the `ITextCommandContext`, through
 dependency injection. Parameters are automatically bound and parsed from the command arguments.
 
 For more information regarding the command system, please refer
@@ -128,19 +135,34 @@ The framework provides attributes to handle different interaction types automati
 Here is an example of a simple interaction handler:
 
 ```csharp
-public sealed class SampleInteractions(ITelegramBotClient botClient, IInteractionContext context) : InteractionGroup
+using Vexel.Telegram.Commands;
+
+public sealed class SampleInteractions(ITelegramBotClient botClient, IFeedbackService feedbackService, IInteractionContext context) : InteractionGroup
 {
     [CallbackButton("ping"), Description("Responds to a ping button press")]
     public async Task<IResult> HandlePingButtonAsync()
     {
         var callbackQuery = context.Interaction.AsT0;
 
-        await botClient.AnswerCallbackQueryAsync(
+        await botClient.AnswerCallbackQuery(
             callbackQueryId: callbackQuery.Id,
             text: "🏓 Pong! Interaction received!",
             showAlert: true,
             cancellationToken: CancellationToken
         );
+
+        if (callbackQuery.Message is not null)
+        {
+            var result = await feedbackService.EditContextualMessageAsync(
+                callbackQuery.Message.MessageId,
+                "🏓 **Pong!** Button interaction received!",
+                ParseMode.Markdown,
+                ct: CancellationToken
+            );
+            
+            if (!result.IsSuccess)
+                return Result.FromError(result.Error);
+        }
 
         return Result.FromSuccess();
     }
@@ -164,8 +186,10 @@ When the user replies, the framework routes their message to the handler decorat
 The following example demonstrates a simple payment workflow where the bot requests an amount after a button is pressed:
 
 ```csharp
-public sealed class PaymentInteractions(ITelegramBotClient botClient, IConversationStateService conversationState, 
-	IInteractionCommandContext context) : InteractionGroup
+using Vexel.Telegram.Commands;
+
+public sealed class PaymentInteractions(ITelegramBotClient botClient, IFeedbackService feedbackService, 
+	IConversationStateService conversationState, IInteractionCommandContext context) : InteractionGroup
 {
 	[CallbackButton(nameof(StartPaymentAsync))]
 	public async Task<IResult> StartPaymentAsync()
@@ -188,15 +212,12 @@ public sealed class PaymentInteractions(ITelegramBotClient botClient, IConversat
 	[TextResponse(nameof(ReceivePaymentAmountAsync))]
 	public async Task<IResult> ReceivePaymentAmountAsync(decimal input)
 	{
-		var message = context.Interaction.AsT3;
-		_ = await botClient.SendMessage
-		(
-			chatId: message.Chat.Id,
-			text: $"Thank you! Payment process for ${input:F2} started.",
-			cancellationToken: CancellationToken
+		var result = await feedbackService.SendContextualSuccessAsync(
+			$"Thank you! Payment process for ${input:F2} started.",
+			ct: CancellationToken
 		);
 	
-		return Result.FromSuccess();
+		return result.IsSuccess ? Result.FromSuccess() : Result.FromError(result.Error);
 	}
 }
 ```
@@ -222,7 +243,9 @@ or
 `CallbackQuery`.
 
 ```csharp
-public class MessageResponder(ILogger<MessageResponder> logger, ITelegramBotClient botClient)
+using Vexel.Telegram.Commands;
+
+public class MessageResponder(ILogger<MessageResponder> logger, IFeedbackService feedbackService)
 	: IResponder<Message>
 {
 	public async Task<Result> RespondAsync(Message message, CancellationToken ct = default)
@@ -236,12 +259,17 @@ public class MessageResponder(ILogger<MessageResponder> logger, ITelegramBotClie
 			message.Text);
 
 		// Simple echo logic
-		_ = await botClient.SendMessage
-		(
-			chatId: message.Chat.Id,
-			text: $"Here's a hello from the MessageResponder: {message.Text}",
-			cancellationToken: ct
+		var result = await feedbackService.SendMessageAsync(
+			message.Chat.Id,
+			$"Here's a hello from the MessageResponder: {message.Text}",
+			ct: ct
 		);
+
+		if (!result.IsSuccess)
+		{
+			logger.LogError("Failed to send message: {Error}", result.Error);
+			return Result.FromError(result.Error);
+		}
 
 		return Result.FromSuccess();
 	}
@@ -258,3 +286,31 @@ services.AddResponder<MessageResponder>();
 ```
 
 This ensures that the dispatcher will forward the appropriate updates to your responder for processing.
+
+## Feedback Service
+
+The `IFeedbackService` provides a convenient and unified way to send messages to users without dealing directly with the Telegram Bot API. It offers contextual messaging, semantic methods for different message types (success, error, warning, info), and comprehensive support for media messages.
+
+### Quick Examples
+
+```csharp
+// Send a success message with emoji prefix
+await feedbackService.SendContextualSuccessAsync("Operation completed!");
+
+// Send a message with reply
+var options = new FeedbackMessageOptions 
+{ 
+    ReplyParameters = new ReplyParameters { MessageId = originalMessageId } 
+};
+await feedbackService.SendContextualMessageAsync("Hello!", options: options);
+
+// Send media
+await feedbackService.SendContextualPhotoAsync(
+    photo: InputFile.FromUri("https://example.com/image.jpg"),
+    caption: "Check this out!"
+);
+```
+
+The service is automatically registered when you call `AddTelegramCommands()` and returns `Result<T>` types for consistent error handling.
+
+For complete documentation of all available methods and options, see the [IFeedbackService interface](./src/Vexel.Telegram.Commands/Feedback/IFeedbackService.cs).
