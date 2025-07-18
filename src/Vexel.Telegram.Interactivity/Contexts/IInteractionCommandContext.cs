@@ -1,5 +1,4 @@
 using Vexel.Telegram.Commands;
-using Vexel.Telegram.Commands.Contexts;
 
 namespace Vexel.Telegram.Interactivity;
 

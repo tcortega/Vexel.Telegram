@@ -7,7 +7,7 @@ using Remora.Results;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.InlineQueryResults;
-using Vexel.Telegram.Commands.Feedback;
+using Vexel.Telegram.Commands;
 
 namespace Vexel.Telegram.Sample.Interactions;
 

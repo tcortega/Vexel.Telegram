@@ -1,5 +1,4 @@
 using Vexel.Telegram.Abstractions.Responders;
-using Vexel.Telegram.Commands.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Remora.Commands.Services;

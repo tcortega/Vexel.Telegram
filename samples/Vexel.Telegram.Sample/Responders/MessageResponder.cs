@@ -2,7 +2,7 @@ using Vexel.Telegram.Abstractions.Responders;
 using Microsoft.Extensions.Logging;
 using Remora.Results;
 using Telegram.Bot.Types;
-using Vexel.Telegram.Commands.Feedback;
+using Vexel.Telegram.Commands;
 
 namespace Vexel.Telegram.Sample.Responders;
 
@@ -27,9 +27,8 @@ public class MessageResponder(ILogger<MessageResponder> logger, IFeedbackService
 			message.Text);
 
 		// Simple echo logic
-		var result = await feedbackService.SendMessageAsync
+		var result = await feedbackService.SendContextualMessageAsync
 		(
-			message.Chat.Id,
 			$"Here's a hello from the MessageResponder: {message.Text}",
 			ct: ct
 		);

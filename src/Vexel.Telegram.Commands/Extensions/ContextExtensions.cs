@@ -1,7 +1,7 @@
 ﻿using Telegram.Bot.Types;
 using OneOf;
 
-namespace Vexel.Telegram.Commands.Extensions;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Extension methods for retrieving chat IDs from various telegram types.

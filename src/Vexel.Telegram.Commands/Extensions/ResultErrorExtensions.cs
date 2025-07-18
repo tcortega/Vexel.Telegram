@@ -1,7 +1,7 @@
 using Remora.Commands.Results;
 using Remora.Results;
 
-namespace Vexel.Telegram.Commands.Extensions;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Defines extension methods for the <see cref="IResultError"/> interface.
