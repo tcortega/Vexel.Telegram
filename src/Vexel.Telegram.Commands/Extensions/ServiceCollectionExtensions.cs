@@ -5,9 +5,7 @@ using Remora.Commands.Extensions;
 using Remora.Commands.Tokenization;
 using Remora.Commands.Trees;
 using Remora.Extensions.Options.Immutable;
-using Vexel.Telegram.Commands.Feedback;
-
-namespace Vexel.Telegram.Commands.Extensions;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Defines extension methods for the <see cref="IServiceCollection"/> interface.

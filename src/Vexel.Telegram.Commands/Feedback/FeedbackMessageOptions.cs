@@ -1,7 +1,7 @@
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
 
-namespace Vexel.Telegram.Commands.Feedback;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Options for customizing feedback messages.

@@ -1,7 +1,7 @@
 using OneOf;
 using Remora.Commands.Services;
 using Telegram.Bot.Types;
-using Vexel.Telegram.Commands.Contexts;
+using Vexel.Telegram.Commands;
 
 namespace Vexel.Telegram.Interactivity;
 

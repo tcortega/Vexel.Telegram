@@ -1,7 +1,7 @@
 ﻿using Remora.Results;
 using Telegram.Bot.Types;
 using Vexel.Telegram.Abstractions.Responders;
-using Vexel.Telegram.Commands.Contexts;
+using Vexel.Telegram.Commands;
 
 namespace Vexel.Telegram.Interactivity;
 

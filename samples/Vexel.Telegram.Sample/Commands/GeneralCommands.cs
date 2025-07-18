@@ -5,7 +5,6 @@ using Remora.Commands.Attributes;
 using Remora.Commands.Groups;
 using Remora.Results;
 using Telegram.Bot.Types.Enums;
-using Vexel.Telegram.Commands.Feedback;
 using Vexel.Telegram.Sample.Interactions;
 
 namespace Vexel.Telegram.Sample.Commands;

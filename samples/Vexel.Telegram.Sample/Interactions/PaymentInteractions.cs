@@ -1,6 +1,6 @@
 ﻿using Remora.Results;
 using Telegram.Bot;
-using Vexel.Telegram.Commands.Feedback;
+using Vexel.Telegram.Commands;
 using Vexel.Telegram.Interactivity;
 
 namespace Vexel.Telegram.Sample.Interactions;

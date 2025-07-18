@@ -3,7 +3,7 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 
-namespace Vexel.Telegram.Commands.Feedback;
+namespace Vexel.Telegram.Commands;
 
 /// <summary>
 /// Handles sending formatted messages to the users.
