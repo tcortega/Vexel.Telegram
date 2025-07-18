@@ -7,13 +7,14 @@ using Remora.Results;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.InlineQueryResults;
+using Vexel.Telegram.Commands.Feedback;
 
 namespace Vexel.Telegram.Sample.Interactions;
 
 /// <summary>
 /// Sample interaction handlers demonstrating callback buttons, inline queries, and chosen results.
 /// </summary>
-public class SampleInteractions(ITelegramBotClient botClient, IInteractionCommandContext context) : InteractionGroup
+public class SampleInteractions(ITelegramBotClient botClient, IFeedbackService feedbackService, IInteractionCommandContext context) : InteractionGroup
 {
 	[CallbackButton("ping"), Description("Responds to ping button presses")]
 	public async Task<IResult> HandlePingButtonAsync()
@@ -27,19 +28,14 @@ public class SampleInteractions(ITelegramBotClient botClient, IInteractionComman
 			cancellationToken: CancellationToken
 		);
 
-		if (callbackQuery.Message is not null)
-		{
-			_ = await botClient.EditMessageText(
-				chatId: callbackQuery.Message.Chat.Id,
-				messageId: callbackQuery.Message.MessageId,
-				text:
-				$"🏓 **Pong!**\n\nButton pressed by: {context.User.FirstName}\nTime: {DateTime.UtcNow:HH:mm:ss} UTC",
-				parseMode: ParseMode.Markdown,
-				cancellationToken: CancellationToken
-			);
-		}
-
-		return Result.FromSuccess();
+		if (callbackQuery.Message is null) return Result.FromSuccess();
+		
+		return await feedbackService.EditContextualMessageAsync(
+			callbackQuery.Message.MessageId,
+			$"🏓 **Pong!**\n\nButton pressed by: {context.User.FirstName}\nTime: {DateTime.UtcNow:HH:mm:ss} UTC",
+			ParseMode.Markdown,
+			ct: CancellationToken
+		);
 	}
 
 	[CallbackButton("color"), Description("Shows a color selection menu")]
@@ -62,14 +58,16 @@ public class SampleInteractions(ITelegramBotClient botClient, IInteractionComman
 
 		if (callbackQuery.Message is not null)
 		{
-			_ = await botClient.EditMessageText(
-				chatId: callbackQuery.Message.Chat.Id,
-				messageId: callbackQuery.Message.MessageId,
-				text: "🎨 **Color Selection**\n\nChoose your favorite color:",
-				parseMode: ParseMode.Markdown,
-				replyMarkup: keyboard,
-				cancellationToken: CancellationToken
+			var result = await feedbackService.EditContextualMessageAsync(
+				callbackQuery.Message.MessageId,
+				"🎨 **Color Selection**\n\nChoose your favorite color:",
+				ParseMode.Markdown,
+				keyboard,
+				CancellationToken
 			);
+
+			if (!result.IsSuccess)
+				return result;
 		}
 
 		await botClient.AnswerCallbackQuery(
@@ -121,16 +119,13 @@ public class SampleInteractions(ITelegramBotClient botClient, IInteractionComman
 			.AddCallbackButton("🏠 Back to Menu", "back_to_menu")
 			.Build();
 
-		_ = await botClient.EditMessageText(
-			chatId: callbackQuery.Message.Chat.Id,
-			messageId: callbackQuery.Message.MessageId,
-			text: $"✅ **Color Selected!**\n\nYou chose: {colorEmoji} {color}\n\nWhat would you like to do next?",
-			parseMode: ParseMode.Markdown,
-			replyMarkup: keyboard,
-			cancellationToken: CancellationToken
+		return await feedbackService.EditContextualMessageAsync(
+			callbackQuery.Message.MessageId,
+			$"✅ **Color Selected!**\n\nYou chose: {colorEmoji} {color}\n\nWhat would you like to do next?",
+			ParseMode.Markdown,
+			keyboard,
+			CancellationToken
 		);
-
-		return Result.FromSuccess();
 	}
 
 	[CallbackButton("back_to_menu"), Description("Returns to the main demo menu")]
@@ -148,14 +143,16 @@ public class SampleInteractions(ITelegramBotClient botClient, IInteractionComman
 
 		if (callbackQuery.Message is not null)
 		{
-			_ = await botClient.EditMessageText(
-				chatId: callbackQuery.Message.Chat.Id,
-				messageId: callbackQuery.Message.MessageId,
-				text: "🎮 **Interactive Demo Menu**\n\nChoose an option to test different interactions:",
-				parseMode: ParseMode.Markdown,
-				replyMarkup: keyboard,
-				cancellationToken: CancellationToken
+			var result = await feedbackService.EditContextualMessageAsync(
+				callbackQuery.Message.MessageId,
+				"🎮 **Interactive Demo Menu**\n\nChoose an option to test different interactions:",
+				ParseMode.Markdown,
+				keyboard,
+				CancellationToken
 			);
+
+			if (!result.IsSuccess)
+				return result;
 		}
 
 		await botClient.AnswerCallbackQuery(
@@ -188,15 +185,16 @@ public class SampleInteractions(ITelegramBotClient botClient, IInteractionComman
 				.AddCallbackButton("🏠 Back", "back_to_menu")
 				.Build();
 
-			_ = await botClient.EditMessageText(
-				chatId: callbackQuery.Message.Chat.Id,
-				messageId: callbackQuery.Message.MessageId,
-				text:
+			var result = await feedbackService.EditContextualMessageAsync(
+				callbackQuery.Message.MessageId,
 				$"🔢 **Counter Demo**\n\nCurrent count: **{count}**\n\nThe count is stored in the button's state data!",
-				parseMode: ParseMode.Markdown,
-				replyMarkup: keyboard,
-				cancellationToken: CancellationToken
+				ParseMode.Markdown,
+				keyboard,
+				CancellationToken
 			);
+
+			if (!result.IsSuccess)
+				return result;
 		}
 
 		await botClient.AnswerCallbackQuery(

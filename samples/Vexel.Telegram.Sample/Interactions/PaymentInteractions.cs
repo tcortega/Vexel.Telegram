@@ -1,11 +1,13 @@
 ﻿using Remora.Results;
 using Telegram.Bot;
+using Vexel.Telegram.Commands.Feedback;
 using Vexel.Telegram.Interactivity;
 
 namespace Vexel.Telegram.Sample.Interactions;
 
 public class PaymentInteractions(
 	ITelegramBotClient botClient,
+	IFeedbackService feedbackService,
 	IInteractionCommandContext context,
 	IConversationStateService conversationState)
 	: InteractionGroup
@@ -27,13 +29,15 @@ public class PaymentInteractions(
 		}
 
 		var chatId = callbackQuery.Message.Chat.Id;
-		_ = await botClient.EditMessageText
+		var result = await feedbackService.EditContextualMessageAsync
 		(
-			chatId: chatId,
-			messageId: callbackQuery.Message.MessageId,
-			text: "Please enter the amount you wish to pay:",
-			cancellationToken: CancellationToken
+			callbackQuery.Message.MessageId,
+			"Please enter the amount you wish to pay:",
+			ct: CancellationToken
 		);
+
+		if (!result.IsSuccess)
+			return result;
 
 		conversationState.SetAwaitingInput
 		(
@@ -49,16 +53,10 @@ public class PaymentInteractions(
 	[TextResponse(nameof(ReceivePaymentAmountAsync))]
 	public async Task<IResult> ReceivePaymentAmountAsync(decimal input)
 	{
-		// We now have direct access to the message that triggered this handler.
-		var message = context.Interaction.AsT3;
-
-		_ = await botClient.SendMessage
+		return await feedbackService.SendContextualSuccessAsync
 		(
-			chatId: message.Chat.Id,
-			text: $"Thank you! Payment process for ${input:F2} started.",
-			cancellationToken: CancellationToken
+			$"Thank you! Payment process for ${input:F2} started.",
+			ct: CancellationToken
 		);
-
-		return Result.FromSuccess();
 	}
 }

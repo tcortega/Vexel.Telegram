@@ -4,8 +4,8 @@ using Vexel.Telegram.Extensions.Builders;
 using Remora.Commands.Attributes;
 using Remora.Commands.Groups;
 using Remora.Results;
-using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
+using Vexel.Telegram.Commands.Feedback;
 using Vexel.Telegram.Sample.Interactions;
 
 namespace Vexel.Telegram.Sample.Commands;
@@ -13,34 +13,20 @@ namespace Vexel.Telegram.Sample.Commands;
 /// <summary>
 /// A command group containing general-purpose commands.
 /// </summary>
-public class GeneralCommands(ITelegramBotClient botClient, ITextCommandContext context) : CommandGroup
+public class GeneralCommands(IFeedbackService feedbackService, ITextCommandContext context) : CommandGroup
 {
 	[Command("ping"), Description("Checks if the bot is responsive.")]
 	public async Task<IResult> PingAsync()
 	{
-		_ = await botClient.SendMessage
-		(
-			chatId: context.Message.Chat.Id,
-			text: "Pong!",
-			replyParameters: context.Message.MessageId,
-			cancellationToken: CancellationToken
-		);
-
-		return Result.FromSuccess();
+		var options = new FeedbackMessageOptions { ReplyParameters = new() { MessageId = context.Message.MessageId }, };
+		return await feedbackService.SendContextualMessageAsync("Pong!", options: options, ct: CancellationToken);
 	}
 
 	[Command("echo"), Description("Repeats the text you provide.")]
 	public async Task<IResult> EchoAsync([Greedy] string text)
 	{
-		_ = await botClient.SendMessage
-		(
-			chatId: context.Message.Chat.Id,
-			text: $"You said: {text}",
-			replyParameters: context.Message.MessageId,
-			cancellationToken: CancellationToken
-		);
-
-		return Result.FromSuccess();
+		var options = new FeedbackMessageOptions { ReplyParameters = new() { MessageId = context.Message.MessageId }, };
+		return await feedbackService.SendContextualMessageAsync($"You said: {text}", options: options, ct: CancellationToken);
 	}
 
 	[Command("demo"), Description("Shows the interactive demo with buttons and callbacks.")]
@@ -54,16 +40,13 @@ public class GeneralCommands(ITelegramBotClient botClient, ITextCommandContext c
 			.AddUrlButton("🌐 Telegram", "https://telegram.org")
 			.Build();
 
-		_ = await botClient.SendMessage
-		(
-			chatId: context.Message.Chat.Id,
-			text: "🎮 **Interactive Demo Menu**\n\nChoose an option to test different interactions:",
-			parseMode: ParseMode.Markdown,
-			replyMarkup: keyboard,
-			cancellationToken: CancellationToken
+		var options = new FeedbackMessageOptions { ReplyMarkup = keyboard };
+		return await feedbackService.SendContextualMessageAsync(
+			"🎮 **Interactive Demo Menu**\n\nChoose an option to test different interactions:",
+			ParseMode.Markdown,
+			options,
+			CancellationToken
 		);
-
-		return Result.FromSuccess();
 	}
 
 	[Command("inline"), Description("Shows how to use inline queries.")]
@@ -76,17 +59,14 @@ public class GeneralCommands(ITelegramBotClient botClient, ITextCommandContext c
 			.AddSwitchInlineQueryButton("🔍 Try Inline Query Anywhere", "telegram")
 			.Build();
 
-		_ = await botClient.SendMessage
-		(
-			chatId: context.Message.Chat.Id,
-			text: "🔍 **Inline Query Demo**\n\nClick the buttons below to try inline queries!\n\n" +
+		var options = new FeedbackMessageOptions { ReplyMarkup = keyboard };
+		return await feedbackService.SendContextualMessageAsync(
+			"🔍 **Inline Query Demo**\n\nClick the buttons below to try inline queries!\n\n" +
 			"You can also try typing `@yourbotname query` in any chat to use inline mode.",
-			parseMode: ParseMode.Markdown,
-			replyMarkup: keyboard,
-			cancellationToken: CancellationToken
+			ParseMode.Markdown,
+			options,
+			CancellationToken
 		);
-
-		return Result.FromSuccess();
 	}
 
 	[Command("payment"), Description("Starts a sample payment workflow with the TextResponse usage")]
@@ -97,14 +77,11 @@ public class GeneralCommands(ITelegramBotClient botClient, ITextCommandContext c
 			.AddCallbackButton("💳 Start Payment", nameof(PaymentInteractions.StartPaymentAsync))
 			.Build();
 
-		_ = await botClient.SendMessage
-		(
-			chatId: context.Message.Chat.Id,
-			text: "This sample payment workflow demonstrates how you can capture text inputs and route them to the proper handlers.",
-			replyMarkup: keyboard,
-			cancellationToken: CancellationToken
+		var options = new FeedbackMessageOptions { ReplyMarkup = keyboard };
+		return await feedbackService.SendContextualMessageAsync(
+			"This sample payment workflow demonstrates how you can capture text inputs and route them to the proper handlers.",
+			options: options,
+			ct: CancellationToken
 		);
-
-		return Result.FromSuccess();
 	}
 }

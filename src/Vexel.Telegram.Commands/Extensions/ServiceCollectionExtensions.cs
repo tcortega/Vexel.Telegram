@@ -5,6 +5,7 @@ using Remora.Commands.Extensions;
 using Remora.Commands.Tokenization;
 using Remora.Commands.Trees;
 using Remora.Extensions.Options.Immutable;
+using Vexel.Telegram.Commands.Feedback;
 
 namespace Vexel.Telegram.Commands.Extensions;
 
@@ -27,6 +28,10 @@ public static class ServiceCollectionExtensions
 	{
 		serviceCollection
 			.TryAddScoped<ContextInjectionService>();
+
+		// Add feedback service
+		serviceCollection
+			.TryAddScoped<IFeedbackService, FeedbackService>();
 
 		// Set up context injection
 		serviceCollection
