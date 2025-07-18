@@ -1,15 +1,15 @@
 using Vexel.Telegram.Abstractions.Responders;
 using Microsoft.Extensions.Logging;
 using Remora.Results;
-using Telegram.Bot;
 using Telegram.Bot.Types;
+using Vexel.Telegram.Commands.Feedback;
 
 namespace Vexel.Telegram.Sample.Responders;
 
 /// <summary>
 /// A responder that reacts to new messages.
 /// </summary>
-public class MessageResponder(ILogger<MessageResponder> logger, ITelegramBotClient botClient)
+public class MessageResponder(ILogger<MessageResponder> logger, IFeedbackService feedbackService)
 	: IResponder<Message>
 {
 	/// <summary>
@@ -27,13 +27,15 @@ public class MessageResponder(ILogger<MessageResponder> logger, ITelegramBotClie
 			message.Text);
 
 		// Simple echo logic
-		_ = await botClient.SendMessage
+		var result = await feedbackService.SendMessageAsync
 		(
-			chatId: message.Chat.Id,
-			text: $"Here's a hello from the MessageResponder: {message.Text}",
-			cancellationToken: ct
+			message.Chat.Id,
+			$"Here's a hello from the MessageResponder: {message.Text}",
+			ct: ct
 		);
 
-		return Result.FromSuccess();
+		if (result.IsSuccess) return Result.FromSuccess();
+		logger.LogError("Failed to send message: {Error}", result.Error);
+		return Result.FromError(result.Error);
 	}
 }
