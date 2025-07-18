@@ -40,7 +40,8 @@ instead.
 
 ### Adding Vexel.Telegram to your project
 
-For applications using the .NET Generic Host, the Vexel.Telegram.Hosting package is the recommended way to register your
+For applications using the .NET Generic Host, the `Vexel.Telegram.Hosting` package is the recommended way to register
+your
 bot. It simplifies configuration and manages the bot's lifecycle as a background service.
 
 To add it to your Hosting project, all you need to do is call the `.AddTelegramService(_ => "<BOT_TOKEN>")` method
@@ -68,7 +69,7 @@ Create a Command by adding the following code to your project:
 public sealed class ExampleCommands(ITelegramBotClient botClient, ITextCommandContext context) : CommandGroup
 {
 	[Command("ping"), Description("Replies with 'Pong!'")]
-	public Task<IResult> PingAsync() 
+	public async Task<IResult> PingAsync() 
 	{
 		_ = await botClient.SendMessage
 		(
@@ -113,8 +114,8 @@ services.AddTelegramCommands()
 
 ### Creating Interactions
 
-In Vexel, incoming queries such as callback queries, inline queries, and others are collectively known as "
-interactions." The framework routes these to dedicated handlers, similar to how commands work. To create a handler,
+In Vexel, incoming queries such as callback queries, inline queries, and others are collectively known as
+"interactions." The framework routes these to dedicated handlers, similar to how commands work. To create a handler,
 simply inherit from the `InteractionGroup` class.
 
 The framework provides attributes to handle different interaction types automatically:
@@ -122,6 +123,7 @@ The framework provides attributes to handle different interaction types automati
 1. **CallbackButton**: For handling callback queries from inline buttons.
 2. **InlineQuery**: For handling inline queries.
 3. **ChosenInlineResult**: For handling chosen inline results.
+4. **TextResponse**: For handling text messages.
 
 Here is an example of a simple interaction handler:
 
@@ -147,6 +149,57 @@ public sealed class SampleInteractions(ITelegramBotClient botClient, IInteractio
 
 While you can construct interaction components manually using `InteractionIdHelper`, it is recommended to use the
 provided builders (e.g., `InlineKeyboardBuilder`) for creating inline keyboards and other components.
+
+#### Working with Messages as Interactions
+
+A significant portion of user input on Telegram occurs through text messages directly within a chat.
+Vexel addresses this by handling text messages as a form of interaction, enabling the creation of
+conversational workflows.
+
+This functionality is achieved by combining the `TextResponse` attribute with the `IConversationStateService`.
+You can set a user's state to "awaiting input" and specify which handler method should process their next message.
+When the user replies, the framework routes their message to the handler decorated with the corresponding
+`TextResponse` attribute.
+
+The following example demonstrates a simple payment workflow where the bot requests an amount after a button is pressed:
+
+```csharp
+public sealed class PaymentInteractions(ITelegramBotClient botClient, IConversationStateService conversationState, 
+	IInteractionCommandContext context) : InteractionGroup
+{
+	[CallbackButton(nameof(StartPaymentAsync))]
+	public async Task<IResult> StartPaymentAsync()
+	{
+		var callbackQuery = context.Interaction.AsT0;
+		var chatId = callbackQuery.Message.Chat.Id;
+		
+		// Set the conversation state to await input for the 'ReceivePaymentAmountAsync' handler.
+		conversationState.SetAwaitingInput
+		(
+			chatId,
+			context.User.Id,
+			nameof(ReceivePaymentAmountAsync)
+		);
+	
+		await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: CancellationToken);
+		return Result.FromSuccess();
+	}
+	
+	[TextResponse(nameof(ReceivePaymentAmountAsync))]
+	public async Task<IResult> ReceivePaymentAmountAsync(decimal input)
+	{
+		var message = context.Interaction.AsT3;
+		_ = await botClient.SendMessage
+		(
+			chatId: message.Chat.Id,
+			text: $"Thank you! Payment process for ${input:F2} started.",
+			cancellationToken: CancellationToken
+		);
+	
+		return Result.FromSuccess();
+	}
+}
+```
 
 ### Registering Interaction Handlers
 
