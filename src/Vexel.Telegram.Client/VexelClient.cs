@@ -51,8 +51,13 @@ public sealed class VexelClient(
 		{
 			// Normal shutdown.
 		}
+		finally
+		{
+			// Drain here, while the container and every handler dependency are still alive.
+			// Disposal of the scheduler singleton itself stays with the container.
+			await scheduler.StopAsync().ConfigureAwait(false);
+		}
 
-		// The scheduler is a container-owned singleton; the container drains and disposes it.
 		logger.LogInformation("VexelClient stopped");
 	}
 

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Telegram.Bot.Types;
@@ -208,6 +209,62 @@ public sealed class UpdateSchedulerTests
 	}
 
 	[Fact]
+	public async Task StopAsync_DrainsBufferedUpdatesAndLeavesSchedulerUsable()
+	{
+		var processed = new ConcurrentQueue<int>();
+		var dispatcher = new ScriptedDispatcher(async (update, ct) =>
+		{
+			await Task.Delay(20, ct);
+			processed.Enqueue(update.Id);
+		});
+
+		await using var scheduler = CreateScheduler(dispatcher);
+
+		for (var id = 1; id <= 5; id++)
+		{
+			await scheduler.ScheduleAsync(MessageUpdate(id, chatId: 7), CancellationToken.None);
+		}
+
+		await scheduler.StopAsync();
+
+		Assert.Equal([1, 2, 3, 4, 5], [.. processed]);
+
+		await scheduler.ScheduleAsync(MessageUpdate(6, chatId: 7), CancellationToken.None);
+		await scheduler.StopAsync();
+
+		Assert.Equal([1, 2, 3, 4, 5, 6], [.. processed]);
+	}
+
+	[Fact]
+	public async Task StopAsync_DispatchesBufferedUpdatesWhileContainerIsAlive()
+	{
+		var handled = new ConcurrentQueue<int>();
+		var services = new ServiceCollection();
+		_ = services.AddSingleton<IRawUpdateHandler>(new DelegateRawHandler((update, _) =>
+		{
+			handled.Enqueue(update.Id);
+			return Task.CompletedTask;
+		}));
+		_ = services.AddSingleton(Options.Create(new VexelClientOptions()));
+		_ = services.AddSingleton<ILogger<UpdateDispatcher>>(NullLogger<UpdateDispatcher>.Instance);
+		_ = services.AddSingleton<ILogger<UpdateScheduler>>(NullLogger<UpdateScheduler>.Instance);
+		_ = services.AddSingleton<IUpdateDispatcher, UpdateDispatcher>();
+		_ = services.AddSingleton<UpdateScheduler>();
+
+		await using var provider = services.BuildServiceProvider();
+		var scheduler = provider.GetRequiredService<UpdateScheduler>();
+
+		for (var id = 1; id <= 3; id++)
+		{
+			await scheduler.ScheduleAsync(MessageUpdate(id, chatId: 42), CancellationToken.None);
+		}
+
+		await scheduler.StopAsync();
+
+		Assert.Equal([1, 2, 3], [.. handled]);
+	}
+
+	[Fact]
 	public async Task Dispose_IsIdempotentAndRejectsFurtherScheduling()
 	{
 		var scheduler = CreateScheduler(new ScriptedDispatcher((_, _) => Task.CompletedTask));
@@ -257,6 +314,21 @@ public sealed class UpdateSchedulerTests
 
 		Assert.Equal(2, tracker.Created);
 		Assert.Equal(2, tracker.Disposed);
+	}
+
+	[Fact]
+	public async Task Dispatcher_IsolatesHandlerResolutionFaults()
+	{
+		var services = new ServiceCollection();
+		_ = services.AddScoped<IRawUpdateHandler, ThrowingConstructorRawHandler>();
+
+		await using var provider = services.BuildServiceProvider(validateScopes: true);
+		var dispatcher = CreateDispatcher(provider);
+
+		var exception = await Record.ExceptionAsync(() =>
+			dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None));
+
+		Assert.Null(exception);
 	}
 
 	private static UpdateDispatcher CreateDispatcher(IServiceProvider provider) =>
@@ -309,6 +381,14 @@ public sealed class UpdateSchedulerTests
 	{
 		public Task HandleAsync(Update update, CancellationToken cancellationToken) =>
 			handler(update, cancellationToken);
+	}
+
+	private sealed class ThrowingConstructorRawHandler : IRawUpdateHandler
+	{
+		public ThrowingConstructorRawHandler() =>
+			throw new InvalidOperationException("handler construction boom");
+
+		public Task HandleAsync(Update update, CancellationToken cancellationToken) => Task.CompletedTask;
 	}
 
 	private sealed class HandlerTracker

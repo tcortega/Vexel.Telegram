@@ -23,8 +23,8 @@ public sealed class UpdateScheduler : IAsyncDisposable
 	private readonly object _gate = new();
 #endif
 	private readonly Dictionary<long, Lane> _lanes = [];
-	private readonly CancellationTokenSource _shutdownCts = new();
 	private readonly List<Task> _workers = [];
+	private CancellationTokenSource _shutdownCts = new();
 	private int _disposeState;
 
 	/// <summary>
@@ -111,9 +111,15 @@ public sealed class UpdateScheduler : IAsyncDisposable
 	}
 
 	/// <summary>
-	/// Stops accepting new work, completes all lanes, and waits for in-flight workers to finish.
-	/// Buffered updates drain within a bounded grace period; workers are only cancelled if the
-	/// drain does not finish in time.
+	/// Completes all lanes and waits for in-flight workers to finish, so buffered updates are
+	/// dispatched while their dependencies are still alive. Workers are only cancelled if the
+	/// drain does not finish within the grace period. The scheduler stays usable afterwards.
+	/// </summary>
+	public Task StopAsync() => DrainAsync(disposing: false);
+
+	/// <summary>
+	/// Drains like <see cref="StopAsync"/> and then releases the scheduler. Callers hosted in a
+	/// container should stop the scheduler before the container tears down its services.
 	/// </summary>
 	public async ValueTask DisposeAsync()
 	{
@@ -122,9 +128,16 @@ public sealed class UpdateScheduler : IAsyncDisposable
 			return;
 		}
 
+		await DrainAsync(disposing: true).ConfigureAwait(false);
+	}
+
+	private async Task DrainAsync(bool disposing)
+	{
 		List<Task> workers;
+		CancellationTokenSource shutdownCts;
 		lock (_gate)
 		{
+			shutdownCts = _shutdownCts;
 			foreach (var lane in _lanes.Values)
 			{
 				_ = lane.Writer.TryComplete();
@@ -135,6 +148,7 @@ public sealed class UpdateScheduler : IAsyncDisposable
 		}
 
 		var drain = Task.WhenAll(workers);
+		var workersAbandoned = false;
 		try
 		{
 			await drain.WaitAsync(s_drainGracePeriod).ConfigureAwait(false);
@@ -145,15 +159,19 @@ public sealed class UpdateScheduler : IAsyncDisposable
 				"Update lanes did not drain within {GracePeriod}; cancelling in-flight dispatch",
 				s_drainGracePeriod);
 
-			await _shutdownCts.CancelAsync().ConfigureAwait(false);
+			await shutdownCts.CancelAsync().ConfigureAwait(false);
 
 			try
 			{
 				await drain.WaitAsync(s_forcedShutdownGracePeriod).ConfigureAwait(false);
 			}
-			catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
+			catch (TimeoutException)
 			{
 				// Last resort: abandon workers that ignore cancellation.
+				workersAbandoned = true;
+			}
+			catch (OperationCanceledException)
+			{
 			}
 		}
 		catch (OperationCanceledException)
@@ -161,7 +179,22 @@ public sealed class UpdateScheduler : IAsyncDisposable
 			// A worker observed cancellation from elsewhere; nothing left to drain.
 		}
 
-		_shutdownCts.Dispose();
+		var retired = false;
+		lock (_gate)
+		{
+			if (shutdownCts.IsCancellationRequested && ReferenceEquals(_shutdownCts, shutdownCts) && !IsDisposed)
+			{
+				// Future lanes must not start on an already-cancelled token.
+				_shutdownCts = new CancellationTokenSource();
+				retired = true;
+			}
+		}
+
+		// Abandoned workers still observe the token, so its source must outlive them.
+		if (!workersAbandoned && (disposing || retired))
+		{
+			shutdownCts.Dispose();
+		}
 	}
 
 	private Lane RentLane(long key)

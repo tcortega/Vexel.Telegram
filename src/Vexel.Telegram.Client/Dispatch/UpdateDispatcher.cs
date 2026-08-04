@@ -26,8 +26,20 @@ public sealed class UpdateDispatcher(
 		// singleton nor shared concurrently across lanes.
 		await using var scope = scopeFactory.CreateAsyncScope();
 
+		IRawUpdateHandler[] handlers;
+		try
+		{
+			handlers = [.. scope.ServiceProvider.GetServices<IRawUpdateHandler>()];
+		}
+		catch (Exception ex)
+		{
+			// A handler constructor or one of its dependencies faulted; keep it inside this update.
+			logger.LogError(ex, "Failed to resolve raw update handlers for update {UpdateId}", update.Id);
+			return;
+		}
+
 		// Routed handler + On* fan-out land in later slices; raw always runs last and cannot suppress routing.
-		foreach (var handler in scope.ServiceProvider.GetServices<IRawUpdateHandler>())
+		foreach (var handler in handlers)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 			await InvokeHandlerAsync(handler, update, cancellationToken).ConfigureAwait(false);
