@@ -213,7 +213,7 @@ public sealed class FeedbackTests
 
 		// Holder is resolved but never Set (dispatcher did not run).
 		var ex = Assert.Throws<InvalidOperationException>(
-			() => scope.ServiceProvider.GetRequiredService<MessageContext>());
+			scope.ServiceProvider.GetRequiredService<MessageContext>);
 
 		Assert.Contains("resolved outside a Vexel update scope", ex.Message, StringComparison.Ordinal);
 	}

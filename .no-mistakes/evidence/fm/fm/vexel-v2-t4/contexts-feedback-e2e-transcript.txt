@@ -1,0 +1,81 @@
+Vexel.Telegram v2 - contexts / Feedback / AddTelegramBot end-to-end run
+
+A real generic host wired only with `services.AddTelegramBot(_ => token)` long-polls an
+in-process fake Telegram Bot API over HTTP. Handlers inject the concrete contexts
+(MessageContext / CallbackContext / InlineQueryContext) and reply through Feedback.
+
+What to look for:
+  * "telegram-api  <- bot calls ..." lines: what Telegram actually received from the bot.
+  * one answerCallbackQuery even though the handler answered twice (first-wins idempotence).
+  * editMessageText targets the bot-authored message (message_id=9001) behind the button.
+  * "Failed to resolve raw update handler" errors are expected: a raw handler asking for a
+    context of the wrong update kind is skipped without taking its siblings or the lane down.
+  * Per-update DI scope identities: a distinct holder + Feedback per update, each bound to its
+    own update id, and the callback-answered latch never leaking into the next update.
+
+Command: dotnet test tests/Vexel.Telegram.Tests -f net10.0 --filter FullyQualifiedName~ContextsEndToEndTests
+
+----------------------------------------------------------------------------------------
+  Standard Output Messages:
+ [ 0.014s] fake Telegram Bot API listening on http://127.0.0.1:63225
+ [ 0.047s] Information Lifetime         Application started. Press Ctrl+C to shut down.
+ [ 0.049s] Information Lifetime         Hosting environment: Production
+ [ 0.049s] Information VexelClient      VexelClient starting polling (DropPendingUpdates=True, LaneCapacity=64)
+ [ 0.049s] Information Lifetime         Content root path: /Users/shiki/.no-mistakes/worktrees/b6147a1cfc26/01KZ6J8JEQNF9D6T1C2VTT6EHP/tests/Vexel.Telegram.Tests/bin/Debug/net10.0/
+ [ 0.084s] telegram-api  getUpdates(offset=-1) -> no updates
+ [ 0.254s] telegram-api  getUpdates(offset=0) -> no updates
+ [ 0.255s] user in chat 100 sends "/menu"
+ [ 0.427s] telegram-api  getUpdates(offset=0) -> update 902
+ [ 0.433s] telegram-api  getUpdates(offset=903) -> no updates
+ [ 0.436s] bot handler   MenuHandler   chat 100 text "/menu"
+ [ 0.537s] telegram-api  <- bot calls sendMessage chat_id=100 text="pick one" reply_markup=<inline keyboard>
+ [ 0.538s] telegram-api  getUpdates(offset=903) -> no updates
+ [ 0.539s] Error       UpdateDispatcher Failed to resolve raw update handler Vexel.Telegram.Tests.EndToEnd.ContextsEndToEndTests+ButtonHandler for update 902 (InvalidOperationException: CallbackContext is not available for this update kind.)
+ [ 0.539s] Error       UpdateDispatcher Failed to resolve raw update handler Vexel.Telegram.Tests.EndToEnd.ContextsEndToEndTests+InlineHandler for update 902 (InvalidOperationException: InlineQueryContext is not available for this update kind.)
+ [ 0.570s] user in chat 100 taps the "Blue" button on the bot's menu message
+ [ 0.669s] telegram-api  getUpdates(offset=903) -> update 903
+ [ 0.670s] telegram-api  getUpdates(offset=904) -> no updates
+ [ 0.670s] Error       UpdateDispatcher Failed to resolve raw update handler Vexel.Telegram.Tests.EndToEnd.ContextsEndToEndTests+MenuHandler for update 903 (InvalidOperationException: MessageContext is not available for this update kind.)
+ [ 0.671s] bot handler   ButtonHandler chat 100 data "pick:blue"
+ [ 0.836s] telegram-api  <- bot calls answerCallbackQuery callback_query_id="cbq-1" text="Blue it is"
+ [ 0.836s] telegram-api  getUpdates(offset=904) -> no updates
+ [ 0.949s] telegram-api  <- bot calls editMessageText chat_id=100 message_id=9001 text="You picked blue"
+ [ 0.950s] telegram-api  getUpdates(offset=904) -> no updates
+ [ 0.950s] Error       UpdateDispatcher Failed to resolve raw update handler Vexel.Telegram.Tests.EndToEnd.ContextsEndToEndTests+InlineHandler for update 903 (InvalidOperationException: InlineQueryContext is not available for this update kind.)
+ [ 1.038s] a different user in chat 200 sends "/menu"
+ [ 1.088s] telegram-api  getUpdates(offset=904) -> update 904
+ [ 1.088s] telegram-api  getUpdates(offset=905) -> no updates
+ [ 1.089s] bot handler   MenuHandler   chat 200 text "/menu"
+ [ 1.230s] telegram-api  <- bot calls sendMessage chat_id=200 text="pick one" reply_markup=<inline keyboard>
+ [ 1.230s] telegram-api  getUpdates(offset=905) -> no updates
+ [ 1.230s] Error       UpdateDispatcher Failed to resolve raw update handler Vexel.Telegram.Tests.EndToEnd.ContextsEndToEndTests+ButtonHandler for update 904 (InvalidOperationException: CallbackContext is not available for this update kind.)
+ [ 1.230s] Error       UpdateDispatcher Failed to resolve raw update handler Vexel.Telegram.Tests.EndToEnd.ContextsEndToEndTests+InlineHandler for update 904 (InvalidOperationException: InlineQueryContext is not available for this update kind.)
+ [ 1.400s] user 700 types an inline query "vex"
+ [ 1.403s] telegram-api  getUpdates(offset=905) -> update 905
+ [ 1.404s] telegram-api  getUpdates(offset=906) -> no updates
+ [ 1.406s] Error       UpdateDispatcher Failed to resolve raw update handler Vexel.Telegram.Tests.EndToEnd.ContextsEndToEndTests+MenuHandler for update 905 (InvalidOperationException: MessageContext is not available for this update kind.)
+ [ 1.406s] Error       UpdateDispatcher Failed to resolve raw update handler Vexel.Telegram.Tests.EndToEnd.ContextsEndToEndTests+ButtonHandler for update 905 (InvalidOperationException: CallbackContext is not available for this update kind.)
+ [ 1.408s] bot handler   InlineHandler user 700 query "vex"
+ [ 1.545s] telegram-api  <- bot calls answerInlineQuery inline_query_id="iq-1"
+ [ 1.545s] telegram-api  getUpdates(offset=906) -> no updates
+ [ 1.700s] telegram-api  getUpdates(offset=906) -> no updates
+ [ 1.704s] Information Lifetime         Application is shutting down...
+ [ 1.714s] Information VexelClient      VexelClient stopped
+ [ 1.716s] host stopped
+ 
+ Bot -> Telegram Bot API calls, as the Telegram side saw them:
+   sendMessage chat_id=100 text="pick one" reply_markup=<inline keyboard>
+   answerCallbackQuery callback_query_id="cbq-1" text="Blue it is"
+   editMessageText chat_id=100 message_id=9001 text="You picked blue"
+   sendMessage chat_id=200 text="pick one" reply_markup=<inline keyboard>
+   answerInlineQuery inline_query_id="iq-1"
+ 
+ Per-update DI scope identities:
+   message:902    holder#2681320 feedback#5135072 update=902 callbackAnswered=False
+   callback:903   holder#8318867 feedback#36573035 update=903 callbackAnswered=True
+   message:904    holder#11080923 feedback#4847719 update=904 callbackAnswered=False
+   inline:905     holder#13273752 feedback#1432091 update=905 callbackAnswered=False
+
+
+
+Test Run Successful.
