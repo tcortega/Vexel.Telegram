@@ -1,0 +1,26 @@
+=== README claim check: the packaged generator also works on the .NET 10 SDK ===
+--- global.json pinning the consumer to SDK 10 ---
+{
+  "sdk": {
+    "version": "10.0.302",
+    "rollForward": "disable"
+  }
+}
+--- dotnet --version ---
+10.0.302
+
+--- dotnet build + run ---
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+Time Elapsed 00:00:01.23
+Consumer app referenced ONLY Vexel.Telegram.Handlers (no analyzer wiring).
+Generated route table -> SetMyCommands catalog:
+  /echo - Echo the rest of the message
+  /ping - Check that the bot is alive
+
+--- generated files ---
+Immediate.Handlers.Generators/Immediate.Handlers.Generators.ImmediateHandlersGenerator/IH.ConsumerBot.Echo.g.cs
+Immediate.Handlers.Generators/Immediate.Handlers.Generators.ImmediateHandlersGenerator/IH.ConsumerBot.Ping.g.cs
+Immediate.Handlers.Generators/Immediate.Handlers.Generators.ImmediateHandlersGenerator/IH.ServiceCollectionExtensions.g.cs
+Vexel.Telegram.Generators/Vexel.Telegram.Generators.RouteGenerator/Vexel.Telegram.Routes.g.cs

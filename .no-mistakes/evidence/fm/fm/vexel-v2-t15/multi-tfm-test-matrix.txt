@@ -1,0 +1,9 @@
+=== CI test matrix reproduced locally (build.yml test job: tfm = net10.0, net11.0) ===
+Targeted filter: docs/packaging-contract tests + the generator snapshot tests that produce the packed analyzer's output.
+
+$ dotnet test -c Release --no-build --framework net10.0 --filter "FullyQualifiedName~Docs|FullyQualifiedName~Generators"
+Passed!  - Failed:     0, Passed:    46, Skipped:     0, Total:    46, Duration: 4 s - Vexel.Telegram.Tests.dll (net10.0)
+
+$ dotnet test -c Release --no-build --framework net11.0 --filter "FullyQualifiedName~Docs|FullyQualifiedName~Generators"
+Passed!  - Failed:     0, Passed:    46, Skipped:     0, Total:    46, Duration: 4 s - Vexel.Telegram.Tests.dll (net11.0)
+
