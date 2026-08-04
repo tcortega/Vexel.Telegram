@@ -64,7 +64,7 @@ internal readonly struct EquatableReadOnlyList<T>(T[]? values) :
 	{
 		private int _index = -1;
 
-		public T Current => values[_index];
+		public readonly T Current => values[_index];
 
 		public bool MoveNext() => ++_index < values.Length;
 	}

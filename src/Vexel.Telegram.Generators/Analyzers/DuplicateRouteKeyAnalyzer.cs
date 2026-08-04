@@ -30,11 +30,9 @@ public sealed class DuplicateRouteKeyAnalyzer : DiagnosticAnalyzer
 				actionContext => AnalyzeCommand(actionContext, commands),
 				SymbolKind.NamedType);
 
-			startContext.RegisterCompilationEndAction(endContext =>
-			{
-				// Diagnostics are reported at discovery time when a duplicate is found.
-				_ = commands;
-			});
+			// Diagnostics are reported at discovery time when a duplicate is found; the end action
+			// only keeps the per-compilation map alive for the duration of the analysis.
+			startContext.RegisterCompilationEndAction(endContext => _ = commands);
 		});
 	}
 

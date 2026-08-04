@@ -91,7 +91,7 @@ internal static class RouteRegistrationEmitter
 			return;
 		}
 
-		var trailingTakesRest = command.Parameters[command.Parameters.Count - 1].IsTrailingString;
+		var trailingTakesRest = command.Parameters[^1].IsTrailingString;
 		_ = sb.Append(indent)
 			.Append("if (!global::Vexel.Telegram.Handlers.Routing.CommandArgumentBinder.TryTokenize(payload, ")
 			.Append(command.Parameters.Count)

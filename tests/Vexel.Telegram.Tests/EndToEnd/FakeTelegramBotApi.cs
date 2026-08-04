@@ -131,6 +131,29 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 	}
 
 	/// <summary>
+	/// Builds a text-message update the way Telegram delivers a typed command: a <c>bot_command</c>
+	/// entity covering the leading <c>/command[@Bot]</c> token.
+	/// </summary>
+	public static (int Id, string Json) CommandUpdate(int id, long chatId, string text)
+	{
+		var (_, json) = MessageUpdate(id, chatId, text);
+		var update = (JsonObject)JsonNode.Parse(json)!;
+
+		var space = text.IndexOf(' ', StringComparison.Ordinal);
+		var length = space < 0 ? text.Length : space;
+
+		update["message"]!["entities"] = new JsonArray(
+			new JsonObject
+			{
+				["type"] = "bot_command",
+				["offset"] = 0,
+				["length"] = length,
+			});
+
+		return (id, update.ToJsonString());
+	}
+
+	/// <summary>
 	/// Builds a callback-query update JSON payload for a tap on a button under a bot message.
 	/// </summary>
 	public static (int Id, string Json) CallbackQueryUpdate(
@@ -298,7 +321,11 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 		{
 			if (request[key] is { } value)
 			{
-				fields.Add($"{key}={value.ToJsonString()}");
+				// Strings are rendered raw rather than JSON-escaped, so message text in the call log
+				// reads the way it does in the chat.
+				fields.Add(value.GetValueKind() == JsonValueKind.String
+					? $"{key}=\"{value.GetValue<string>()}\""
+					: $"{key}={value.ToJsonString()}");
 			}
 		}
 

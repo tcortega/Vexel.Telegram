@@ -5,7 +5,7 @@ Not a frozen API contract.
 Items below are labeled `agreed`, `proposed`, or `open`.
 Do not treat proposed items as authorization to implement product code.
 
-Last updated: 2026-08-04 (decision log through 32; T1 skeleton, T2 client dispatch, and T4 contexts/Feedback/DI landed)
+Last updated: 2026-08-04 (decision log through 32; T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, and T3 `[Command]` routing landed)
 Branch: `v2` (created to hold this context and future V2 work)
 Repo stays public. Private-repo idea was rejected.
 
@@ -155,7 +155,7 @@ Current build-level details live in `AGENTS.md`; the solution and csproj files a
 
 App references: `Vexel.Telegram` + `Immediate.Handlers` as an **explicit peer** (same honesty as Apis).
 
-### Runtime flow (proposed)
+### Runtime flow - **command leg settled in T3**
 
 ```
 Update
@@ -169,6 +169,12 @@ Update
 ```
 
 Hot path: compile-time map, no reflection invoke.
+
+`[Command]` is the leg that exists today: `IUpdateRouter` is the dispatcher seam, `TelegramRouter`
+the runtime implementation. Callback / inline / chosen-result legs are still proposed.
+The command binding convention (key extraction, `@Bot` suffix, argument shapes) is normative in the
+code that implements it - `CommandKeyExtractor` and `CommandArgumentBinder` in
+`src/Vexel.Telegram.Handlers/Routing` - not restated here.
 
 ### Example DX (illustrative, not approved API names)
 
@@ -236,13 +242,16 @@ Do not invent a second pipeline.
 ### Registration DX
 
 ```csharp
-builder.Services.AddTelegramBot(_ => "<BOT_TOKEN>");    // client + host + contexts + Feedback
+builder.Services.AddTelegramBot(_ => "<BOT_TOKEN>");    // client + host + contexts + Feedback + router
 builder.Services.AddXxxHandlers();                      // Immediate
 builder.Services.AddXxxTelegram();                      // Vexel generated routes
 ```
 
 **Settled in T4:** `AddTelegramBot(...)` ships (with `AddVexelUpdateContexts()` as the contexts-only
-seam for manual wiring). `AddXxxTelegram()` lands with the router.
+seam for manual wiring).
+**Settled in T3:** the generator emits `Add{Assembly}Telegram()`, which registers that assembly's
+`TelegramRouteContribution`; `TelegramRouter` composes all contributions and fails fast on duplicate
+command keys across assemblies.
 
 ### Escape hatch
 
@@ -274,6 +283,9 @@ Reasons this locked:
 Mitigations for dual-attr DX:
 
 - Analyzer + code fix when a Vexel route attr is present without `[Handler]` (same idea as Immediate.Apis IAPI0001).
+  **T3:** the analyzer ships (`VEX0001`); the code fix is still outstanding.
+  Shipped rule IDs and severities are tracked in
+  `src/Vexel.Telegram.Generators/AnalyzerReleases.*.md`, not duplicated here.
 - Samples and docs always show the pair; never document Telegram attrs alone as sufficient.
 
 ### Do not
@@ -377,7 +389,7 @@ Not a substitute for unit tests. Not prod userbots.
 ### Open questions
 
 None tracked here.
-The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI landed).
+The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing landed).
 
 
 ---

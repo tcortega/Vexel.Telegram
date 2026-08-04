@@ -8,8 +8,8 @@ namespace Vexel.Telegram.Client.Dispatch;
 
 /// <summary>
 /// Default update dispatcher.
-/// T2 runs raw handlers only; later slices insert routed handlers and On* fan-out ahead of raw
-/// (precedence: routed → On* → raw).
+/// Runs registered <see cref="IUpdateRouter"/>s, then raw handlers; On* fan-out slots between them
+/// in a later slice (precedence: routed → On* → raw).
 /// </summary>
 /// <param name="scopeFactory">Factory for the per-update DI scope.</param>
 /// <param name="rootProvider">
@@ -17,6 +17,7 @@ namespace Vexel.Telegram.Client.Dispatch;
 /// they never capture an update scope and stay subject to the container's scope validation.
 /// </param>
 /// <param name="registry">Raw handler registry.</param>
+/// <param name="routers">Routed-handler stages run before raw handlers, in registration order.</param>
 /// <param name="options">Client options.</param>
 /// <param name="logger">Logger.</param>
 public sealed class UpdateDispatcher(

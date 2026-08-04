@@ -17,13 +17,24 @@ namespace Vexel.Telegram.Tests.Generators;
 
 internal static class GeneratorTestHelper
 {
-	public static GeneratorDriverRunResult RunGenerators(string source)
+	public static GeneratorDriverRunResult RunGenerators(string source) =>
+		RunGenerators(source, "GeneratorTests", out _);
+
+	/// <summary>
+	/// Runs the Immediate and Vexel generators over <paramref name="source"/> as assembly
+	/// <paramref name="assemblyName"/> and hands back the compiled result, so a caller can emit and
+	/// load the generated route table like a real bot assembly.
+	/// </summary>
+	public static GeneratorDriverRunResult RunGenerators(
+		string source,
+		string assemblyName,
+		out Compilation compilation)
 	{
 		var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 		var syntaxTree = CSharpSyntaxTree.ParseText(source, parseOptions);
 
-		var compilation = CSharpCompilation.Create(
-			assemblyName: "GeneratorTests",
+		var inputCompilation = CSharpCompilation.Create(
+			assemblyName: assemblyName,
 			syntaxTrees: [syntaxTree],
 			references: GetReferences(),
 			options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
@@ -37,10 +48,10 @@ internal static class GeneratorTestHelper
 				immediateGenerator.AsSourceGenerator(),
 			],
 			parseOptions: parseOptions,
-			optionsProvider: new TestOptionsProvider());
+			optionsProvider: new TestOptionsProvider(assemblyName));
 
 		driver = driver.RunGeneratorsAndUpdateCompilation(
-			compilation,
+			inputCompilation,
 			out var outputCompilation,
 			out var diagnostics);
 
@@ -61,7 +72,28 @@ internal static class GeneratorTestHelper
 				+ trees);
 		}
 
+		compilation = outputCompilation;
 		return driver.GetRunResult();
+	}
+
+	/// <summary>
+	/// Compiles <paramref name="source"/> plus everything both generators emitted into a real
+	/// assembly and loads it, the way a bot author's own project ships to production.
+	/// </summary>
+	public static Assembly EmitBotAssembly(string source, string assemblyName, out string generatedRoutes)
+	{
+		var result = RunGenerators(source, assemblyName, out var compilation);
+		generatedRoutes = GetVexelGeneratedSource(result);
+
+		using var peStream = new MemoryStream();
+		var emit = compilation.Emit(peStream);
+		Assert.True(
+			emit.Success,
+			string.Join(
+				Environment.NewLine,
+				emit.Diagnostics.Where(static d => d.Severity is DiagnosticSeverity.Error)));
+
+		return Assembly.Load(peStream.ToArray());
 	}
 
 	public static async Task<ImmutableArray<Diagnostic>> RunAnalyzersAsync(
@@ -153,19 +185,19 @@ internal static class GeneratorTestHelper
 		return [.. refs];
 	}
 
-	private sealed class TestOptionsProvider : AnalyzerConfigOptionsProvider
+	private sealed class TestOptionsProvider(string rootNamespace) : AnalyzerConfigOptionsProvider
 	{
-		private static readonly AnalyzerConfigOptions s_options = new DictionaryOptions(
+		private readonly AnalyzerConfigOptions _options = new DictionaryOptions(
 			new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
 			{
-				["build_property.rootnamespace"] = "GeneratorTests",
+				["build_property.rootnamespace"] = rootNamespace,
 			});
 
-		public override AnalyzerConfigOptions GlobalOptions => s_options;
+		public override AnalyzerConfigOptions GlobalOptions => _options;
 
-		public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => s_options;
+		public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _options;
 
-		public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => s_options;
+		public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => _options;
 	}
 
 	private sealed class DictionaryOptions(Dictionary<string, string> values) : AnalyzerConfigOptions
