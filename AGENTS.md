@@ -22,7 +22,6 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 * Tests live in `tests/Vexel.Telegram.Tests` (xunit): unit + generator snapshots + `EndToEnd/` host-level polling against an in-process fake Bot API; run with `dotnet test`.
 * Handlers references `Immediate.Handlers` as a normal PackageReference (no PrivateAssets) so consumers get it transitively. Generators is Analyzer ProjectReference today; nupkg embedding is T15.
 * Sample bot: `samples/Vexel.Telegram.Sample` is the v2 living docs (in the solution build). Three-call wiring in `Program.cs`; token via `TELEGRAM_BOT_TOKEN` / user-secrets `BotToken` (see sample README). Monorepo consumers must ProjectReference `Vexel.Telegram.Generators` as `OutputItemType=Analyzer` themselves - analyzer ProjectReferences do not flow transitively; package consumers get it from the Handlers nupkg (T15).
-* Legacy v1 projects under `src/Vexel.Telegram.{Abstractions,Commands,Interactivity,Extensions}` stay on disk as reference only until T14; they are out of the solution build.
 * Central package versions live in `Directory.Packages.props`. Microsoft.Extensions is on 10.0.x to satisfy Immediate.Handlers TFM floors.
 * `docs/v2-context.md` owns the v2 design decisions and decision log; check it before proposing API or architecture changes.
 * Human v1→v2 migration notes: `docs/v1-to-v2.md` (linked from the README). Not an AI plan artifact.
