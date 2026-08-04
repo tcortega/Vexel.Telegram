@@ -39,7 +39,7 @@ builder.Logging.AddSimpleConsole(o => o.SingleLine = true);
 
 // The single public entry point a v2 consumer is meant to call.
 builder.Services.AddTelegramService(
-    tokenFactory: _ => Environment.GetEnvironmentVariable("BOT_TOKEN")!, // redacted: placeholder value in the real run
+    tokenFactory: _ => "<redacted-test-bot-token>",
     configureClientOptions: o => o.DropPendingUpdates = false);
 
 var host = builder.Build();
