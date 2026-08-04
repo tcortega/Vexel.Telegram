@@ -25,8 +25,8 @@
 	<ItemGroup>
 		<ProjectReference Include="..\..\src\Vexel.Telegram\Vexel.Telegram.csproj"/>
 		<!--
-			ProjectReference analyzers do not flow transitively. Consumers of the Handlers *package*
-			get the generator from the nupkg (T15). In this monorepo sample we reference it directly.
+			ProjectReference analyzers do not flow transitively. NuGet consumers of Handlers get the
+			generator from analyzers/dotnet/cs in the nupkg. This monorepo sample references it directly.
 		-->
 		<ProjectReference Include="..\..\src\Vexel.Telegram.Generators\Vexel.Telegram.Generators.csproj"
 		                  ReferenceOutputAssembly="false"

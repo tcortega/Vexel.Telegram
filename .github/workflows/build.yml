@@ -15,11 +15,13 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # MinVer needs tags + history for pack dry-run versioning.
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -40,5 +42,45 @@ jobs:
       - name: Build
         run: dotnet build -c Release --no-restore
 
-      - name: Test
-        run: dotnet test -c Release --no-build --verbosity normal
+      - name: Pack (dry-run)
+        run: |
+          rm -rf nupkgs
+          mkdir -p nupkgs
+          dotnet pack src/Vexel.Telegram.Client/Vexel.Telegram.Client.csproj -c Release --no-build -o nupkgs
+          dotnet pack src/Vexel.Telegram.Handlers/Vexel.Telegram.Handlers.csproj -c Release --no-build -o nupkgs
+          dotnet pack src/Vexel.Telegram.Hosting/Vexel.Telegram.Hosting.csproj -c Release --no-build -o nupkgs
+          dotnet pack src/Vexel.Telegram.AspNetCore/Vexel.Telegram.AspNetCore.csproj -c Release --no-build -o nupkgs
+
+      - name: Assert pack layout
+        run: bash ./build/assert-pack-layout.sh nupkgs
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Test project TFMs (see tests/Vexel.Telegram.Tests.csproj). Library TFMs are still built above.
+        tfm: [ net10.0, net11.0 ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+            11.0.x
+          dotnet-quality: preview
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Test (${{ matrix.tfm }})
+        run: dotnet test -c Release --no-build --framework ${{ matrix.tfm }} --verbosity normal

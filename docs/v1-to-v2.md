@@ -85,13 +85,14 @@ See the sample and the analyzer diagnostics (`VEX0001`…`VEX0007`) when a shape
 * **`Vexel.Telegram.Client`**: receive (polling or webhook), per-chat `UpdateScheduler`, raw handler registry
 * **`Vexel.Telegram.Handlers`**: attributes, contexts, `Feedback`, `Flow`/`IFlowStore`, router, keyboards
 * **`Vexel.Telegram.Generators`**: Roslyn generator + analyzers (not published alone).
-  Today every app project must `ProjectReference` it itself with `OutputItemType="Analyzer"`; analyzer project references do not flow transitively.
-  Embedding it in the `Handlers` nupkg (`analyzers/dotnet/cs`) so package consumers get it for free is planned work (T15), not current behavior.
+  The `Handlers` nupkg embeds it under `analyzers/dotnet/cs`, so NuGet consumers of Handlers get route generation and VEX diagnostics automatically.
+  Monorepo `ProjectReference` consumers still need an explicit Generators analyzer reference - analyzer project references do not flow transitively.
 * **`Vexel.Telegram.Hosting`**: `BackgroundService` receive loop + auto `SetMyCommands` (no ASP.NET Core framework reference)
 * **`Vexel.Telegram.AspNetCore`**: sole `FrameworkReference` to ASP.NET Core; owns `MapTelegramWebhook`
 * **`Vexel.Telegram`**: metapackage of Client + Handlers + Hosting (**excludes** AspNetCore)
 
 Production apps should prefer explicit package references over the metapackage once packages publish.
+Package consumers only need `Vexel.Telegram.Handlers` (plus Client/Hosting/AspNetCore as needed); they do not add a separate Generators package.
 
 ### Three-call wiring
 

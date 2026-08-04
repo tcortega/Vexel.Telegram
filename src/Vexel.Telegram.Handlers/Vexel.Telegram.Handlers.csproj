@@ -17,11 +17,37 @@
 	<ItemGroup>
 		<ProjectReference Include="..\Vexel.Telegram.Client\Vexel.Telegram.Client.csproj"/>
 		<ProjectReference Include="..\Vexel.Telegram.Hosting\Vexel.Telegram.Hosting.csproj"/>
-		<!-- Development-time analyzer; nupkg embedding is asserted in T15 pack dry-run. -->
+		<!--
+			Dev-time analyzer for monorepo project references.
+			NuGet consumers get the same DLL from analyzers/dotnet/cs (see _PackEmbeddedGenerators).
+			PrivateAssets keeps Generators out of the dependency group (it is not a published package).
+		-->
 		<ProjectReference Include="..\Vexel.Telegram.Generators\Vexel.Telegram.Generators.csproj"
 		                  ReferenceOutputAssembly="false"
-		                  OutputItemType="Analyzer"/>
+		                  OutputItemType="Analyzer"
+		                  PrivateAssets="all"/>
 	</ItemGroup>
+
+	<!--
+		Embed generator + VEX analyzers in the Handlers nupkg.
+		Package consumers reference Handlers only; monorepo ProjectReferences still need an explicit
+		Generators analyzer reference (analyzer project refs do not flow transitively).
+	-->
+	<PropertyGroup>
+		<TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_PackEmbeddedGenerators</TargetsForTfmSpecificContentInPackage>
+	</PropertyGroup>
+
+	<Target Name="_PackEmbeddedGenerators">
+		<!-- Single TFM gate so multi-targeting does not duplicate the analyzer entry. -->
+		<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+			<_GeneratorDll>$(MSBuildThisFileDirectory)..\Vexel.Telegram.Generators\bin\$(Configuration)\netstandard2.0\Vexel.Telegram.Generators.dll</_GeneratorDll>
+		</PropertyGroup>
+		<Error Text="Generators DLL not found at '$(_GeneratorDll)'. Build Vexel.Telegram.Generators before packing Handlers."
+		       Condition="'$(TargetFramework)' == 'net8.0' AND !Exists('$(_GeneratorDll)')"/>
+		<ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+			<TfmSpecificPackageFile Include="$(_GeneratorDll)" PackagePath="analyzers/dotnet/cs"/>
+		</ItemGroup>
+	</Target>
 
 	<PropertyGroup Label="MinVer">
 		<MinVerAutoIncrement>minor</MinVerAutoIncrement>

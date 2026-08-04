@@ -229,12 +229,12 @@ public sealed class V1ToV2DocTests(ITestOutputHelper output)
 			Assert.Contains(id, releases, StringComparison.Ordinal);
 		}
 
-		// 3. "generator ships as an analyzer ... not published alone" and the T15 caveat.
+		// 3. Generators stays unpackable; Handlers embeds it under analyzers/dotnet/cs for NuGet consumers.
 		Assert.Contains(
 			"<IsPackable>false</IsPackable>",
 			File.ReadAllText(Path.Combine(root, "src", "Vexel.Telegram.Generators", "Vexel.Telegram.Generators.csproj")),
 			StringComparison.Ordinal);
-		Assert.DoesNotContain(
+		Assert.Contains(
 			"analyzers/dotnet/cs",
 			File.ReadAllText(Path.Combine(root, "src", "Vexel.Telegram.Handlers", "Vexel.Telegram.Handlers.csproj")),
 			StringComparison.Ordinal);
