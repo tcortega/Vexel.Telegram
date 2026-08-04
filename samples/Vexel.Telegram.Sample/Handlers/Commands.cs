@@ -148,7 +148,7 @@ public static partial class PickColor
 	{
 		await feedback.AnswerCallbackAsync($"Selected {command.Color}", cancellationToken: token);
 		await feedback.EditAsync(
-			$"{context.From.FirstName} picked *{command.Color}*.",
+			$"{MarkdownText.Escape(context.From.FirstName)} picked *{MarkdownText.Escape(command.Color)}*.",
 			parseMode: ParseMode.Markdown,
 			replyMarkup: new InlineKeyboardBuilder()
 				.AddRow()
@@ -165,7 +165,7 @@ internal static class HelpText
 		"""
 		*What this sample shows*
 
-		`[Handler]` + a Vexel route/On* attribute on every type (Immediate.Apis parity).
+		`[Handler]` + a Vexel route or `[On*]` attribute on every type (Immediate.Apis parity).
 
 		• `/start`, `/menu` - button-first home keyboard
 		• `/ping`, `/echo hi`, `/help`, `/inline`, `/signup`

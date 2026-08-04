@@ -64,7 +64,7 @@ internal static class MenuKeyboard
 		• *Help* - what each piece demonstrates
 
 		Commands always win over an armed flow, so `/menu` and `/cancel` work mid-signup.
-		An unknown `/foo` mid-flow is a command miss (falls through to On*) - not free text.
+		An unknown `/foo` mid-flow is a command miss (falls through to `On*`) - not free text.
 		""";
 
 	internal static InlineKeyboardMarkup Build() =>

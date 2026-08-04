@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -10,6 +11,10 @@ using Vexel.Telegram.Sample;
 //   2. AddXxxHandlers      - Immediate.Handlers DI for every [Handler]
 //   3. AddXxxTelegram      - Vexel-generated route / flow-step / On* contribution
 var builder = Host.CreateApplicationBuilder(args);
+
+// The host only wires user-secrets in the Development environment, and this sample runs as
+// Production by default - add the provider explicitly so the README's `dotnet run` works as-is.
+builder.Configuration.AddUserSecrets(Assembly.GetExecutingAssembly(), optional: true, reloadOnChange: false);
 
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options =>
