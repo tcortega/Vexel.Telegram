@@ -11,3 +11,4 @@ VEX0003 | Vexel.Telegram | Error | Invalid Telegram command name
 VEX0004 | Vexel.Telegram | Error | Unbindable request shape
 VEX0005 | Vexel.Telegram | Error | Duplicate route key
 VEX0006 | Vexel.Telegram | Error | Invalid inline query trigger
+VEX0007 | Vexel.Telegram | Error | Invalid Flow.PromptAsync target

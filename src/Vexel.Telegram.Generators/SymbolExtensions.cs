@@ -138,6 +138,19 @@ internal static class SymbolExtensions
 		return false;
 	}
 
+	public static AttributeData? GetHandlerAttribute(this INamedTypeSymbol type)
+	{
+		foreach (var attribute in type.GetAttributes())
+		{
+			if (attribute.AttributeClass.IsHandlerAttribute())
+			{
+				return attribute;
+			}
+		}
+
+		return null;
+	}
+
 	public static AttributeData? GetCommandAttribute(this INamedTypeSymbol type)
 	{
 		foreach (var attribute in type.GetAttributes())
@@ -270,12 +283,13 @@ internal static class SymbolExtensions
 		var display = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
 		if (string.Equals(display, "global::Vexel.Telegram.Handlers.Feedback", StringComparison.Ordinal)
+			|| string.Equals(display, "global::Vexel.Telegram.Handlers.Flow", StringComparison.Ordinal)
+			|| string.Equals(display, "global::Vexel.Telegram.Handlers.IFlowStore", StringComparison.Ordinal)
 			|| string.Equals(display, "global::Vexel.Telegram.Handlers.Contexts.MessageContext", StringComparison.Ordinal)
 			|| string.Equals(display, "global::Vexel.Telegram.Handlers.Contexts.CallbackContext", StringComparison.Ordinal)
 			|| string.Equals(display, "global::Vexel.Telegram.Handlers.Contexts.InlineQueryContext", StringComparison.Ordinal)
 			|| string.Equals(display, "global::Vexel.Telegram.Handlers.Contexts.ChosenInlineResultContext", StringComparison.Ordinal)
-			|| string.Equals(display, "global::Telegram.Bot.ITelegramBotClient", StringComparison.Ordinal)
-			|| display.StartsWith("global::Vexel.Telegram.Handlers.Flow", StringComparison.Ordinal))
+			|| string.Equals(display, "global::Telegram.Bot.ITelegramBotClient", StringComparison.Ordinal))
 		{
 			return true;
 		}

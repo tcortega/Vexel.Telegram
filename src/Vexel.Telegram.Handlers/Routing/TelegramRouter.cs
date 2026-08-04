@@ -1,5 +1,7 @@
 using System.Collections.Frozen;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Vexel.Telegram.Client.Dispatch;
@@ -11,6 +13,9 @@ namespace Vexel.Telegram.Handlers.Routing;
 /// bind arguments, and await the generated Immediate handler.
 /// </summary>
 /// <remarks>
+/// Text precedence (D7): leading <c>/</c> commands always win (including <c>/cancel</c> mid-flow),
+/// then an armed flow step, else unrouted. An unknown <c>/foo</c> mid-flow is a command miss and
+/// does not get consumed as flow input (C2).
 /// Callback and inline answer obligations (B4) are discharged by
 /// <see cref="CallbackAnswerObligation"/> and <see cref="InlineAnswerObligation"/> after the full
 /// dispatch pipeline so routed handlers, exceptions, unrouted updates, and raw handlers all share
@@ -24,21 +29,27 @@ public sealed class TelegramRouter : IUpdateRouter
 	private readonly FrozenDictionary<string, RouteEntry> _callbacks;
 	private readonly FrozenDictionary<string, RouteEntry> _inlineQueries;
 	private readonly FrozenDictionary<string, RouteEntry> _chosenInlineResults;
+	private readonly FrozenDictionary<string, RouteEntry> _flowSteps;
+	private readonly bool _hasUserCancelCommand;
+	private readonly FlowOptions _flowOptions;
 	private string? _botUsername;
 	private int _botUsernameResolved; // 0 = unset, 1 = resolved
 	private long _botUsernameRetryAfterTicks;
 
 	/// <summary>
 	/// Initializes a new router from all registered <see cref="TelegramRouteContribution"/>s.
-	/// Fails fast when two assemblies contribute the same command, callback, inline, or chosen key.
+	/// Fails fast when two assemblies contribute the same command, callback, inline, chosen, or
+	/// flow step key.
 	/// </summary>
 	/// <param name="contributions">Per-assembly route contributions.</param>
 	/// <param name="botClient">Bot client used to resolve this bot's username when needed.</param>
 	/// <param name="logger">Logger.</param>
+	/// <param name="flowOptions">Optional flow options; defaults apply when omitted.</param>
 	public TelegramRouter(
 		IEnumerable<TelegramRouteContribution> contributions,
 		ITelegramBotClient botClient,
-		ILogger<TelegramRouter> logger)
+		ILogger<TelegramRouter> logger,
+		IOptions<FlowOptions>? flowOptions = null)
 	{
 		ArgumentNullException.ThrowIfNull(contributions);
 		ArgumentNullException.ThrowIfNull(botClient);
@@ -46,12 +57,15 @@ public sealed class TelegramRouter : IUpdateRouter
 
 		_botClient = botClient;
 		_logger = logger;
+		_flowOptions = flowOptions?.Value ?? new FlowOptions();
 
 		var contributionList = contributions as IList<TelegramRouteContribution> ?? [.. contributions];
 		_commands = ComposeCommands(contributionList);
 		_callbacks = ComposeCallbacks(contributionList);
 		_inlineQueries = ComposeInlineQueries(contributionList);
 		_chosenInlineResults = ComposeChosenInlineResults(contributionList);
+		_flowSteps = ComposeFlowSteps(contributionList);
+		_hasUserCancelCommand = _commands.ContainsKey("cancel");
 	}
 
 	/// <summary>
@@ -78,6 +92,17 @@ public sealed class TelegramRouter : IUpdateRouter
 	/// <summary>Composed command metadata across all contributions (for SetMyCommands).</summary>
 	public IReadOnlyList<CommandRouteMetadata> CommandMetadata { get; private set; } = [];
 
+	/// <summary>
+	/// Returns <see langword="true"/> when <paramref name="stepKey"/> is a registered flow step.
+	/// Used by <see cref="Flow.PromptAsync{TRequest}"/>.
+	/// </summary>
+	/// <param name="stepKey">Request type <see cref="Type.FullName"/>.</param>
+	public bool HasFlowStep(string stepKey)
+	{
+		ArgumentNullException.ThrowIfNull(stepKey);
+		return _flowSteps.ContainsKey(stepKey);
+	}
+
 	/// <inheritdoc />
 	public async Task RouteAsync(Update update, IServiceProvider scope, CancellationToken cancellationToken)
 	{
@@ -103,33 +128,62 @@ public sealed class TelegramRouter : IUpdateRouter
 			return;
 		}
 
-		if (update.Message is not { } message || _commands.Count == 0)
+		if (update.Message is { } message)
 		{
-			return;
+			await RouteMessageAsync(message, update, scope, cancellationToken).ConfigureAwait(false);
 		}
+	}
 
-		if (!CommandKeyExtractor.TryExtract(message, out var command, out var botSuffix, out var arguments))
+	private async Task RouteMessageAsync(
+		Message message,
+		Update update,
+		IServiceProvider scope,
+		CancellationToken cancellationToken)
+	{
+		// D7: leading-/ commands always win over an armed flow step. C2: an offset-0 BotCommand entity is
+		// never flow-step input, so every command path below returns instead of falling through to the
+		// armed step - a miss (unknown /foo, or /foo@OtherBot) reaches On*/raw handlers only.
+		if (CommandKeyExtractor.TryExtract(message, out var command, out var botSuffix, out var arguments))
 		{
-			return;
-		}
-
-		// GetMe is only needed to adjudicate an @Suffix, so plain commands never pay for it.
-		if (botSuffix is not null)
-		{
-			var botUsername = await ResolveBotUsernameAsync(cancellationToken).ConfigureAwait(false);
-			if (botUsername is not null
-				&& !botSuffix.Equals(botUsername, StringComparison.OrdinalIgnoreCase))
+			if (botSuffix is not null)
 			{
-				// Directed at another bot - fall through to flow/On*.
+				var botUsername = await ResolveBotUsernameAsync(cancellationToken).ConfigureAwait(false);
+				if (botUsername is not null
+					&& !botSuffix.Equals(botUsername, StringComparison.OrdinalIgnoreCase))
+				{
+					// Directed at another bot - not ours to route, and not step input either.
+					return;
+				}
+			}
+
+			if (_commands.TryGetValue(command, out var entry))
+			{
+				await InvokeCommandAsync(entry, arguments, update, scope, cancellationToken)
+					.ConfigureAwait(false);
 				return;
 			}
-		}
 
-		if (!_commands.TryGetValue(command, out var entry))
-		{
+			// Built-in /cancel only when the app has flow steps and did not register [Command("cancel")].
+			if (_flowSteps.Count > 0
+				&& !_hasUserCancelCommand
+				&& command.Equals("cancel", StringComparison.OrdinalIgnoreCase))
+			{
+				await HandleBuiltInCancelAsync(message, scope, cancellationToken).ConfigureAwait(false);
+			}
+
 			return;
 		}
 
+		await RouteFlowStepAsync(message, update, scope, cancellationToken).ConfigureAwait(false);
+	}
+
+	private async Task InvokeCommandAsync(
+		RouteEntry entry,
+		string arguments,
+		Update update,
+		IServiceProvider scope,
+		CancellationToken cancellationToken)
+	{
 		bool invoked;
 		try
 		{
@@ -156,6 +210,155 @@ public sealed class TelegramRouter : IUpdateRouter
 				"Failed to bind arguments for /{Command} (update {UpdateId}); handler not invoked",
 				entry.RouteKey,
 				update.Id);
+		}
+	}
+
+	private async Task RouteFlowStepAsync(
+		Message message,
+		Update update,
+		IServiceProvider scope,
+		CancellationToken cancellationToken)
+	{
+		if (_flowSteps.Count == 0)
+		{
+			return;
+		}
+
+		var userId = message.From?.Id;
+		if (userId is null)
+		{
+			return;
+		}
+
+		var store = scope.GetService<IFlowStore>();
+		if (store is null)
+		{
+			return;
+		}
+
+		var chatId = message.Chat.Id;
+		var entry = await store.GetAsync(chatId, userId.Value, cancellationToken).ConfigureAwait(false);
+		if (entry is null)
+		{
+			return;
+		}
+
+		if (!_flowSteps.TryGetValue(entry.StepKey, out var step))
+		{
+			_logger.LogWarning(
+				"Armed flow step '{StepKey}' has no binder (update {UpdateId}); clearing stale state",
+				entry.StepKey,
+				update.Id);
+			await store.CompleteAsync(chatId, userId.Value, cancellationToken).ConfigureAwait(false);
+			return;
+		}
+
+		// Binding convention rule 5: Text ?? Caption ?? "".
+		var payload = message.Text ?? message.Caption ?? string.Empty;
+		var flow = scope.GetService<Flow>();
+
+		bool invoked;
+		try
+		{
+			invoked = await step.Binder(scope, payload, cancellationToken).ConfigureAwait(false);
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			// B3: step exception keeps the step armed so the user can retry. Fail-closed generic reply.
+			_logger.LogError(
+				ex,
+				"Flow step '{StepKey}' failed for update {UpdateId}",
+				entry.StepKey,
+				update.Id);
+
+			if (_flowOptions.SendStepErrorReply)
+			{
+				await TrySendStepErrorAsync(scope, cancellationToken).ConfigureAwait(false);
+			}
+
+			return;
+		}
+
+		if (!invoked)
+		{
+			_logger.LogWarning(
+				"Failed to bind arguments for flow step '{StepKey}' (update {UpdateId}); handler not invoked",
+				entry.StepKey,
+				update.Id);
+			return;
+		}
+
+		// B3: success without re-arm auto-completes (forgotten Complete cannot leak state).
+		if (flow is null || (!flow.WasRearmed && !flow.WasCleared))
+		{
+			await store.CompleteAsync(chatId, userId.Value, cancellationToken).ConfigureAwait(false);
+		}
+	}
+
+	private async Task HandleBuiltInCancelAsync(
+		Message message,
+		IServiceProvider scope,
+		CancellationToken cancellationToken)
+	{
+		var userId = message.From?.Id;
+		if (userId is null)
+		{
+			return;
+		}
+
+		var store = scope.GetService<IFlowStore>();
+		if (store is null)
+		{
+			return;
+		}
+
+		// Only claim "Cancelled." for a live armed flow; with nothing armed this is an ordinary
+		// command miss that On*/raw handlers own.
+		var entry = await store.GetAsync(message.Chat.Id, userId.Value, cancellationToken).ConfigureAwait(false);
+		if (entry is null)
+		{
+			return;
+		}
+
+		await store.CompleteAsync(message.Chat.Id, userId.Value, cancellationToken).ConfigureAwait(false);
+
+		var feedback = scope.GetService<Feedback>();
+		if (feedback is not null)
+		{
+			try
+			{
+				_ = await feedback.ReplyAsync(
+					_flowOptions.CancelConfirmationMessage,
+					cancellationToken: cancellationToken).ConfigureAwait(false);
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "Built-in /cancel confirmation reply failed");
+			}
+		}
+	}
+
+	private async Task TrySendStepErrorAsync(IServiceProvider scope, CancellationToken cancellationToken)
+	{
+		var feedback = scope.GetService<Feedback>();
+		if (feedback is null)
+		{
+			return;
+		}
+
+		try
+		{
+			_ = await feedback.ReplyAsync(
+				_flowOptions.StepErrorMessage,
+				cancellationToken: cancellationToken).ConfigureAwait(false);
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Failed to send flow step error reply");
 		}
 	}
 
@@ -432,6 +635,35 @@ public sealed class TelegramRouter : IUpdateRouter
 								+ $"'{displayKey}' more than once. Call Add{contribution.AssemblyName}Telegram() "
 								+ "exactly once (a library that already calls it must not be re-registered by the app)."
 							: $"Duplicate {kind} route '{displayKey}' registered by assemblies "
+								+ $"'{otherAssembly}' and '{contribution.AssemblyName}'.");
+				}
+
+				owners[pair.Key] = contribution.AssemblyName;
+				map[pair.Key] = new RouteEntry(pair.Key, pair.Value);
+			}
+		}
+
+		return map.ToFrozenDictionary(StringComparer.Ordinal);
+	}
+
+	private static FrozenDictionary<string, RouteEntry> ComposeFlowSteps(
+		IEnumerable<TelegramRouteContribution> contributions)
+	{
+		var map = new Dictionary<string, RouteEntry>(StringComparer.Ordinal);
+		var owners = new Dictionary<string, string>(StringComparer.Ordinal);
+
+		foreach (var contribution in contributions)
+		{
+			foreach (var pair in contribution.FlowSteps)
+			{
+				if (owners.TryGetValue(pair.Key, out var otherAssembly))
+				{
+					throw new InvalidOperationException(
+						string.Equals(otherAssembly, contribution.AssemblyName, StringComparison.Ordinal)
+							? $"Assembly '{contribution.AssemblyName}' contributed flow step "
+								+ $"'{pair.Key}' more than once. Call Add{contribution.AssemblyName}Telegram() "
+								+ "exactly once (a library that already calls it must not be re-registered by the app)."
+							: $"Duplicate flow step '{pair.Key}' registered by assemblies "
 								+ $"'{otherAssembly}' and '{contribution.AssemblyName}'.");
 				}
 

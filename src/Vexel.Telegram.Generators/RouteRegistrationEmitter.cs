@@ -68,6 +68,23 @@ internal static class RouteRegistrationEmitter
 		_ = sb.AppendLine();
 		EmitBinderDictionary(sb, "chosenInlineResults", model.ChosenInlineResults, static c => c.RouteKey, static c => (c.HandlerFullyQualifiedName, c.RequestFullyQualifiedName, c.HasStringParameter));
 		_ = sb.AppendLine();
+		_ = sb.AppendLine("\t\tvar flowSteps = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(");
+		_ = sb.AppendLine("\t\t\tglobal::System.StringComparer.Ordinal)");
+		_ = sb.AppendLine("\t\t{");
+
+		foreach (var step in model.FlowSteps)
+		{
+			// Key must equal typeof(TRequest).FullName at runtime (Flow.PromptAsync / router lookup).
+			_ = sb.Append("\t\t\t[typeof(")
+				.Append(step.RequestFullyQualifiedName)
+				.AppendLine(").FullName!] = static async (scope, payload, cancellationToken) =>");
+			_ = sb.AppendLine("\t\t\t{");
+			EmitStringOrEmptyBinderBody(sb, step.HandlerFullyQualifiedName, step.RequestFullyQualifiedName, step.HasStringParameter, indent: "\t\t\t\t");
+			_ = sb.AppendLine("\t\t\t},");
+		}
+
+		_ = sb.AppendLine("\t\t};");
+		_ = sb.AppendLine();
 		_ = sb.AppendLine("\t\t_ = global::Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton(");
 		_ = sb.AppendLine("\t\t\tservices,");
 		_ = sb.AppendLine("\t\t\tnew global::Vexel.Telegram.Handlers.Routing.TelegramRouteContribution(");
@@ -76,7 +93,8 @@ internal static class RouteRegistrationEmitter
 		_ = sb.AppendLine("\t\t\t\tmetadata,");
 		_ = sb.AppendLine("\t\t\t\tcallbacks,");
 		_ = sb.AppendLine("\t\t\t\tinlineQueries,");
-		_ = sb.AppendLine("\t\t\t\tchosenInlineResults));");
+		_ = sb.AppendLine("\t\t\t\tchosenInlineResults,");
+		_ = sb.AppendLine("\t\t\t\tflowSteps));");
 		_ = sb.AppendLine();
 		_ = sb.AppendLine("\t\treturn services;");
 		_ = sb.AppendLine("\t}");

@@ -191,4 +191,32 @@ public sealed class RouteGeneratorSnapshotTests
 		var generated = GeneratorTestHelper.GetVexelGeneratedSource(GeneratorTestHelper.RunGenerators(source));
 		await Verify(generated);
 	}
+
+	[Fact]
+	public async Task Flow_only_handler_emits_step_map_entry()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+
+			namespace Demo;
+
+			[Handler]
+			public static partial class CollectName
+			{
+				public sealed record Command(string Name);
+
+				private static ValueTask HandleAsync(Command command, CancellationToken token)
+				{
+					_ = command;
+					_ = token;
+					return default;
+				}
+			}
+			""";
+
+		var generated = GeneratorTestHelper.GetVexelGeneratedSource(GeneratorTestHelper.RunGenerators(source));
+		await Verify(generated);
+	}
 }

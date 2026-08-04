@@ -68,4 +68,16 @@ internal static class DiagnosticDescriptors
 		description:
 			"Inline queries route on the first whitespace token of the query text, so a trigger containing "
 			+ "whitespace could never match.");
+
+	public static readonly DiagnosticDescriptor VEX0007InvalidPromptTarget = new(
+		id: "VEX0007",
+		title: "Invalid Flow.PromptAsync target",
+		messageFormat: "{0}",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true,
+		description:
+			"Flow.PromptAsync<TRequest> requires TRequest to be the request type of a [Handler] with no "
+			+ "route attribute and a flow-bindable request shape (empty record or single string; binding "
+			+ "convention rules 5-6).");
 }

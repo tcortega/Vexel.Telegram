@@ -5,7 +5,7 @@ Not a frozen API contract.
 Items below are labeled `agreed`, `proposed`, or `open`.
 Do not treat proposed items as authorization to implement product code.
 
-Last updated: 2026-08-05 (decision log through 32; T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, and T7 `[InlineQuery]` / `[ChosenInlineResult]` routing landed)
+Last updated: 2026-08-05 (decision log through 32; T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, T6 `Flow` + flow step routing, and T7 `[InlineQuery]` / `[ChosenInlineResult]` routing landed)
 Branch: `v2` (created to hold this context and future V2 work)
 Repo stays public. Private-repo idea was rejected.
 
@@ -157,13 +157,13 @@ Current build-level details live in `AGENTS.md`; the solution and csproj files a
 
 App references: `Vexel.Telegram` + `Immediate.Handlers` as an **explicit peer** (same honesty as Apis).
 
-### Runtime flow - **command, callback, and inline legs settled in T3/T5/T7**
+### Runtime flow - **command, callback, and inline legs settled in T3/T5/T7, flow step leg in T6**
 
 ```
 Update
   -> Client (concurrency / ordering policies)
     -> generated Telegram router
-         match kind + key (command | callback | inline trigger | chosen result | ...)
+         match kind + key (command | callback | armed flow step | inline trigger | chosen result | ...)
          bind to TRequest
          resolve generated Immediate handler
          await HandleAsync
@@ -174,11 +174,13 @@ Update
 
 Hot path: compile-time map, no reflection invoke.
 
-`[Command]`, `[Callback]`, `[InlineQuery]`, and `[ChosenInlineResult]` legs exist today: `IUpdateRouter`
-is the dispatcher seam, `TelegramRouter` the runtime implementation.
+`[Command]`, `[Callback]`, `[InlineQuery]`, `[ChosenInlineResult]`, and text flow step legs exist
+today: `IUpdateRouter` is the dispatcher seam, `TelegramRouter` the runtime implementation.
 Binding conventions live in the code that implements them -
 `CommandKeyExtractor`, `CommandArgumentBinder`, `CallbackKeyExtractor`, `InlineQueryKeyExtractor` in
 `src/Vexel.Telegram.Handlers/Routing` - not restated here.
+Message text precedence (commands beat an armed step, built-in `/cancel`, B3 step lifecycle) lives with
+`TelegramRouter` and `Flow` in the same package.
 Keyboard builders emit short `key` / `key|suffix` callback data (`Keyboards/`).
 
 ### Example DX (illustrative, not approved API names)
@@ -237,7 +239,7 @@ Small injectables, not a giant framework. Concrete types (decision 31), no inter
 Shapes and invariants live with the code in `src/Vexel.Telegram.Handlers`; see `AGENTS.md` for the
 one-paragraph summary.
 
-Conversation state: explicit service or payload state; avoid magic interceptors unless designed cleanly later.
+Conversation state: explicit service (`Flow` + `IFlowStore`, settled in T6 - see decision 16), not magic interceptors.
 
 ### Behaviors
 
@@ -247,16 +249,18 @@ Do not invent a second pipeline.
 ### Registration DX
 
 ```csharp
-builder.Services.AddTelegramBot(_ => "<BOT_TOKEN>");    // client + host + contexts + Feedback + router
+builder.Services.AddTelegramBot(_ => "<BOT_TOKEN>");    // client + host + contexts + Feedback + Flow + router
 builder.Services.AddXxxHandlers();                      // Immediate
 builder.Services.AddXxxTelegram();                      // Vexel generated routes
 ```
 
 **Settled in T4:** `AddTelegramBot(...)` ships (with `AddVexelUpdateContexts()` as the contexts-only
 seam for manual wiring).
-**Settled in T3/T5/T7:** the generator emits `Add{Assembly}Telegram()`, which registers that assembly's
+**Settled in T3/T5/T6/T7:** the generator emits `Add{Assembly}Telegram()`, which registers that assembly's
 `TelegramRouteContribution`; `TelegramRouter` composes all contributions and fails fast on duplicate
-route keys (command, callback, inline query, or chosen inline result) across assemblies.
+route keys (command, callback, inline query, chosen inline result, or flow step) across assemblies.
+**Settled in T6:** `AddTelegramFlow(...)` wires `Flow`, `IFlowStore` (`MemoryFlowStore` default), and
+`FlowOptions`; `AddTelegramBot(...)` calls it, and takes an optional `configureFlowOptions` callback.
 
 ### Escape hatch
 
@@ -338,7 +342,9 @@ Mitigations for dual-attr DX:
 13. No Remora.Results. Handlers use ValueTask/ValueTask<T>; errors via exceptions (+ optional behaviors).
 14. Route attrs: `[Command]`, `[Callback]`, `[InlineQuery]`, `[ChosenInlineResult]`, plus first-class text/conversation routing (not deferred).
 15. Common-workflow-first DX: commands, callback menus, inline mode, multi-step text prompts/FSM - not only fire-and-forget commands.
-16. UX model: button-first (`[Callback]`), commands as entry/deep link/cancel, typed `IFlow.PromptAsync<TNext>` for text steps, per-scope draft/store for multi-question state. No reflection. No Immediate.Cache required for flow (that package is response caching, not FSM). Pluggable `IFlowStore` (memory sample, redis/etc prod).
+16. UX model: button-first (`[Callback]`), commands as entry/deep link/cancel, typed `Flow.PromptAsync<TRequest>` for text steps, per-scope draft/store for multi-question state. No reflection. No Immediate.Cache required for flow (that package is response caching, not FSM). Pluggable `IFlowStore` (memory sample, redis/etc prod).
+    - Concrete `Flow`, not `IFlow` (see 31). `PromptAsync` takes the **request** record, not the handler class: Immediate handler types are `static` and C# rejects static types as type arguments, so `flow.PromptAsync<CollectName.Command>()` is the shape. Durable step key = request `Type.FullName` (nested requests render `Ns.Handler+Command`).
+    - A flow step is a `[Handler]` with a flow-bindable request and **no** route attribute (a pure text step). `[Command]`/`[Callback]` handlers are reached through their own route and never enter the step map, so they may share request records freely.
 17. `IFeedback` thin high-DX helper (not optional framework sludge): Reply/Edit/AnswerCallback/AnswerInline + send-with-keyboard. Defaults from context (chat, message id, parse mode opt). Power: inject `ITelegramBotClient` anytime. No fat localization/template engine in core.
 18. Concurrency: configurable; **default ordered per chat**, cross-chat parallel. Power can loosen.
 19. Hosting: **polling default**, webhook supported.
@@ -397,7 +403,7 @@ Not a substitute for unit tests. Not prod userbots.
 ### Open questions
 
 None tracked here.
-The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, T7 `[InlineQuery]` / `[ChosenInlineResult]` routing landed).
+The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, T6 `Flow` + flow step routing, T7 `[InlineQuery]` / `[ChosenInlineResult]` routing landed).
 
 
 ---

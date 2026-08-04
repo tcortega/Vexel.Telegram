@@ -5,8 +5,11 @@ namespace Vexel.Telegram.Generators;
 
 /// <summary>
 /// Discovers Immediate.Handlers types that also carry a Vexel route attribute and emits
-/// <c>Add{Assembly}Telegram()</c> registration plus frozen command, callback, inline-query, and
-/// chosen-inline-result binders.
+/// <c>Add{Assembly}Telegram()</c> registration plus frozen command, callback, inline-query,
+/// chosen-inline-result, and flow step binders.
+/// Flow steps are the pure text steps: a <c>[Handler]</c> with a flow-bindable request shape (empty
+/// or single string) and <em>no</em> route attribute, so <c>Flow.PromptAsync&lt;TRequest&gt;</c> can
+/// resolve them by the request type's <see cref="Type.FullName"/>.
 /// </summary>
 [Generator]
 public sealed class RouteGenerator : IIncrementalGenerator
@@ -23,7 +26,8 @@ public sealed class RouteGenerator : IIncrementalGenerator
 				pair.Command is not null
 				|| pair.Callback is not null
 				|| pair.InlineQuery is not null
-				|| pair.ChosenInlineResult is not null)
+				|| pair.ChosenInlineResult is not null
+				|| pair.FlowStep is not null)
 			.WithTrackingName("VexelRoutes");
 
 		var assemblyIdentifier = context.CompilationProvider
@@ -78,13 +82,22 @@ public sealed class RouteGenerator : IIncrementalGenerator
 					.ThenBy(static r => r.HandlerFullyQualifiedName, StringComparer.Ordinal)
 					.ToArray();
 
+				var flowSteps = routes
+					.Select(static r => r.FlowStep)
+					.Where(static s => s is not null)
+					.Select(static s => s!)
+					.OrderBy(static s => s.StepKey, StringComparer.Ordinal)
+					.ThenBy(static s => s.HandlerFullyQualifiedName, StringComparer.Ordinal)
+					.ToArray();
+
 				return new AssemblyRoutesModel(
 					assemblyIdentifier,
 					rootNamespace,
 					new EquatableReadOnlyList<CommandRouteModel>(commands),
 					new EquatableReadOnlyList<CallbackRouteModel>(callbacks),
 					new EquatableReadOnlyList<InlineQueryRouteModel>(inlineQueries),
-					new EquatableReadOnlyList<ChosenInlineResultRouteModel>(chosenInlineResults));
+					new EquatableReadOnlyList<ChosenInlineResultRouteModel>(chosenInlineResults),
+					new EquatableReadOnlyList<FlowStepModel>(flowSteps));
 			})
 			.WithTrackingName("VexelRouteModel");
 
@@ -106,7 +119,8 @@ public sealed class RouteGenerator : IIncrementalGenerator
 			TransformCommand(type, token),
 			TransformCallback(type, token),
 			TransformInlineQuery(type, token),
-			TransformChosenInlineResult(type, token));
+			TransformChosenInlineResult(type, token),
+			TransformFlowStep(type, token));
 	}
 
 	private static CommandRouteModel? TransformCommand(INamedTypeSymbol type, CancellationToken token)
@@ -301,6 +315,33 @@ public sealed class RouteGenerator : IIncrementalGenerator
 			HasStringParameter: hasStringParameter);
 	}
 
+	private static FlowStepModel? TransformFlowStep(INamedTypeSymbol type, CancellationToken token)
+	{
+		token.ThrowIfCancellationRequested();
+
+		// Flow steps are pure text steps only: a [Handler] with a flow-bindable request (rule 5) and no
+		// route attribute. A [Command]/[Callback] handler is reached through its own route, so keying it
+		// by request type would make two commands sharing one request record collide for no benefit.
+		if (type.HasVexelRouteAttribute()
+			|| !TryGetBindableFlowRequest(type, out var requestType, out var hasStringParameter, out _))
+		{
+			return null;
+		}
+
+		token.ThrowIfCancellationRequested();
+
+		// The step key is the *request* type: handler classes are static and cannot be type arguments,
+		// so Flow.PromptAsync<TRequest> keys on typeof(TRequest).FullName. Match by emitting
+		// typeof(...).FullName! over the request type as the map key.
+		var requestFq = requestType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+		return new FlowStepModel(
+			StepKey: requestFq,
+			HandlerFullyQualifiedName: type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+			RequestFullyQualifiedName: requestFq,
+			AssemblyDisplayName: type.ContainingAssembly.Name,
+			HasStringParameter: hasStringParameter);
+	}
+
 	internal static bool TryGetBindableRequest(
 		INamedTypeSymbol handlerType,
 		[System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ITypeSymbol? requestType,
@@ -409,6 +450,42 @@ public sealed class RouteGenerator : IIncrementalGenerator
 		out bool hasStringParameter,
 		out string? errorMessage)
 	{
+		return TryGetBindableEmptyOrStringRequest(
+			handlerType,
+			routeKind: kindLabel,
+			ruleText: "empty record or a single string parameter (binding convention rule 3/4/6)",
+			out requestType,
+			out hasStringParameter,
+			out errorMessage);
+	}
+
+	/// <summary>
+	/// Flow-armed steps bind <c>Message.Text ?? Message.Caption ?? ""</c> as empty or single string
+	/// (binding convention rule 5).
+	/// </summary>
+	internal static bool TryGetBindableFlowRequest(
+		INamedTypeSymbol handlerType,
+		[System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ITypeSymbol? requestType,
+		out bool hasStringParameter,
+		out string? errorMessage)
+	{
+		return TryGetBindableEmptyOrStringRequest(
+			handlerType,
+			routeKind: "Flow",
+			ruleText: "empty record or a single string parameter receiving Message.Text ?? Caption (binding convention rule 5)",
+			out requestType,
+			out hasStringParameter,
+			out errorMessage);
+	}
+
+	private static bool TryGetBindableEmptyOrStringRequest(
+		INamedTypeSymbol handlerType,
+		string routeKind,
+		string ruleText,
+		[System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ITypeSymbol? requestType,
+		out bool hasStringParameter,
+		out string? errorMessage)
+	{
 		requestType = null;
 		hasStringParameter = false;
 		errorMessage = null;
@@ -465,7 +542,7 @@ public sealed class RouteGenerator : IIncrementalGenerator
 		}
 
 		errorMessage =
-			$"{kindLabel} request '{namedRequest.ToDisplayString()}' on '{handlerType.Name}' must be an empty record or a single string parameter (binding convention rule 3/4/6).";
+			$"{routeKind} request '{namedRequest.ToDisplayString()}' on '{handlerType.Name}' must be an {ruleText}.";
 		return false;
 	}
 
@@ -480,5 +557,6 @@ public sealed class RouteGenerator : IIncrementalGenerator
 		CommandRouteModel? Command,
 		CallbackRouteModel? Callback,
 		InlineQueryRouteModel? InlineQuery,
-		ChosenInlineResultRouteModel? ChosenInlineResult);
+		ChosenInlineResultRouteModel? ChosenInlineResult,
+		FlowStepModel? FlowStep);
 }
