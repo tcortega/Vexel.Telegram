@@ -23,11 +23,21 @@ public sealed class TelegramRouteContribution
 	/// <param name="callbacks">
 	/// Callback-key (ordinal, case-sensitive) to binder map. Must already use an ordinal comparer.
 	/// </param>
+	/// <param name="inlineQueries">
+	/// Inline-query trigger (ordinal, case-sensitive; empty string = default) to binder map.
+	/// Must already use an ordinal comparer.
+	/// </param>
+	/// <param name="chosenInlineResults">
+	/// Chosen-inline-result key (ordinal, case-sensitive ResultId prefix) to binder map.
+	/// Must already use an ordinal comparer.
+	/// </param>
 	public TelegramRouteContribution(
 		string assemblyName,
 		IReadOnlyDictionary<string, RouteBinder> commands,
 		IReadOnlyList<CommandRouteMetadata> commandMetadata,
-		IReadOnlyDictionary<string, RouteBinder>? callbacks = null)
+		IReadOnlyDictionary<string, RouteBinder>? callbacks = null,
+		IReadOnlyDictionary<string, RouteBinder>? inlineQueries = null,
+		IReadOnlyDictionary<string, RouteBinder>? chosenInlineResults = null)
 	{
 		ArgumentNullException.ThrowIfNull(assemblyName);
 		ArgumentNullException.ThrowIfNull(commands);
@@ -37,6 +47,8 @@ public sealed class TelegramRouteContribution
 		Commands = commands;
 		CommandMetadata = commandMetadata;
 		Callbacks = callbacks ?? new Dictionary<string, RouteBinder>(StringComparer.Ordinal);
+		InlineQueries = inlineQueries ?? new Dictionary<string, RouteBinder>(StringComparer.Ordinal);
+		ChosenInlineResults = chosenInlineResults ?? new Dictionary<string, RouteBinder>(StringComparer.Ordinal);
 	}
 
 	/// <summary>Display name of the contributing assembly.</summary>
@@ -50,4 +62,10 @@ public sealed class TelegramRouteContribution
 
 	/// <summary>Callback route map for this assembly.</summary>
 	public IReadOnlyDictionary<string, RouteBinder> Callbacks { get; }
+
+	/// <summary>Inline-query route map for this assembly (empty key = default handler).</summary>
+	public IReadOnlyDictionary<string, RouteBinder> InlineQueries { get; }
+
+	/// <summary>Chosen-inline-result route map for this assembly.</summary>
+	public IReadOnlyDictionary<string, RouteBinder> ChosenInlineResults { get; }
 }

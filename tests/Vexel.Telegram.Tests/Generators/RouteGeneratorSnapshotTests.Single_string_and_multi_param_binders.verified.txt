@@ -75,13 +75,25 @@ public static partial class TelegramServiceCollectionExtensions
 		{
 		};
 
+		var inlineQueries = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
+			global::System.StringComparer.Ordinal)
+		{
+		};
+
+		var chosenInlineResults = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
+			global::System.StringComparer.Ordinal)
+		{
+		};
+
 		_ = global::Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton(
 			services,
 			new global::Vexel.Telegram.Handlers.Routing.TelegramRouteContribution(
 				"GeneratorTests",
 				commands,
 				metadata,
-				callbacks));
+				callbacks,
+				inlineQueries,
+				chosenInlineResults));
 
 		return services;
 	}

@@ -62,19 +62,11 @@ internal static class RouteRegistrationEmitter
 
 		_ = sb.AppendLine("\t\t};");
 		_ = sb.AppendLine();
-		_ = sb.AppendLine("\t\tvar callbacks = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(");
-		_ = sb.AppendLine("\t\t\tglobal::System.StringComparer.Ordinal)");
-		_ = sb.AppendLine("\t\t{");
-
-		foreach (var callback in model.Callbacks)
-		{
-			_ = sb.Append("\t\t\t[\"").Append(Escape(callback.RouteKey)).AppendLine("\"] = static async (scope, payload, cancellationToken) =>");
-			_ = sb.AppendLine("\t\t\t{");
-			EmitCallbackBinderBody(sb, callback, indent: "\t\t\t\t");
-			_ = sb.AppendLine("\t\t\t},");
-		}
-
-		_ = sb.AppendLine("\t\t};");
+		EmitBinderDictionary(sb, "callbacks", model.Callbacks, static c => c.RouteKey, static c => (c.HandlerFullyQualifiedName, c.RequestFullyQualifiedName, c.HasStringParameter));
+		_ = sb.AppendLine();
+		EmitBinderDictionary(sb, "inlineQueries", model.InlineQueries, static c => c.Trigger, static c => (c.HandlerFullyQualifiedName, c.RequestFullyQualifiedName, c.HasStringParameter));
+		_ = sb.AppendLine();
+		EmitBinderDictionary(sb, "chosenInlineResults", model.ChosenInlineResults, static c => c.RouteKey, static c => (c.HandlerFullyQualifiedName, c.RequestFullyQualifiedName, c.HasStringParameter));
 		_ = sb.AppendLine();
 		_ = sb.AppendLine("\t\t_ = global::Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton(");
 		_ = sb.AppendLine("\t\t\tservices,");
@@ -82,13 +74,40 @@ internal static class RouteRegistrationEmitter
 		_ = sb.Append("\t\t\t\t\"").Append(Escape(model.AssemblyIdentifier)).AppendLine("\",");
 		_ = sb.AppendLine("\t\t\t\tcommands,");
 		_ = sb.AppendLine("\t\t\t\tmetadata,");
-		_ = sb.AppendLine("\t\t\t\tcallbacks));");
+		_ = sb.AppendLine("\t\t\t\tcallbacks,");
+		_ = sb.AppendLine("\t\t\t\tinlineQueries,");
+		_ = sb.AppendLine("\t\t\t\tchosenInlineResults));");
 		_ = sb.AppendLine();
 		_ = sb.AppendLine("\t\treturn services;");
 		_ = sb.AppendLine("\t}");
 		_ = sb.AppendLine("}");
 
 		return sb.ToString();
+	}
+
+	private static void EmitBinderDictionary<T>(
+		StringBuilder sb,
+		string variableName,
+		IEnumerable<T> routes,
+		Func<T, string> keySelector,
+		Func<T, (string Handler, string Request, bool HasString)> binderSelector)
+	{
+		_ = sb.Append("\t\tvar ").Append(variableName)
+			.AppendLine(" = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(");
+		_ = sb.AppendLine("\t\t\tglobal::System.StringComparer.Ordinal)");
+		_ = sb.AppendLine("\t\t{");
+
+		foreach (var route in routes)
+		{
+			var key = keySelector(route);
+			var (handler, request, hasString) = binderSelector(route);
+			_ = sb.Append("\t\t\t[\"").Append(Escape(key)).AppendLine("\"] = static async (scope, payload, cancellationToken) =>");
+			_ = sb.AppendLine("\t\t\t{");
+			EmitStringOrEmptyBinderBody(sb, handler, request, hasString, indent: "\t\t\t\t");
+			_ = sb.AppendLine("\t\t\t},");
+		}
+
+		_ = sb.AppendLine("\t\t};");
 	}
 
 	private static void EmitCommandBinderBody(StringBuilder sb, CommandRouteModel command, string indent)
@@ -139,16 +158,16 @@ internal static class RouteRegistrationEmitter
 		EmitResolveAndInvoke(sb, command.HandlerFullyQualifiedName, command.RequestFullyQualifiedName, indent, args.ToString());
 	}
 
-	private static void EmitCallbackBinderBody(StringBuilder sb, CallbackRouteModel callback, string indent)
+	private static void EmitStringOrEmptyBinderBody(
+		StringBuilder sb,
+		string handlerFullyQualifiedName,
+		string requestFullyQualifiedName,
+		bool hasStringParameter,
+		string indent)
 	{
-		// Empty record: ignore suffix. Single string: whole suffix (possibly empty).
-		var requestArgs = callback.HasStringParameter ? "payload" : string.Empty;
-		EmitResolveAndInvoke(
-			sb,
-			callback.HandlerFullyQualifiedName,
-			callback.RequestFullyQualifiedName,
-			indent,
-			requestArgs);
+		// Empty record: ignore payload. Single string: whole payload (possibly empty).
+		var requestArgs = hasStringParameter ? "payload" : string.Empty;
+		EmitResolveAndInvoke(sb, handlerFullyQualifiedName, requestFullyQualifiedName, indent, requestArgs);
 	}
 
 	private static void EmitResolveAndInvoke(

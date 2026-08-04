@@ -26,12 +26,16 @@ public sealed class DuplicateRouteKeyAnalyzer : DiagnosticAnalyzer
 		{
 			var commands = new ConcurrentDictionary<string, INamedTypeSymbol>(StringComparer.OrdinalIgnoreCase);
 			var callbacks = new ConcurrentDictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
+			var inlineQueries = new ConcurrentDictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
+			var chosenInlineResults = new ConcurrentDictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
 
 			startContext.RegisterSymbolAction(
 				actionContext =>
 				{
 					AnalyzeCommand(actionContext, commands);
 					AnalyzeCallback(actionContext, callbacks);
+					AnalyzeInlineQuery(actionContext, inlineQueries);
+					AnalyzeChosenInlineResult(actionContext, chosenInlineResults);
 				},
 				SymbolKind.NamedType);
 
@@ -41,6 +45,8 @@ public sealed class DuplicateRouteKeyAnalyzer : DiagnosticAnalyzer
 			{
 				_ = commands;
 				_ = callbacks;
+				_ = inlineQueries;
+				_ = chosenInlineResults;
 			});
 		});
 	}
@@ -91,13 +97,71 @@ public sealed class DuplicateRouteKeyAnalyzer : DiagnosticAnalyzer
 		ReportIfDuplicate(context, callbacks, key, type, attribute, kind: "callback");
 	}
 
+	private static void AnalyzeInlineQuery(
+		SymbolAnalysisContext context,
+		ConcurrentDictionary<string, INamedTypeSymbol> inlineQueries)
+	{
+		if (context.Symbol is not INamedTypeSymbol type)
+		{
+			return;
+		}
+
+		var attribute = type.GetInlineQueryAttribute();
+		if (attribute is null)
+		{
+			return;
+		}
+
+		string trigger;
+		if (attribute.ConstructorArguments.Length == 0)
+		{
+			trigger = string.Empty;
+		}
+		else if (attribute.ConstructorArguments is [{ Value: string t }])
+		{
+			trigger = t;
+		}
+		else
+		{
+			return;
+		}
+
+		// Empty trigger is the default handler; still unique per compilation (two defaults = VEX0005).
+		var displayKey = trigger.Length == 0 ? "<default>" : trigger;
+		ReportIfDuplicate(context, inlineQueries, trigger, type, attribute, kind: "inline query", displayKey);
+	}
+
+	private static void AnalyzeChosenInlineResult(
+		SymbolAnalysisContext context,
+		ConcurrentDictionary<string, INamedTypeSymbol> chosenInlineResults)
+	{
+		if (context.Symbol is not INamedTypeSymbol type)
+		{
+			return;
+		}
+
+		var attribute = type.GetChosenInlineResultAttribute();
+		if (attribute is null)
+		{
+			return;
+		}
+
+		if (attribute.ConstructorArguments is not [{ Value: string key }])
+		{
+			return;
+		}
+
+		ReportIfDuplicate(context, chosenInlineResults, key, type, attribute, kind: "chosen inline result");
+	}
+
 	private static void ReportIfDuplicate(
 		SymbolAnalysisContext context,
 		ConcurrentDictionary<string, INamedTypeSymbol> map,
 		string key,
 		INamedTypeSymbol type,
 		AttributeData attribute,
-		string kind)
+		string kind,
+		string? displayKey = null)
 	{
 		var location = attribute.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken).GetLocation()
 			?? type.Locations.FirstOrDefault();
@@ -112,13 +176,15 @@ public sealed class DuplicateRouteKeyAnalyzer : DiagnosticAnalyzer
 			return;
 		}
 
+		var shown = displayKey ?? key;
+
 		// Report on both the original and the duplicate.
 		context.ReportDiagnostic(
 			Diagnostic.Create(
 				DiagnosticDescriptors.VEX0005DuplicateRouteKey,
 				location,
 				kind,
-				key,
+				shown,
 				other.ToDisplayString(),
 				type.ToDisplayString()));
 
@@ -129,7 +195,7 @@ public sealed class DuplicateRouteKeyAnalyzer : DiagnosticAnalyzer
 					DiagnosticDescriptors.VEX0005DuplicateRouteKey,
 					otherLocation,
 					kind,
-					key,
+					shown,
 					type.ToDisplayString(),
 					other.ToDisplayString()));
 		}

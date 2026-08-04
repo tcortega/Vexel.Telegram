@@ -279,4 +279,128 @@ public sealed class AnalyzerTests
 
 		Assert.Contains(diagnostics, static d => d.Id == "VEX0004");
 	}
+
+	[Fact]
+	public async Task VEX0001_fires_when_InlineQuery_missing_Handler()
+	{
+		const string source = """
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[InlineQuery("search")]
+			public static class Search
+			{
+				public sealed record Query(string Text);
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new MissingHandlerAttributeAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0001");
+	}
+
+	[Fact]
+	public async Task VEX0005_fires_on_duplicate_inline_query_defaults()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[InlineQuery]
+			public static class DefaultA
+			{
+				public sealed record Query;
+				private static ValueTask HandleAsync(Query _, CancellationToken token) => default;
+			}
+
+			[Handler]
+			[InlineQuery("")]
+			public static class DefaultB
+			{
+				public sealed record Query;
+				private static ValueTask HandleAsync(Query _, CancellationToken token) => default;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new DuplicateRouteKeyAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0005");
+	}
+
+	[Fact]
+	public async Task VEX0005_fires_on_duplicate_chosen_inline_result_keys()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[ChosenInlineResult("item")]
+			public static class ItemA
+			{
+				public sealed record Command;
+				private static ValueTask HandleAsync(Command _, CancellationToken token) => default;
+			}
+
+			[Handler]
+			[ChosenInlineResult("item")]
+			public static class ItemB
+			{
+				public sealed record Command;
+				private static ValueTask HandleAsync(Command _, CancellationToken token) => default;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new DuplicateRouteKeyAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0005");
+	}
+
+	[Fact]
+	public async Task VEX0004_fires_on_unbindable_inline_query_request()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[InlineQuery("search")]
+			public static class Search
+			{
+				public sealed record Query(int Count);
+
+				private static ValueTask HandleAsync(Query _, CancellationToken token)
+				{
+					_ = token;
+					return default;
+				}
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new UnbindableRequestAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0004");
+	}
 }

@@ -46,7 +46,22 @@ public sealed class UnbindableRequestAnalyzer : DiagnosticAnalyzer
 
 		if (error is null && type.GetCallbackAttribute() is not null)
 		{
-			_ = RouteGenerator.TryGetBindableCallbackRequest(type, out _, out _, out error);
+			_ = RouteGenerator.TryGetBindableStringOrEmptyRequest(type, "Callback", out _, out _, out error);
+		}
+
+		if (error is null && type.GetInlineQueryAttribute() is not null)
+		{
+			_ = RouteGenerator.TryGetBindableStringOrEmptyRequest(type, "Inline query", out _, out _, out error);
+		}
+
+		if (error is null && type.GetChosenInlineResultAttribute() is not null)
+		{
+			_ = RouteGenerator.TryGetBindableStringOrEmptyRequest(
+				type,
+				"Chosen inline result",
+				out _,
+				out _,
+				out error);
 		}
 
 		if (error is null)

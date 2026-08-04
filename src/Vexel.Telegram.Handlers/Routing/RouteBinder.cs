@@ -8,6 +8,9 @@ namespace Vexel.Telegram.Handlers.Routing;
 /// <param name="payload">
 /// For commands: message text after the command entity, trimmed (empty when the user sent only the command).
 /// For callbacks: data suffix after the first <c>|</c> (empty string when absent).
+/// For inline-query triggers: query remainder after the trigger token, trimmed.
+/// For the inline-query default handler: the full query text.
+/// For chosen inline results: ResultId suffix after the first <c>|</c> (empty string when absent).
 /// </param>
 /// <param name="cancellationToken">Cancellation token.</param>
 /// <returns>
