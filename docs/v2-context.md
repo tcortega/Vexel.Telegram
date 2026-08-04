@@ -312,6 +312,9 @@ Mitigations for dual-attr DX:
 11. Real-user E2E on Telegram **test DC** (user MTProto client + test bot), plus unit fakes in CI. Not prod server userbots.
 12. One handler type per route (Immediate style). No multi-method CommandGroup/InteractionGroup bags.
 13. No Remora.Results. Handlers use ValueTask/ValueTask<T>; errors via exceptions (+ optional behaviors).
+14. Route attrs: `[Command]`, `[Callback]`, `[InlineQuery]`, `[ChosenInlineResult]`, plus first-class text/conversation routing (not deferred).
+15. Common-workflow-first DX: commands, callback menus, inline mode, multi-step text prompts/FSM - not only fire-and-forget commands.
+
 
 ### Proposed (not fully approved)
 
