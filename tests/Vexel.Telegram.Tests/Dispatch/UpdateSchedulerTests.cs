@@ -293,7 +293,7 @@ public sealed class UpdateSchedulerTests
 		}));
 
 		await using var provider = services.BuildServiceProvider();
-		var dispatcher = CreateDispatcher(provider);
+		await using var dispatcher = CreateDispatcher(provider);
 
 		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None);
 
@@ -309,7 +309,7 @@ public sealed class UpdateSchedulerTests
 		_ = services.AddScoped<IRawUpdateHandler, TrackedRawHandler>();
 
 		await using var provider = services.BuildServiceProvider(validateScopes: true);
-		var dispatcher = CreateDispatcher(provider);
+		await using var dispatcher = CreateDispatcher(provider);
 
 		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None);
 		await dispatcher.DispatchAsync(MessageUpdate(2, chatId: 1), CancellationToken.None);
@@ -325,7 +325,7 @@ public sealed class UpdateSchedulerTests
 		_ = services.AddScoped<IRawUpdateHandler, ThrowingConstructorRawHandler>();
 
 		await using var provider = services.BuildServiceProvider(validateScopes: true);
-		var dispatcher = CreateDispatcher(provider);
+		await using var dispatcher = CreateDispatcher(provider);
 
 		var exception = await Record.ExceptionAsync(() =>
 			dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None));
@@ -343,7 +343,7 @@ public sealed class UpdateSchedulerTests
 		_ = services.AddRawUpdateHandler<TrackedRawHandler>();
 
 		await using var provider = services.BuildServiceProvider(validateScopes: true);
-		var dispatcher = CreateDispatcher(provider);
+		await using var dispatcher = CreateDispatcher(provider);
 
 		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None);
 
@@ -362,7 +362,7 @@ public sealed class UpdateSchedulerTests
 		_ = services.AddRawUpdateHandler<TrackedRawHandler>();
 
 		await using var provider = services.BuildServiceProvider(validateScopes: true);
-		var dispatcher = CreateDispatcher(provider);
+		await using var dispatcher = CreateDispatcher(provider);
 
 		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None);
 
@@ -404,6 +404,7 @@ public sealed class UpdateSchedulerTests
 	private static UpdateDispatcher CreateDispatcher(IServiceProvider provider) =>
 		new(
 			provider.GetRequiredService<IServiceScopeFactory>(),
+			provider,
 			provider.GetService<RawUpdateHandlerRegistry>() ?? new RawUpdateHandlerRegistry(),
 			Options.Create(new VexelClientOptions()),
 			NullLogger<UpdateDispatcher>.Instance);

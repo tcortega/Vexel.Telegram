@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Vexel.Telegram.Client.Dispatch;
@@ -8,14 +7,14 @@ namespace Vexel.Telegram.Client.Dispatch;
 /// <c>AddRawUpdateHandler&lt;THandler&gt;</c>.
 /// The dispatcher resolves each type on its own, so a handler that fails to construct cannot
 /// stop the remaining handlers from seeing the update. Handlers registered directly against
-/// <see cref="IRawUpdateHandler"/> still run; the registry also tracks those registrations so the
-/// dispatcher can resolve them one at a time instead of as the single unit the container builds.
+/// <see cref="IRawUpdateHandler"/> still run through the container as a set; the registry also
+/// tracks those registrations so the dispatcher can degrade to resolving them one at a time when
+/// that set cannot be built.
 /// </summary>
 public sealed class RawUpdateHandlerRegistry
 {
 	private readonly List<Type> _handlerTypes = [];
 	private readonly HashSet<Type> _handlerTypeSet = [];
-	private readonly ConcurrentDictionary<ServiceDescriptor, IRawUpdateHandler> _singletonHandlers = new();
 	private IServiceCollection? _services;
 	private ServiceDescriptor[]? _containerRegistrations;
 
@@ -51,19 +50,6 @@ public sealed class RawUpdateHandlerRegistry
 	}
 
 	internal void AttachServices(IServiceCollection services) => _services = services;
-
-	/// <summary>
-	/// Backing store for singleton registrations the dispatcher builds itself, so a singleton raw
-	/// handler is constructed once for the process rather than once per update.
-	/// </summary>
-	internal IRawUpdateHandler GetOrCreateSingletonHandler(
-		ServiceDescriptor descriptor,
-		IServiceProvider provider,
-		Func<ServiceDescriptor, IServiceProvider, IRawUpdateHandler> factory) =>
-		_singletonHandlers.GetOrAdd(
-			descriptor,
-			static (key, state) => state.Factory(key, state.Provider),
-			(Provider: provider, Factory: factory));
 
 	private ServiceDescriptor[] SnapshotContainerRegistrations()
 	{
