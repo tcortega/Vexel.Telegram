@@ -25,6 +25,7 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 * Legacy v1 projects under `src/Vexel.Telegram.{Abstractions,Commands,Interactivity,Extensions}` stay on disk as reference only until T14; they are out of the solution build.
 * Central package versions live in `Directory.Packages.props`. Microsoft.Extensions is on 10.0.x to satisfy Immediate.Handlers TFM floors.
 * `docs/v2-context.md` owns the v2 design decisions and decision log; check it before proposing API or architecture changes.
+* Human v1→v2 migration notes: `docs/v1-to-v2.md` (linked from the README). Not an AI plan artifact.
 
 ## Maintaining this file
 
