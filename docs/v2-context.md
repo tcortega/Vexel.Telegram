@@ -5,7 +5,7 @@ Not a frozen API contract.
 Items below are labeled `agreed`, `proposed`, or `open`.
 Do not treat proposed items as authorization to implement product code.
 
-Last updated: 2026-08-05 (decision log through 32; T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, T6 `Flow` + flow step routing, T7 `[InlineQuery]` / `[ChosenInlineResult]` routing, and T8 `[On*]` fan-out generation landed)
+Last updated: 2026-08-05 (decision log through 32; T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, T6 `Flow` + flow step routing, T7 `[InlineQuery]` / `[ChosenInlineResult]` routing, T8 `[On*]` fan-out generation, and T9 host polish (auto `SetMyCommands` + webhook receive) landed)
 Branch: `v2` (created to hold this context and future V2 work)
 Repo stays public. Private-repo idea was rejected.
 
@@ -141,18 +141,22 @@ Cross-generator note: a Vexel generator **cannot** emit `[Handler]` on a partial
 
 Vexel V2 = Immediate.Apis for Telegram: Immediate.Handlers for work units; Vexel for routes, binding, contexts, feedback, and bot host.
 
-### Package layout - **agreed** (decision 20), skeleton shipped in T1
+### Package layout - **agreed** (decision 20), skeleton shipped in T1, `AspNetCore` split added in T9
 
 ```
 Vexel.Telegram                  metapackage (Client + Handlers + Hosting); IsPackable=false until publish decision
 Vexel.Telegram.Client           receive (poll/webhook), dispatch, concurrency
-Vexel.Telegram.Hosting          generic host integration
+Vexel.Telegram.Hosting          generic host integration + SetMyCommands at start
 Vexel.Telegram.Handlers         Telegram attributes, contexts, feedback, conversation helpers, builders
+Vexel.Telegram.AspNetCore       webhook endpoint mapping (MapTelegramWebhook)
 Vexel.Telegram.Generators       source generator + analyzers + code fixes
                                   (netstandard2.0; not published standalone, packed into Handlers)
 ```
 
 No separate `Abstractions` or `Extensions` package in V2.0.
+`AspNetCore` is the **only** project with an ASP.NET Core framework reference, so a polling-only
+console/worker bot still runs on the base runtime image; the metapackage deliberately excludes it
+(webhook apps take the reference explicitly).
 Current build-level details live in `AGENTS.md`; the solution and csproj files are authoritative.
 
 App references: `Vexel.Telegram` + `Immediate.Handlers` as an **explicit peer** (same honesty as Apis).
@@ -161,6 +165,7 @@ App references: `Vexel.Telegram` + `Immediate.Handlers` as an **explicit peer** 
 
 ```
 Update
+  -> receive: long poll (default) XOR webhook ingress (T9)
   -> Client (concurrency / ordering policies)
     -> generated Telegram router
          match kind + key (command | callback | armed flow step | inline trigger | chosen result | ...)
@@ -185,6 +190,14 @@ Message text precedence (commands beat an armed step, built-in `/cancel`, B3 ste
 `TelegramRouter` and `Flow` in the same package, as does the `[On*]` fan-out order and its per-observer
 fault isolation.
 Keyboard builders emit short `key` / `key|suffix` callback data (`Keyboards/`).
+
+**Settled in T9 (receive mode):** `TelegramReceiveMode` is polling XOR webhook, validated fail-fast at
+host start (`VexelClientOptions.ValidateReceiveMode`). Webhook mode sets `secret_token` on `setWebhook`
+and the endpoint verifies that header on every inbound request (mismatch/missing → 403). Endpoint
+registration is an **explicit opt-in** `MapTelegramWebhook` call in `Vexel.Telegram.AspNetCore`;
+nothing is auto-mapped. A fatal receive error rethrows from `VexelService` so the host stops rather
+than idling as a zombie. Mechanics live with `VexelClient` / `WebhookUpdateReceiver`; `AGENTS.md`
+carries the one-paragraph summary.
 
 ### Example DX (illustrative, not approved API names)
 
@@ -265,6 +278,10 @@ contributions and fails fast on duplicate route keys (command, callback, inline 
 or flow step) across assemblies, and on the same assembly contributing one `[On*]` observer twice.
 **Settled in T6:** `AddTelegramFlow(...)` wires `Flow`, `IFlowStore` (`MemoryFlowStore` default), and
 `FlowOptions`; `AddTelegramBot(...)` calls it, and takes an optional `configureFlowOptions` callback.
+**Settled in T9:** `AddTelegramBot(...)` also registers `SetMyCommandsInitializer`, which pushes the
+generated `[Command]` catalog (`IBotCommandCatalog`) at host start; opt out with
+`VexelClientOptions.RegisterBotCommands = false`. Webhook apps additionally reference
+`Vexel.Telegram.AspNetCore` and call `app.MapTelegramWebhook()` themselves.
 
 ### Escape hatch
 
@@ -351,11 +368,12 @@ Mitigations for dual-attr DX:
     - A flow step is a `[Handler]` with a flow-bindable request and **no** route or `[On*]` attribute (a pure text step). `[Command]`/`[Callback]`/`[On*]` handlers are reached through their own route or fan-out and never enter the step map, so they may share request records freely.
 17. `IFeedback` thin high-DX helper (not optional framework sludge): Reply/Edit/AnswerCallback/AnswerInline + send-with-keyboard. Defaults from context (chat, message id, parse mode opt). Power: inject `ITelegramBotClient` anytime. No fat localization/template engine in core.
 18. Concurrency: configurable; **default ordered per chat**, cross-chat parallel. Power can loosen.
-19. Hosting: **polling default**, webhook supported.
+19. Hosting: **polling default**, webhook supported. Landed in T9 as an exclusive `TelegramReceiveMode` with fail-fast validation at host start.
 20. Packages (V2.0): **Client + Handlers(+embedded generators/analyzers) + Hosting**. Merge/skip separate Abstractions/Extensions packages initially; builders live with Handlers or Client. Metapackage optional at publish time.
+    - Amended in T9: webhook endpoint mapping lives in a fourth package, `Vexel.Telegram.AspNetCore`, so the ASP.NET Core framework reference stays out of `Hosting` and out of the metapackage.
 21. TFMs: **same as Immediate.Handlers** (`net8.0;net9.0;net10.0;net11.0`). Depend on **latest stable Telegram.Bot** at implement time.
 22. Callback data: **short stable route id**; multi-step/large state in store/draft. Analyzer for 64B cap. Optional tiny suffix when needed.
-23. `SetMyCommands`: **auto** from `[Command]`+description at startup; opt-out flag for power users.
+23. `SetMyCommands`: **auto** from `[Command]`+description at startup; opt-out flag for power users. Landed in T9: command metadata is cosmetic, so catalog/Telegram faults are logged and swallowed instead of failing host start, and an empty payload is skipped (sending `[]` wipes the BotFather menu).
 24. Boot DX: `AddTelegramBot(...)` wires client/host/Vexel routes; app still calls Immediate `AddXxxHandlers()`. Sample shows both. No hiding Immediate.
 25. No v1 master inline hotfix parallel track; effort on `v2` only.
 26. Drop Remora.Commands (and Remora.Results) on `v2` entirely.
@@ -410,7 +428,7 @@ Not a substitute for unit tests. Not prod userbots.
 ### Open questions
 
 None tracked here.
-The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, T6 `Flow` + flow step routing, T7 `[InlineQuery]` / `[ChosenInlineResult]` routing, T8 `[On*]` fan-out landed).
+The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, T6 `Flow` + flow step routing, T7 `[InlineQuery]` / `[ChosenInlineResult]` routing, T8 `[On*]` fan-out, T9 host polish landed).
 
 
 ---

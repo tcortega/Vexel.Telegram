@@ -19,7 +19,7 @@ public sealed class WebhookUpdateReceiverTests
 	{
 		var (receiver, _) = CreateReceiver();
 
-		await using var body = Body("""{"update_id":1}""");
+		await using var body = Body(/*lang=json,strict*/ """{"update_id":1}""");
 		var status = await receiver.ProcessAsync(body, secretTokenHeader: null);
 
 		Assert.Equal(HttpStatusCode.Forbidden, status);
@@ -30,7 +30,7 @@ public sealed class WebhookUpdateReceiverTests
 	{
 		var (receiver, _) = CreateReceiver();
 
-		await using var body = Body("""{"update_id":1}""");
+		await using var body = Body(/*lang=json,strict*/ """{"update_id":1}""");
 		var status = await receiver.ProcessAsync(body, secretTokenHeader: "wrong-token");
 
 		Assert.Equal(HttpStatusCode.Forbidden, status);
@@ -47,7 +47,7 @@ public sealed class WebhookUpdateReceiverTests
 		});
 
 		await using var body = Body(
-			"""{"update_id":42,"message":{"message_id":1,"date":1700000000,"chat":{"id":7,"type":"private"},"text":"hi"}}""");
+			/*lang=json,strict*/ """{"update_id":42,"message":{"message_id":1,"date":1700000000,"chat":{"id":7,"type":"private"},"text":"hi"}}""");
 
 		var status = await receiver.ProcessAsync(body, secretTokenHeader: Secret);
 
