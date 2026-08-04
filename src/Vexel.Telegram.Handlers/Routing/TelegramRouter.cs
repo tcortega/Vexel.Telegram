@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using Vexel.Telegram.Client;
 using Vexel.Telegram.Client.Dispatch;
 
 namespace Vexel.Telegram.Handlers.Routing;
@@ -23,7 +24,7 @@ namespace Vexel.Telegram.Handlers.Routing;
 /// dispatch pipeline so routed handlers, On*, exceptions, unrouted updates, and raw handlers all
 /// share one fail-closed default answer when Feedback did not answer.
 /// </remarks>
-public sealed class TelegramRouter : IUpdateRouter
+public sealed class TelegramRouter : IUpdateRouter, IBotCommandCatalog
 {
 	private readonly ITelegramBotClient _botClient;
 	private readonly ILogger<TelegramRouter> _logger;
@@ -107,6 +108,10 @@ public sealed class TelegramRouter : IUpdateRouter
 
 	/// <summary>Composed command metadata across all contributions (for SetMyCommands).</summary>
 	public IReadOnlyList<CommandRouteMetadata> CommandMetadata { get; private set; } = [];
+
+	/// <inheritdoc />
+	IReadOnlyList<BotCommandDescriptor> IBotCommandCatalog.Commands =>
+		[.. CommandMetadata.Select(static m => new BotCommandDescriptor(m.Name, m.Description))];
 
 	/// <summary>
 	/// Returns <see langword="true"/> when <paramref name="stepKey"/> is a registered flow step.

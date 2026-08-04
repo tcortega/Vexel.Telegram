@@ -32,7 +32,8 @@ public static class HostBuilderExtensions
 	}
 
 	/// <summary>
-	/// Adds Vexel Telegram client services and a hosted <see cref="VexelService"/>.
+	/// Adds Vexel Telegram client services, automatic SetMyCommands registration, and a hosted
+	/// <see cref="VexelService"/>.
 	/// </summary>
 	/// <param name="services">The service collection.</param>
 	/// <param name="tokenFactory">Factory that returns the bot token.</param>
@@ -46,6 +47,11 @@ public static class HostBuilderExtensions
 		ArgumentNullException.ThrowIfNull(services);
 
 		_ = services.AddVexelTelegramClient(tokenFactory, configureClientOptions);
+
+		// SetMyCommands runs before the receive loop: registration order == start order.
+		services.TryAddSingleton<SetMyCommandsInitializer>();
+		_ = services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<SetMyCommandsInitializer>());
+
 		services.TryAddSingleton<VexelService>();
 		_ = services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<VexelService>());
 

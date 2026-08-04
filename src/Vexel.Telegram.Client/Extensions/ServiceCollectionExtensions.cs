@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Telegram.Bot;
 using Vexel.Telegram.Client.Dispatch;
+using Vexel.Telegram.Client.Webhook;
 
 namespace Vexel.Telegram.Client.Extensions;
 
@@ -31,6 +32,7 @@ public static class ServiceCollectionExtensions
 		services.TryAddSingleton<ITelegramBotClient>(sp => new TelegramBotClient(tokenFactory(sp)));
 		services.TryAddSingleton<IUpdateDispatcher, UpdateDispatcher>();
 		services.TryAddSingleton<UpdateScheduler>();
+		services.TryAddSingleton<WebhookUpdateReceiver>();
 		services.TryAddSingleton<VexelClient>();
 
 		return services;

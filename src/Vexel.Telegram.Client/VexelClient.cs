@@ -8,7 +8,7 @@ using Vexel.Telegram.Client.Dispatch;
 namespace Vexel.Telegram.Client;
 
 /// <summary>
-/// Host-agnostic Telegram bot client: long-polling receive loop plus per-chat ordered dispatch.
+/// Host-agnostic Telegram bot client: long-polling or webhook receive plus per-chat ordered dispatch.
 /// </summary>
 public sealed class VexelClient(
 	ILogger<VexelClient> logger,
@@ -21,7 +21,7 @@ public sealed class VexelClient(
 	private readonly VexelClientOptions _options = options.Value;
 
 	/// <summary>
-	/// Runs the polling receive loop until <paramref name="stoppingToken"/> is cancelled, then
+	/// Runs the receive loop until <paramref name="stoppingToken"/> is cancelled, then
 	/// drains buffered updates without a shutdown budget.
 	/// </summary>
 	/// <param name="stoppingToken">Token that signals the client should stop.</param>
@@ -30,7 +30,7 @@ public sealed class VexelClient(
 		RunAsync(stoppingToken, CancellationToken.None);
 
 	/// <summary>
-	/// Runs the polling receive loop until <paramref name="stoppingToken"/> is cancelled.
+	/// Runs the configured receive mode until <paramref name="stoppingToken"/> is cancelled.
 	/// </summary>
 	/// <param name="stoppingToken">Token that signals the client should stop.</param>
 	/// <param name="drainToken">
@@ -40,6 +40,37 @@ public sealed class VexelClient(
 	/// <returns>A task that completes when the client stops.</returns>
 	public async Task RunAsync(CancellationToken stoppingToken, CancellationToken drainToken)
 	{
+		// Fail fast before touching the network when polling and webhook are both (or neither) set.
+		_options.ValidateReceiveMode();
+
+		try
+		{
+			if (_options.ReceiveMode == TelegramReceiveMode.Webhook)
+			{
+				await RunWebhookAsync(stoppingToken).ConfigureAwait(false);
+			}
+			else
+			{
+				await RunPollingAsync(stoppingToken).ConfigureAwait(false);
+			}
+		}
+		finally
+		{
+			// Drain here, while the container and every handler dependency are still alive.
+			// Disposal of the scheduler singleton itself stays with the container.
+			await scheduler.StopAsync(drainToken).ConfigureAwait(false);
+		}
+
+		logger.LogInformation("VexelClient stopped");
+	}
+
+	private async Task RunPollingAsync(CancellationToken stoppingToken)
+	{
+		// A leftover webhook blocks getUpdates; clear it so polling always owns receive.
+		await botClient
+			.DeleteWebhook(dropPendingUpdates: _options.DropPendingUpdates, cancellationToken: stoppingToken)
+			.ConfigureAwait(false);
+
 		// AllowedUpdates stays null: Telegram.Bot then receives every update kind, whereas an
 		// explicit empty list excludes reactions and chat member updates.
 		var receiverOptions = new ReceiverOptions
@@ -64,14 +95,36 @@ public sealed class VexelClient(
 		{
 			// Normal shutdown.
 		}
-		finally
-		{
-			// Drain here, while the container and every handler dependency are still alive.
-			// Disposal of the scheduler singleton itself stays with the container.
-			await scheduler.StopAsync(drainToken).ConfigureAwait(false);
-		}
+	}
 
-		logger.LogInformation("VexelClient stopped");
+	private async Task RunWebhookAsync(CancellationToken stoppingToken)
+	{
+		var webhook = _options.Webhook!;
+
+		logger.LogInformation(
+			"VexelClient starting webhook mode (Url={Url}, Path={Path}, DropPendingUpdates={DropPendingUpdates}, LaneCapacity={LaneCapacity}). "
+			+ "Map the endpoint explicitly (MapTelegramWebhook); nothing is auto-mapped.",
+			webhook.Url,
+			webhook.Path,
+			_options.DropPendingUpdates,
+			_options.LaneCapacity);
+
+		await botClient.SetWebhook(
+			url: webhook.Url!.AbsoluteUri,
+			dropPendingUpdates: _options.DropPendingUpdates,
+			secretToken: webhook.SecretToken,
+			cancellationToken: stoppingToken).ConfigureAwait(false);
+
+		try
+		{
+			// Ingress is the explicitly mapped HTTP endpoint; this task just keeps the host alive
+			// and owns the scheduler drain on stop.
+			await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken).ConfigureAwait(false);
+		}
+		catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+		{
+			// Normal shutdown.
+		}
 	}
 
 	private async Task HandleUpdateAsync(ITelegramBotClient _, Update update, CancellationToken cancellationToken)
