@@ -15,7 +15,8 @@ public sealed class InlineQueryKeyExtractorTests
 	[InlineData("hello world", "hello", "world")]
 	public void Extracts_first_token_and_trimmed_remainder(string? query, string expectedTrigger, string expectedRemainder)
 	{
-		Assert.True(InlineQueryKeyExtractor.TryExtract(query, out var trigger, out var remainder));
+		var (trigger, remainder) = InlineQueryKeyExtractor.Extract(query);
+
 		Assert.Equal(expectedTrigger, trigger);
 		Assert.Equal(expectedRemainder, remainder);
 	}

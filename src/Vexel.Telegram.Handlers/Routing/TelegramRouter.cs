@@ -192,34 +192,13 @@ public sealed class TelegramRouter : IUpdateRouter
 			return;
 		}
 
-		bool invoked;
-		try
-		{
-			invoked = await entry.Binder(scope, suffix, cancellationToken).ConfigureAwait(false);
-		}
-		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-		{
-			throw;
-		}
-		catch (Exception ex)
-		{
-			// Fault isolation: handler exceptions never kill the lane (P2). Answer obligation
-			// still discharges post-pipeline. No auto error text.
-			_logger.LogError(
-				ex,
-				"Callback handler for '{CallbackKey}' failed for update {UpdateId}",
-				entry.RouteKey,
-				update.Id);
-			return;
-		}
-
-		if (!invoked)
-		{
-			_logger.LogWarning(
-				"Failed to bind arguments for callback '{CallbackKey}' (update {UpdateId}); handler not invoked",
-				entry.RouteKey,
-				update.Id);
-		}
+		await InvokeRouteAsync(
+			entry,
+			suffix,
+			update,
+			scope,
+			RouteKindLabel.Callback,
+			cancellationToken).ConfigureAwait(false);
 	}
 
 	private async Task RouteInlineQueryAsync(
@@ -235,19 +214,19 @@ public sealed class TelegramRouter : IUpdateRouter
 			return;
 		}
 
-		_ = InlineQueryKeyExtractor.TryExtract(inlineQuery.Query, out var trigger, out var remainder);
+		var (trigger, remainder) = InlineQueryKeyExtractor.Extract(inlineQuery.Query);
 
 		// Non-empty first token that matches a registered trigger wins (D8 exact match).
 		// The empty-string default is never selected via the trigger path.
-		if (trigger is { Length: > 0 }
+		if (trigger.Length > 0
 			&& _inlineQueries.TryGetValue(trigger, out var triggerEntry))
 		{
 			await InvokeRouteAsync(
 				triggerEntry,
-				remainder ?? string.Empty,
+				remainder,
 				update,
 				scope,
-				"Inline query",
+				RouteKindLabel.InlineQuery,
 				cancellationToken).ConfigureAwait(false);
 			return;
 		}
@@ -260,7 +239,7 @@ public sealed class TelegramRouter : IUpdateRouter
 				inlineQuery.Query ?? string.Empty,
 				update,
 				scope,
-				"Inline query",
+				RouteKindLabel.InlineQuery,
 				cancellationToken).ConfigureAwait(false);
 			return;
 		}
@@ -306,7 +285,7 @@ public sealed class TelegramRouter : IUpdateRouter
 			suffix,
 			update,
 			scope,
-			"Chosen inline result",
+			RouteKindLabel.ChosenInlineResult,
 			cancellationToken).ConfigureAwait(false);
 	}
 
@@ -315,7 +294,7 @@ public sealed class TelegramRouter : IUpdateRouter
 		string payload,
 		Update update,
 		IServiceProvider scope,
-		string kindLabel,
+		RouteKindLabel kind,
 		CancellationToken cancellationToken)
 	{
 		bool invoked;
@@ -334,7 +313,7 @@ public sealed class TelegramRouter : IUpdateRouter
 			_logger.LogError(
 				ex,
 				"{Kind} handler for '{RouteKey}' failed for update {UpdateId}",
-				kindLabel,
+				kind.Title,
 				entry.RouteKey,
 				update.Id);
 			return;
@@ -344,7 +323,7 @@ public sealed class TelegramRouter : IUpdateRouter
 		{
 			_logger.LogWarning(
 				"Failed to bind arguments for {Kind} '{RouteKey}' (update {UpdateId}); handler not invoked",
-				kindLabel.ToLowerInvariant(),
+				kind.Lowercase,
 				entry.RouteKey,
 				update.Id);
 		}
@@ -465,4 +444,15 @@ public sealed class TelegramRouter : IUpdateRouter
 	}
 
 	private readonly record struct RouteEntry(string RouteKey, RouteBinder Binder);
+
+	/// <summary>Sentence-initial and mid-sentence spellings of a route kind for log templates.</summary>
+	private readonly record struct RouteKindLabel(string Title, string Lowercase)
+	{
+		public static RouteKindLabel Callback { get; } = new("Callback", "callback");
+
+		public static RouteKindLabel InlineQuery { get; } = new("Inline query", "inline query");
+
+		public static RouteKindLabel ChosenInlineResult { get; } =
+			new("Chosen inline result", "chosen inline result");
+	}
 }

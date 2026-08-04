@@ -3,7 +3,20 @@ using System.Text;
 namespace Vexel.Telegram.Generators;
 
 /// <summary>
-/// Shared validation for <c>[Callback]</c> route keys (VEX0002 + generator emission gate).
+/// Route-key kinds that share the callback key rules (non-blank, no <c>|</c>, 64 UTF-8 bytes).
+/// </summary>
+internal enum RouteKeyKind
+{
+	/// <summary><c>[Callback]</c> keys, carried in <c>callback_data</c>.</summary>
+	Callback,
+
+	/// <summary><c>[ChosenInlineResult]</c> keys, carried in the inline result <c>ResultId</c>.</summary>
+	ChosenInlineResult,
+}
+
+/// <summary>
+/// Shared validation for <c>[Callback]</c> and <c>[ChosenInlineResult]</c> route keys
+/// (VEX0002 + generator emission gate).
 /// </summary>
 internal static class CallbackKeyValidation
 {
@@ -34,19 +47,23 @@ internal static class CallbackKeyValidation
 	/// Describes why <paramref name="key"/> failed <see cref="IsValid"/>.
 	/// </summary>
 	/// <param name="key">Invalid key.</param>
-	public static string DescribeFailure(string key)
+	/// <param name="kind">Route kind the key belongs to, used to name the Telegram payload field.</param>
+	public static string DescribeFailure(string key, RouteKeyKind kind)
 	{
+		var keyLabel = kind == RouteKeyKind.Callback ? "Callback route key" : "Chosen inline result route key";
+		var payloadLabel = kind == RouteKeyKind.Callback ? "callback_data" : "ResultId";
+
 		if (string.IsNullOrWhiteSpace(key))
 		{
-			return $"Callback route key must not be empty or whitespace; Telegram requires 1-{MaxUtf8ByteLength} UTF-8 bytes of callback_data";
+			return $"{keyLabel} must not be empty or whitespace; Telegram requires 1-{MaxUtf8ByteLength} UTF-8 bytes of {payloadLabel}";
 		}
 
 		if (key.IndexOf('|') >= 0)
 		{
-			return $"Callback route key '{key}' must not contain '|' (the key/suffix separator)";
+			return $"{keyLabel} '{key}' must not contain '|' (the key/suffix separator)";
 		}
 
 		var byteCount = Encoding.UTF8.GetByteCount(key);
-		return $"Callback route key is {byteCount} UTF-8 bytes; Telegram allows at most {MaxUtf8ByteLength} for callback_data";
+		return $"{keyLabel} is {byteCount} UTF-8 bytes; Telegram allows at most {MaxUtf8ByteLength} for {payloadLabel}";
 	}
 }

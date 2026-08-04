@@ -23,8 +23,8 @@ internal static class DiagnosticDescriptors
 		defaultSeverity: DiagnosticSeverity.Error,
 		isEnabledByDefault: true,
 		description:
-			"Telegram rejects callback_data over 64 UTF-8 bytes. Callback route keys must also not contain "
-			+ "the '|' key/suffix separator.");
+			"Telegram rejects callback_data over 64 UTF-8 bytes. Callback and chosen-inline-result route keys "
+			+ "must also not contain the '|' key/suffix separator.");
 
 	public static readonly DiagnosticDescriptor VEX0003InvalidCommandName = new(
 		id: "VEX0003",
@@ -55,4 +55,17 @@ internal static class DiagnosticDescriptors
 		defaultSeverity: DiagnosticSeverity.Error,
 		isEnabledByDefault: true,
 		description: "Route keys must be unique per kind within a compilation.");
+
+	public static readonly DiagnosticDescriptor VEX0006InvalidInlineQueryTrigger = new(
+		id: "VEX0006",
+		title: "Invalid inline query trigger",
+		messageFormat:
+			"Inline query trigger '{0}' is invalid; a trigger must be a single token with no whitespace "
+			+ "(use [InlineQuery] or [InlineQuery(\"\")] for the default handler)",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true,
+		description:
+			"Inline queries route on the first whitespace token of the query text, so a trigger containing "
+			+ "whitespace could never match.");
 }

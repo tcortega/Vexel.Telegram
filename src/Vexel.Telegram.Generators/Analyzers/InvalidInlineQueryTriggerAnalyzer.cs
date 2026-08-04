@@ -5,15 +5,15 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace Vexel.Telegram.Generators.Analyzers;
 
 /// <summary>
-/// VEX0002: callback and chosen-inline-result route keys must fit in Telegram's 64-byte UTF-8
-/// callback_data/ResultId limit and must not contain the <c>|</c> key/suffix separator.
+/// VEX0006: inline query triggers must be a single whitespace-free token (or empty for the
+/// default handler), because routing matches the first whitespace token of the query text.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class CallbackDataTooLongAnalyzer : DiagnosticAnalyzer
+public sealed class InvalidInlineQueryTriggerAnalyzer : DiagnosticAnalyzer
 {
 	/// <inheritdoc />
 	public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
-		[DiagnosticDescriptors.VEX0002CallbackDataTooLong];
+		[DiagnosticDescriptors.VEX0006InvalidInlineQueryTrigger];
 
 	/// <inheritdoc />
 	public override void Initialize(AnalysisContext context)
@@ -32,27 +32,24 @@ public sealed class CallbackDataTooLongAnalyzer : DiagnosticAnalyzer
 			return;
 		}
 
-		ReportInvalidKey(context, type, type.GetCallbackAttribute(), RouteKeyKind.Callback);
-		ReportInvalidKey(context, type, type.GetChosenInlineResultAttribute(), RouteKeyKind.ChosenInlineResult);
-	}
-
-	private static void ReportInvalidKey(
-		SymbolAnalysisContext context,
-		INamedTypeSymbol type,
-		AttributeData? attribute,
-		RouteKeyKind kind)
-	{
+		var attribute = type.GetInlineQueryAttribute();
 		if (attribute is null)
 		{
 			return;
 		}
 
-		if (attribute.ConstructorArguments is not [{ Value: string key }])
+		// The optional ctor arg defaults to "" when omitted ([InlineQuery] with no args).
+		if (attribute.ConstructorArguments.Length == 0)
 		{
 			return;
 		}
 
-		if (CallbackKeyValidation.IsValid(key))
+		if (attribute.ConstructorArguments is not [{ Value: string trigger }])
+		{
+			return;
+		}
+
+		if (InlineQueryTriggerValidation.IsValid(trigger))
 		{
 			return;
 		}
@@ -62,8 +59,8 @@ public sealed class CallbackDataTooLongAnalyzer : DiagnosticAnalyzer
 
 		context.ReportDiagnostic(
 			Diagnostic.Create(
-				DiagnosticDescriptors.VEX0002CallbackDataTooLong,
+				DiagnosticDescriptors.VEX0006InvalidInlineQueryTrigger,
 				location,
-				CallbackKeyValidation.DescribeFailure(key, kind)));
+				trigger));
 	}
 }

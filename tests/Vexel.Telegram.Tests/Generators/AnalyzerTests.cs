@@ -1,3 +1,4 @@
+using System.Globalization;
 using Vexel.Telegram.Generators.Analyzers;
 
 namespace Vexel.Telegram.Tests.Generators;
@@ -370,6 +371,123 @@ public sealed class AnalyzerTests
 			new DuplicateRouteKeyAnalyzer());
 
 		Assert.Contains(diagnostics, static d => d.Id == "VEX0005");
+	}
+
+	[Theory]
+	[InlineData("find user")]
+	[InlineData(" ")]
+	[InlineData("search\\tmore")]
+	public async Task VEX0006_fires_on_inline_query_trigger_with_whitespace(string trigger)
+	{
+		var source = $$"""
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[InlineQuery("{{trigger}}")]
+			public static class Find
+			{
+				public sealed record Query(string Text);
+				private static ValueTask HandleAsync(Query _, CancellationToken token) => default;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new InvalidInlineQueryTriggerAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0006");
+	}
+
+	[Theory]
+	[InlineData("")]
+	[InlineData("search")]
+	public async Task VEX0006_does_not_fire_on_valid_inline_query_trigger(string trigger)
+	{
+		var source = $$"""
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[InlineQuery("{{trigger}}")]
+			public static class Find
+			{
+				public sealed record Query(string Text);
+				private static ValueTask HandleAsync(Query _, CancellationToken token) => default;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new InvalidInlineQueryTriggerAnalyzer());
+
+		Assert.DoesNotContain(diagnostics, static d => d.Id == "VEX0006");
+	}
+
+	[Theory]
+	[InlineData("item|v2")]
+	[InlineData("  ")]
+	public async Task VEX0002_fires_on_invalid_chosen_inline_result_key(string key)
+	{
+		var source = $$"""
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[ChosenInlineResult("{{key}}")]
+			public static class Item
+			{
+				public sealed record Command(string Suffix);
+				private static ValueTask HandleAsync(Command _, CancellationToken token) => default;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new CallbackDataTooLongAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0002");
+	}
+
+	[Fact]
+	public async Task VEX0002_fires_when_chosen_inline_result_key_exceeds_64_utf8_bytes()
+	{
+		var key = new string('a', 65);
+		var source = $$"""
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[ChosenInlineResult("{{key}}")]
+			public static class Item
+			{
+				public sealed record Command;
+				private static ValueTask HandleAsync(Command _, CancellationToken token) => default;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new CallbackDataTooLongAnalyzer());
+
+		var diagnostic = Assert.Single(diagnostics.Where(static d => d.Id == "VEX0002"));
+		Assert.Contains("ResultId", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
 	}
 
 	[Fact]

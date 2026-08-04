@@ -230,7 +230,7 @@ public sealed class RouteGenerator : IIncrementalGenerator
 
 		if (!InlineQueryTriggerValidation.IsValid(trigger))
 		{
-			// Invalid trigger (whitespace); skip emission.
+			// VEX0006 reports; skip emission.
 			return null;
 		}
 
@@ -274,6 +274,7 @@ public sealed class RouteGenerator : IIncrementalGenerator
 		// Same key rules as callback (non-blank, no '|', <= 64 UTF-8 bytes of ResultId budget).
 		if (!CallbackKeyValidation.IsValid(routeKey))
 		{
+			// VEX0002 reports; skip emission.
 			return null;
 		}
 
@@ -467,14 +468,6 @@ public sealed class RouteGenerator : IIncrementalGenerator
 			$"{kindLabel} request '{namedRequest.ToDisplayString()}' on '{handlerType.Name}' must be an empty record or a single string parameter (binding convention rule 3/4/6).";
 		return false;
 	}
-
-	// Kept for analyzer call sites that still name the callback-specific helper.
-	internal static bool TryGetBindableCallbackRequest(
-		INamedTypeSymbol handlerType,
-		[System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ITypeSymbol? requestType,
-		out bool hasStringParameter,
-		out string? errorMessage) =>
-		TryGetBindableStringOrEmptyRequest(handlerType, "Callback", out requestType, out hasStringParameter, out errorMessage);
 
 	private static void Emit(SourceProductionContext context, AssemblyRoutesModel model)
 	{

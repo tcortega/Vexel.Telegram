@@ -1,5 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
-
 namespace Vexel.Telegram.Handlers.Routing;
 
 /// <summary>
@@ -12,20 +10,11 @@ public static class InlineQueryKeyExtractor
 	/// Splits <paramref name="query"/> into a leading trigger token and the trimmed remainder.
 	/// </summary>
 	/// <param name="query">Raw <c>InlineQuery.Query</c> (may be empty; null treated as empty).</param>
-	/// <param name="trigger">
-	/// First non-whitespace token, or empty when the query has no tokens.
-	/// </param>
-	/// <param name="remainder">
-	/// Text after the first token, trimmed; empty when the query is only the token (or empty).
-	/// </param>
 	/// <returns>
-	/// Always <see langword="true"/>. Present for symmetry with other extractors; inline queries
-	/// always have a string query to inspect.
+	/// The first non-whitespace token (empty when the query has no tokens) and the text after that
+	/// token, trimmed (empty when the query is only the token).
 	/// </returns>
-	public static bool TryExtract(
-		string? query,
-		[NotNullWhen(true)] out string? trigger,
-		[NotNullWhen(true)] out string? remainder)
+	public static (string Trigger, string Remainder) Extract(string? query)
 	{
 		query ??= string.Empty;
 
@@ -38,9 +27,7 @@ public static class InlineQueryKeyExtractor
 
 		if (i >= length)
 		{
-			trigger = string.Empty;
-			remainder = string.Empty;
-			return true;
+			return (string.Empty, string.Empty);
 		}
 
 		var start = i;
@@ -49,8 +36,8 @@ public static class InlineQueryKeyExtractor
 			i++;
 		}
 
-		trigger = query[start..i];
-		remainder = i < length ? query[i..].Trim() : string.Empty;
-		return true;
+		var trigger = query[start..i];
+		var remainder = i < length ? query[i..].Trim() : string.Empty;
+		return (trigger, remainder);
 	}
 }
