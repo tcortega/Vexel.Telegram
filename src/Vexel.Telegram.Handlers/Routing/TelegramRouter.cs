@@ -10,18 +10,24 @@ namespace Vexel.Telegram.Handlers.Routing;
 /// Runtime Telegram router: classify the update, extract a route key per the binding convention,
 /// bind arguments, and await the generated Immediate handler.
 /// </summary>
+/// <remarks>
+/// Callback answer obligation (B4) is discharged by <see cref="CallbackAnswerObligation"/> after
+/// the full dispatch pipeline so routed handlers, exceptions, unrouted callbacks, and raw handlers
+/// all share one fail-closed empty <c>answerCallbackQuery</c> when Feedback did not answer.
+/// </remarks>
 public sealed class TelegramRouter : IUpdateRouter
 {
 	private readonly ITelegramBotClient _botClient;
 	private readonly ILogger<TelegramRouter> _logger;
 	private readonly FrozenDictionary<string, RouteEntry> _commands;
+	private readonly FrozenDictionary<string, RouteEntry> _callbacks;
 	private string? _botUsername;
 	private int _botUsernameResolved; // 0 = unset, 1 = resolved
 	private long _botUsernameRetryAfterTicks;
 
 	/// <summary>
 	/// Initializes a new router from all registered <see cref="TelegramRouteContribution"/>s.
-	/// Fails fast when two assemblies contribute the same command key.
+	/// Fails fast when two assemblies contribute the same command or callback key.
 	/// </summary>
 	/// <param name="contributions">Per-assembly route contributions.</param>
 	/// <param name="botClient">Bot client used to resolve this bot's username when needed.</param>
@@ -37,7 +43,10 @@ public sealed class TelegramRouter : IUpdateRouter
 
 		_botClient = botClient;
 		_logger = logger;
-		_commands = ComposeCommands(contributions);
+
+		var contributionList = contributions as IList<TelegramRouteContribution> ?? [.. contributions];
+		_commands = ComposeCommands(contributionList);
+		_callbacks = ComposeCallbacks(contributionList);
 	}
 
 	/// <summary>
@@ -69,6 +78,12 @@ public sealed class TelegramRouter : IUpdateRouter
 	{
 		ArgumentNullException.ThrowIfNull(update);
 		ArgumentNullException.ThrowIfNull(scope);
+
+		if (update.CallbackQuery is { } callbackQuery)
+		{
+			await RouteCallbackAsync(callbackQuery, update, scope, cancellationToken).ConfigureAwait(false);
+			return;
+		}
 
 		if (update.Message is not { } message || _commands.Count == 0)
 		{
@@ -112,7 +127,7 @@ public sealed class TelegramRouter : IUpdateRouter
 			_logger.LogError(
 				ex,
 				"Command handler for /{Command} failed for update {UpdateId}",
-				entry.CommandName,
+				entry.RouteKey,
 				update.Id);
 			return;
 		}
@@ -121,7 +136,64 @@ public sealed class TelegramRouter : IUpdateRouter
 		{
 			_logger.LogWarning(
 				"Failed to bind arguments for /{Command} (update {UpdateId}); handler not invoked",
-				entry.CommandName,
+				entry.RouteKey,
+				update.Id);
+		}
+	}
+
+	private async Task RouteCallbackAsync(
+		CallbackQuery callbackQuery,
+		Update update,
+		IServiceProvider scope,
+		CancellationToken cancellationToken)
+	{
+		// Answer obligation (B4) is discharged by CallbackAnswerObligation after the full pipeline
+		// so raw handlers can still answer unrouted callbacks first.
+		if (!CallbackKeyExtractor.TryExtract(callbackQuery.Data, out var key, out var suffix))
+		{
+			_logger.LogWarning(
+				"Unrouted callback query {CallbackId} for update {UpdateId}: no callback data",
+				callbackQuery.Id,
+				update.Id);
+			return;
+		}
+
+		if (!_callbacks.TryGetValue(key, out var entry))
+		{
+			_logger.LogWarning(
+				"Unrouted callback query {CallbackId} for update {UpdateId}: no route for key '{CallbackKey}'",
+				callbackQuery.Id,
+				update.Id,
+				key);
+			return;
+		}
+
+		bool invoked;
+		try
+		{
+			invoked = await entry.Binder(scope, suffix, cancellationToken).ConfigureAwait(false);
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			// Fault isolation: handler exceptions never kill the lane (P2). Answer obligation
+			// still discharges post-pipeline. No auto error text.
+			_logger.LogError(
+				ex,
+				"Callback handler for '{CallbackKey}' failed for update {UpdateId}",
+				entry.RouteKey,
+				update.Id);
+			return;
+		}
+
+		if (!invoked)
+		{
+			_logger.LogWarning(
+				"Failed to bind arguments for callback '{CallbackKey}' (update {UpdateId}); handler not invoked",
+				entry.RouteKey,
 				update.Id);
 		}
 	}
@@ -196,5 +268,34 @@ public sealed class TelegramRouter : IUpdateRouter
 		return map.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 	}
 
-	private readonly record struct RouteEntry(string CommandName, RouteBinder Binder);
+	private static FrozenDictionary<string, RouteEntry> ComposeCallbacks(
+		IEnumerable<TelegramRouteContribution> contributions)
+	{
+		var map = new Dictionary<string, RouteEntry>(StringComparer.Ordinal);
+		var owners = new Dictionary<string, string>(StringComparer.Ordinal);
+
+		foreach (var contribution in contributions)
+		{
+			foreach (var pair in contribution.Callbacks)
+			{
+				if (owners.TryGetValue(pair.Key, out var otherAssembly))
+				{
+					throw new InvalidOperationException(
+						string.Equals(otherAssembly, contribution.AssemblyName, StringComparison.Ordinal)
+							? $"Assembly '{contribution.AssemblyName}' contributed callback route "
+								+ $"'{pair.Key}' more than once. Call Add{contribution.AssemblyName}Telegram() "
+								+ "exactly once (a library that already calls it must not be re-registered by the app)."
+							: $"Duplicate callback route '{pair.Key}' registered by assemblies "
+								+ $"'{otherAssembly}' and '{contribution.AssemblyName}'.");
+				}
+
+				owners[pair.Key] = contribution.AssemblyName;
+				map[pair.Key] = new RouteEntry(pair.Key, pair.Value);
+			}
+		}
+
+		return map.ToFrozenDictionary(StringComparer.Ordinal);
+	}
+
+	private readonly record struct RouteEntry(string RouteKey, RouteBinder Binder);
 }

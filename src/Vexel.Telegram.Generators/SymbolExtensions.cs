@@ -7,6 +7,7 @@ internal static class SymbolExtensions
 {
 	public const string HandlerAttributeMetadataName = "Immediate.Handlers.Shared.HandlerAttribute";
 	public const string CommandAttributeMetadataName = "Vexel.Telegram.Handlers.Attributes.CommandAttribute";
+	public const string CallbackAttributeMetadataName = "Vexel.Telegram.Handlers.Attributes.CallbackAttribute";
 	public const string ImmediateAssemblyIdentifierMetadataName =
 		"Immediate.Handlers.Shared.ImmediateAssemblyIdentifierAttribute";
 
@@ -52,6 +53,29 @@ internal static class SymbolExtensions
 			},
 		};
 
+	public static bool IsCallbackAttribute([NotNullWhen(true)] this ITypeSymbol? type) =>
+		type is
+		{
+			Name: "CallbackAttribute",
+			ContainingNamespace:
+			{
+				Name: "Attributes",
+				ContainingNamespace:
+				{
+					Name: "Handlers",
+					ContainingNamespace:
+					{
+						Name: "Telegram",
+						ContainingNamespace:
+						{
+							Name: "Vexel",
+							ContainingNamespace.IsGlobalNamespace: true,
+						},
+					},
+				},
+			},
+		};
+
 	public static bool HasHandlerAttribute(this INamedTypeSymbol type)
 	{
 		foreach (var attribute in type.GetAttributes())
@@ -78,9 +102,22 @@ internal static class SymbolExtensions
 		return null;
 	}
 
+	public static AttributeData? GetCallbackAttribute(this INamedTypeSymbol type)
+	{
+		foreach (var attribute in type.GetAttributes())
+		{
+			if (attribute.AttributeClass.IsCallbackAttribute())
+			{
+				return attribute;
+			}
+		}
+
+		return null;
+	}
+
 	public static bool IsVexelRouteAttribute([NotNullWhen(true)] this ITypeSymbol? type) =>
-		type.IsCommandAttribute();
-	// Callback/Inline/On* land in later tasks and extend this check.
+		type.IsCommandAttribute() || type.IsCallbackAttribute();
+	// Inline/On* land in later tasks and extend this check.
 
 	public static bool HasVexelRouteAttribute(this INamedTypeSymbol type)
 	{

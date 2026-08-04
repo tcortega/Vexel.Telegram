@@ -27,6 +27,78 @@ public sealed class AnalyzerTests
 	}
 
 	[Fact]
+	public async Task VEX0001_fires_when_Callback_missing_Handler()
+	{
+		const string source = """
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Callback("confirm")]
+			public static class Confirm
+			{
+				public sealed record Command;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new MissingHandlerAttributeAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0001");
+	}
+
+	[Fact]
+	public async Task VEX0002_fires_when_callback_key_exceeds_64_utf8_bytes()
+	{
+		// 65 ASCII bytes.
+		var key = new string('a', 65);
+		var source = $$"""
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[Callback("{{key}}")]
+			public static class TooLong
+			{
+				public sealed record Command;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new CallbackDataTooLongAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0002");
+	}
+
+	[Fact]
+	public async Task VEX0002_fires_when_callback_key_contains_pipe()
+	{
+		const string source = """
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[Callback("bad|key")]
+			public static class BadKey
+			{
+				public sealed record Command;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new CallbackDataTooLongAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0002");
+	}
+
+	[Fact]
 	public async Task VEX0003_fires_on_invalid_command_name()
 	{
 		const string source = """
@@ -115,5 +187,72 @@ public sealed class AnalyzerTests
 			new DuplicateRouteKeyAnalyzer());
 
 		Assert.Contains(diagnostics, static d => d.Id == "VEX0005");
+	}
+
+	[Fact]
+	public async Task VEX0005_fires_on_duplicate_callback_keys()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[Callback("go")]
+			public static class GoA
+			{
+				public sealed record Command;
+				private static ValueTask HandleAsync(Command _, CancellationToken token) => default;
+			}
+
+			[Handler]
+			[Callback("go")]
+			public static class GoB
+			{
+				public sealed record Command;
+				private static ValueTask HandleAsync(Command _, CancellationToken token) => default;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new DuplicateRouteKeyAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0005");
+	}
+
+	[Fact]
+	public async Task VEX0004_fires_on_unbindable_callback_request()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[Callback("go")]
+			public static class Go
+			{
+				public sealed record Command(int Count);
+
+				private static ValueTask HandleAsync(Command _, CancellationToken token)
+				{
+					_ = token;
+					return default;
+				}
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new UnbindableRequestAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0004");
 	}
 }

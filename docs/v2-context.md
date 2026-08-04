@@ -5,7 +5,7 @@ Not a frozen API contract.
 Items below are labeled `agreed`, `proposed`, or `open`.
 Do not treat proposed items as authorization to implement product code.
 
-Last updated: 2026-08-04 (decision log through 32; T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, and T3 `[Command]` routing landed)
+Last updated: 2026-08-04 (decision log through 32; T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, and T5 `[Callback]` + keyboard helpers landed)
 Branch: `v2` (created to hold this context and future V2 work)
 Repo stays public. Private-repo idea was rejected.
 
@@ -155,7 +155,7 @@ Current build-level details live in `AGENTS.md`; the solution and csproj files a
 
 App references: `Vexel.Telegram` + `Immediate.Handlers` as an **explicit peer** (same honesty as Apis).
 
-### Runtime flow - **command leg settled in T3**
+### Runtime flow - **command + callback legs settled in T3/T5**
 
 ```
 Update
@@ -166,15 +166,17 @@ Update
          resolve generated Immediate handler
          await HandleAsync
     -> raw IRawUpdateHandler escape hatches (always last; cannot suppress routing)
+    -> IUpdateCompletionHook (B4: default answerCallbackQuery/answerInlineQuery if Feedback did not answer)
 ```
 
 Hot path: compile-time map, no reflection invoke.
 
-`[Command]` is the leg that exists today: `IUpdateRouter` is the dispatcher seam, `TelegramRouter`
-the runtime implementation. Callback / inline / chosen-result legs are still proposed.
-The command binding convention (key extraction, `@Bot` suffix, argument shapes) is normative in the
-code that implements it - `CommandKeyExtractor` and `CommandArgumentBinder` in
+`[Command]` and `[Callback]` legs exist today: `IUpdateRouter` is the dispatcher seam, `TelegramRouter`
+the runtime implementation. Inline / chosen-result legs are still proposed.
+Binding conventions live in the code that implements them -
+`CommandKeyExtractor`, `CommandArgumentBinder`, `CallbackKeyExtractor` in
 `src/Vexel.Telegram.Handlers/Routing` - not restated here.
+Keyboard builders emit short `key` / `key|suffix` callback data (`Keyboards/`).
 
 ### Example DX (illustrative, not approved API names)
 

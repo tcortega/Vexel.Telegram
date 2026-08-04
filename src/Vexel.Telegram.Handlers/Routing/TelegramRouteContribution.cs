@@ -20,10 +20,14 @@ public sealed class TelegramRouteContribution
 	/// <param name="commandMetadata">
 	/// SetMyCommands metadata in a stable order (typically sorted by command name).
 	/// </param>
+	/// <param name="callbacks">
+	/// Callback-key (ordinal, case-sensitive) to binder map. Must already use an ordinal comparer.
+	/// </param>
 	public TelegramRouteContribution(
 		string assemblyName,
 		IReadOnlyDictionary<string, RouteBinder> commands,
-		IReadOnlyList<CommandRouteMetadata> commandMetadata)
+		IReadOnlyList<CommandRouteMetadata> commandMetadata,
+		IReadOnlyDictionary<string, RouteBinder>? callbacks = null)
 	{
 		ArgumentNullException.ThrowIfNull(assemblyName);
 		ArgumentNullException.ThrowIfNull(commands);
@@ -32,6 +36,7 @@ public sealed class TelegramRouteContribution
 		AssemblyName = assemblyName;
 		Commands = commands;
 		CommandMetadata = commandMetadata;
+		Callbacks = callbacks ?? new Dictionary<string, RouteBinder>(StringComparer.Ordinal);
 	}
 
 	/// <summary>Display name of the contributing assembly.</summary>
@@ -42,4 +47,7 @@ public sealed class TelegramRouteContribution
 
 	/// <summary>SetMyCommands metadata for this assembly.</summary>
 	public IReadOnlyList<CommandRouteMetadata> CommandMetadata { get; }
+
+	/// <summary>Callback route map for this assembly.</summary>
+	public IReadOnlyDictionary<string, RouteBinder> Callbacks { get; }
 }

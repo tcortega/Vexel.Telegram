@@ -5,7 +5,7 @@ namespace Vexel.Telegram.Generators;
 
 /// <summary>
 /// Discovers Immediate.Handlers types that also carry a Vexel route attribute and emits
-/// <c>Add{Assembly}Telegram()</c> registration plus frozen command binders.
+/// <c>Add{Assembly}Telegram()</c> registration plus frozen command and callback binders.
 /// </summary>
 [Generator]
 public sealed class RouteGenerator : IIncrementalGenerator
@@ -13,13 +13,13 @@ public sealed class RouteGenerator : IIncrementalGenerator
 	/// <inheritdoc />
 	public void Initialize(IncrementalGeneratorInitializationContext context)
 	{
-		var commands = context.SyntaxProvider
+		var routes = context.SyntaxProvider
 			.ForAttributeWithMetadataName(
 				SymbolExtensions.HandlerAttributeMetadataName,
 				predicate: static (node, _) => node is TypeDeclarationSyntax,
-				transform: static (ctx, token) => TransformCommand(ctx, token))
-			.WhereNotNull()
-			.WithTrackingName("VexelCommands");
+				transform: static (ctx, token) => TransformHandler(ctx, token))
+			.Where(static pair => pair.Command is not null || pair.Callback is not null)
+			.WithTrackingName("VexelRoutes");
 
 		var assemblyIdentifier = context.CompilationProvider
 			.Select(static (compilation, _) => compilation.GetAssemblyIdentifier())
@@ -32,7 +32,7 @@ public sealed class RouteGenerator : IIncrementalGenerator
 					: string.Empty)
 			.WithTrackingName("VexelRootNamespace");
 
-		var collected = commands.Collect();
+		var collected = routes.Collect();
 
 		var model = collected
 			.Combine(assemblyIdentifier)
@@ -40,22 +40,35 @@ public sealed class RouteGenerator : IIncrementalGenerator
 			.Select(static (tuple, _) =>
 			{
 				var ((routes, assemblyIdentifier), rootNamespace) = tuple;
-				var ordered = routes
+
+				var commands = routes
+					.Select(static r => r.Command)
+					.Where(static c => c is not null)
+					.Select(static c => c!)
 					.OrderBy(static r => r.CommandName, StringComparer.OrdinalIgnoreCase)
+					.ThenBy(static r => r.HandlerFullyQualifiedName, StringComparer.Ordinal)
+					.ToArray();
+
+				var callbacks = routes
+					.Select(static r => r.Callback)
+					.Where(static c => c is not null)
+					.Select(static c => c!)
+					.OrderBy(static r => r.RouteKey, StringComparer.Ordinal)
 					.ThenBy(static r => r.HandlerFullyQualifiedName, StringComparer.Ordinal)
 					.ToArray();
 
 				return new AssemblyRoutesModel(
 					assemblyIdentifier,
 					rootNamespace,
-					new EquatableReadOnlyList<CommandRouteModel>(ordered));
+					new EquatableReadOnlyList<CommandRouteModel>(commands),
+					new EquatableReadOnlyList<CallbackRouteModel>(callbacks));
 			})
 			.WithTrackingName("VexelRouteModel");
 
 		context.RegisterSourceOutput(model, static (spc, routes) => Emit(spc, routes));
 	}
 
-	private static CommandRouteModel? TransformCommand(
+	private static HandlerRoutes TransformHandler(
 		GeneratorAttributeSyntaxContext context,
 		CancellationToken token)
 	{
@@ -63,8 +76,17 @@ public sealed class RouteGenerator : IIncrementalGenerator
 
 		if (context.TargetSymbol is not INamedTypeSymbol type || type.ContainingType is not null)
 		{
-			return null;
+			return default;
 		}
+
+		return new HandlerRoutes(
+			TransformCommand(type, token),
+			TransformCallback(type, token));
+	}
+
+	private static CommandRouteModel? TransformCommand(INamedTypeSymbol type, CancellationToken token)
+	{
+		token.ThrowIfCancellationRequested();
 
 		var commandAttribute = type.GetCommandAttribute();
 		if (commandAttribute is null)
@@ -96,7 +118,7 @@ public sealed class RouteGenerator : IIncrementalGenerator
 
 		token.ThrowIfCancellationRequested();
 
-		if (!TryGetBindableRequest(type, out var requestType, out var parameters, out _))
+		if (!TryGetBindableCommandRequest(type, out var requestType, out var parameters, out _))
 		{
 			// VEX0004 reports; skip emission.
 			return null;
@@ -111,6 +133,57 @@ public sealed class RouteGenerator : IIncrementalGenerator
 			RequestFullyQualifiedName: requestType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
 			AssemblyDisplayName: type.ContainingAssembly.Name,
 			Parameters: parameters);
+	}
+
+	private static CallbackRouteModel? TransformCallback(INamedTypeSymbol type, CancellationToken token)
+	{
+		token.ThrowIfCancellationRequested();
+
+		var callbackAttribute = type.GetCallbackAttribute();
+		if (callbackAttribute is null)
+		{
+			return null;
+		}
+
+		token.ThrowIfCancellationRequested();
+
+		if (callbackAttribute.ConstructorArguments is not [{ Value: string routeKey }])
+		{
+			return null;
+		}
+
+		if (!CallbackKeyValidation.IsValid(routeKey))
+		{
+			// VEX0002 reports; skip emission.
+			return null;
+		}
+
+		token.ThrowIfCancellationRequested();
+
+		if (!TryGetBindableCallbackRequest(type, out var requestType, out var hasStringParameter, out _))
+		{
+			// VEX0004 reports; skip emission.
+			return null;
+		}
+
+		token.ThrowIfCancellationRequested();
+
+		return new CallbackRouteModel(
+			RouteKey: routeKey,
+			HandlerFullyQualifiedName: type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+			RequestFullyQualifiedName: requestType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+			AssemblyDisplayName: type.ContainingAssembly.Name,
+			HasStringParameter: hasStringParameter);
+	}
+
+	internal static bool TryGetBindableCommandRequest(
+		INamedTypeSymbol handlerType,
+		[System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ITypeSymbol? requestType,
+		out EquatableReadOnlyList<RequestParameterModel> parameters,
+		out string? errorMessage)
+	{
+		// Back-compat alias used by analyzers and older call sites.
+		return TryGetBindableRequest(handlerType, out requestType, out parameters, out errorMessage);
 	}
 
 	internal static bool TryGetBindableRequest(
@@ -211,10 +284,78 @@ public sealed class RouteGenerator : IIncrementalGenerator
 		return true;
 	}
 
+	internal static bool TryGetBindableCallbackRequest(
+		INamedTypeSymbol handlerType,
+		[System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ITypeSymbol? requestType,
+		out bool hasStringParameter,
+		out string? errorMessage)
+	{
+		requestType = null;
+		hasStringParameter = false;
+		errorMessage = null;
+
+		var handleMethod = handlerType.GetHandleMethod();
+		if (handleMethod is null || handleMethod.Parameters.Length == 0)
+		{
+			errorMessage =
+				$"Handler '{handlerType.Name}' must declare a single Handle/HandleAsync method whose first parameter is the request type.";
+			return false;
+		}
+
+		requestType = handleMethod.Parameters[0].Type;
+
+		if (requestType is not INamedTypeSymbol namedRequest)
+		{
+			errorMessage =
+				$"Request type '{requestType.ToDisplayString()}' on '{handlerType.Name}' must be a named type with one public constructor.";
+			return false;
+		}
+
+		if (namedRequest.IsKnownDiServiceType())
+		{
+			errorMessage =
+				$"DI service type '{namedRequest.ToDisplayString()}' cannot be used as a request record on '{handlerType.Name}'. "
+				+ "Contexts, Feedback, and ITelegramBotClient bind via HandleAsync parameters, never from the payload.";
+			return false;
+		}
+
+		var ctors = namedRequest.InstanceConstructors
+			.Where(static c => c.DeclaredAccessibility == Accessibility.Public && !c.IsStatic)
+			.ToArray();
+
+		if (ctors.Length != 1)
+		{
+			errorMessage =
+				$"Request type '{namedRequest.ToDisplayString()}' on '{handlerType.Name}' must have exactly one public constructor (binding convention rule 6).";
+			return false;
+		}
+
+		var ctor = ctors[0];
+		if (ctor.Parameters.Length == 0)
+		{
+			hasStringParameter = false;
+			return true;
+		}
+
+		if (ctor.Parameters.Length == 1
+			&& ctor.Parameters[0].Type.SpecialType == SpecialType.System_String
+			&& !ctor.Parameters[0].Type.IsKnownDiServiceType())
+		{
+			hasStringParameter = true;
+			return true;
+		}
+
+		errorMessage =
+			$"Callback request '{namedRequest.ToDisplayString()}' on '{handlerType.Name}' must be an empty record or a single string parameter receiving the data suffix (binding convention rule 3).";
+		return false;
+	}
+
 	private static void Emit(SourceProductionContext context, AssemblyRoutesModel model)
 	{
 		// Always emit the registration method so apps can call AddXxxTelegram() even with zero routes.
 		var source = RouteRegistrationEmitter.Emit(model);
 		context.AddSource("Vexel.Telegram.Routes.g.cs", source);
 	}
+
+	private readonly record struct HandlerRoutes(CommandRouteModel? Command, CallbackRouteModel? Callback);
 }

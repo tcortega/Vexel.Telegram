@@ -18,22 +18,27 @@ public static partial class TelegramServiceCollectionExtensions
 		var commands = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
 			global::System.StringComparer.OrdinalIgnoreCase)
 		{
-			["ping"] = static async (scope, payload, cancellationToken) =>
-			{
-				var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::Demo.Ping.Handler>(scope);
-				_ = await handler.HandleAsync(new global::Demo.Ping.Command(), cancellationToken).ConfigureAwait(false);
-				return true;
-			},
 		};
 
 		var metadata = new global::Vexel.Telegram.Handlers.Routing.CommandRouteMetadata[]
 		{
-			new global::Vexel.Telegram.Handlers.Routing.CommandRouteMetadata("ping", "Ping the bot"),
 		};
 
 		var callbacks = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
 			global::System.StringComparer.Ordinal)
 		{
+			["confirm"] = static async (scope, payload, cancellationToken) =>
+			{
+				var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::Demo.Confirm.Handler>(scope);
+				_ = await handler.HandleAsync(new global::Demo.Confirm.Command(), cancellationToken).ConfigureAwait(false);
+				return true;
+			},
+			["item"] = static async (scope, payload, cancellationToken) =>
+			{
+				var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::Demo.Item.Handler>(scope);
+				_ = await handler.HandleAsync(new global::Demo.Item.Command(payload), cancellationToken).ConfigureAwait(false);
+				return true;
+			},
 		};
 
 		_ = global::Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton(

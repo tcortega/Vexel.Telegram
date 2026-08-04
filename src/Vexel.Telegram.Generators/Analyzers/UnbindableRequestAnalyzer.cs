@@ -32,12 +32,38 @@ public sealed class UnbindableRequestAnalyzer : DiagnosticAnalyzer
 		}
 
 		// Only validate types that are dual-attr complete; VEX0001 covers missing [Handler].
-		if (type.GetCommandAttribute() is null || !type.HasHandlerAttribute())
+		if (!type.HasHandlerAttribute())
 		{
 			return;
 		}
 
-		if (RouteGenerator.TryGetBindableRequest(type, out _, out _, out var error) || error is null)
+		string? error = null;
+
+		if (type.GetCommandAttribute() is not null)
+		{
+			if (!RouteGenerator.TryGetBindableRequest(type, out _, out _, out error) && error is not null)
+			{
+				// fall through to report
+			}
+			else
+			{
+				error = null;
+			}
+		}
+
+		if (error is null && type.GetCallbackAttribute() is not null)
+		{
+			if (!RouteGenerator.TryGetBindableCallbackRequest(type, out _, out _, out error) && error is not null)
+			{
+				// fall through to report
+			}
+			else
+			{
+				error = null;
+			}
+		}
+
+		if (error is null)
 		{
 			return;
 		}

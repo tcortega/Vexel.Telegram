@@ -41,7 +41,7 @@ internal static class RouteRegistrationEmitter
 		{
 			_ = sb.Append("\t\t\t[\"").Append(Escape(command.CommandName)).AppendLine("\"] = static async (scope, payload, cancellationToken) =>");
 			_ = sb.AppendLine("\t\t\t{");
-			EmitBinderBody(sb, command, indent: "\t\t\t\t");
+			EmitCommandBinderBody(sb, command, indent: "\t\t\t\t");
 			_ = sb.AppendLine("\t\t\t},");
 		}
 
@@ -62,12 +62,27 @@ internal static class RouteRegistrationEmitter
 
 		_ = sb.AppendLine("\t\t};");
 		_ = sb.AppendLine();
+		_ = sb.AppendLine("\t\tvar callbacks = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(");
+		_ = sb.AppendLine("\t\t\tglobal::System.StringComparer.Ordinal)");
+		_ = sb.AppendLine("\t\t{");
+
+		foreach (var callback in model.Callbacks)
+		{
+			_ = sb.Append("\t\t\t[\"").Append(Escape(callback.RouteKey)).AppendLine("\"] = static async (scope, payload, cancellationToken) =>");
+			_ = sb.AppendLine("\t\t\t{");
+			EmitCallbackBinderBody(sb, callback, indent: "\t\t\t\t");
+			_ = sb.AppendLine("\t\t\t},");
+		}
+
+		_ = sb.AppendLine("\t\t};");
+		_ = sb.AppendLine();
 		_ = sb.AppendLine("\t\t_ = global::Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton(");
 		_ = sb.AppendLine("\t\t\tservices,");
 		_ = sb.AppendLine("\t\t\tnew global::Vexel.Telegram.Handlers.Routing.TelegramRouteContribution(");
 		_ = sb.Append("\t\t\t\t\"").Append(Escape(model.AssemblyIdentifier)).AppendLine("\",");
 		_ = sb.AppendLine("\t\t\t\tcommands,");
-		_ = sb.AppendLine("\t\t\t\tmetadata));");
+		_ = sb.AppendLine("\t\t\t\tmetadata,");
+		_ = sb.AppendLine("\t\t\t\tcallbacks));");
 		_ = sb.AppendLine();
 		_ = sb.AppendLine("\t\treturn services;");
 		_ = sb.AppendLine("\t}");
@@ -76,18 +91,18 @@ internal static class RouteRegistrationEmitter
 		return sb.ToString();
 	}
 
-	private static void EmitBinderBody(StringBuilder sb, CommandRouteModel command, string indent)
+	private static void EmitCommandBinderBody(StringBuilder sb, CommandRouteModel command, string indent)
 	{
 		if (command.Parameters.Count == 0)
 		{
-			EmitResolveAndInvoke(sb, command, indent, requestArgs: string.Empty);
+			EmitResolveAndInvoke(sb, command.HandlerFullyQualifiedName, command.RequestFullyQualifiedName, indent, requestArgs: string.Empty);
 			return;
 		}
 
 		if (command.Parameters is [{ Kind: BindableParameterKind.String }])
 		{
 			// Single string: whole remainder (possibly empty).
-			EmitResolveAndInvoke(sb, command, indent, requestArgs: "payload");
+			EmitResolveAndInvoke(sb, command.HandlerFullyQualifiedName, command.RequestFullyQualifiedName, indent, requestArgs: "payload");
 			return;
 		}
 
@@ -121,22 +136,35 @@ internal static class RouteRegistrationEmitter
 				: "p" + i);
 		}
 
-		EmitResolveAndInvoke(sb, command, indent, args.ToString());
+		EmitResolveAndInvoke(sb, command.HandlerFullyQualifiedName, command.RequestFullyQualifiedName, indent, args.ToString());
+	}
+
+	private static void EmitCallbackBinderBody(StringBuilder sb, CallbackRouteModel callback, string indent)
+	{
+		// Empty record: ignore suffix. Single string: whole suffix (possibly empty).
+		var requestArgs = callback.HasStringParameter ? "payload" : string.Empty;
+		EmitResolveAndInvoke(
+			sb,
+			callback.HandlerFullyQualifiedName,
+			callback.RequestFullyQualifiedName,
+			indent,
+			requestArgs);
 	}
 
 	private static void EmitResolveAndInvoke(
 		StringBuilder sb,
-		CommandRouteModel command,
+		string handlerFullyQualifiedName,
+		string requestFullyQualifiedName,
 		string indent,
 		string requestArgs)
 	{
 		_ = sb.Append(indent)
 			.Append("var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<")
-			.Append(command.HandlerFullyQualifiedName)
+			.Append(handlerFullyQualifiedName)
 			.AppendLine(".Handler>(scope);");
 		_ = sb.Append(indent)
 			.Append("_ = await handler.HandleAsync(new ")
-			.Append(command.RequestFullyQualifiedName)
+			.Append(requestFullyQualifiedName)
 			.Append('(')
 			.Append(requestArgs)
 			.AppendLine("), cancellationToken).ConfigureAwait(false);");

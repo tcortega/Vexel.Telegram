@@ -407,6 +407,7 @@ public sealed class UpdateSchedulerTests
 			provider,
 			provider.GetService<RawUpdateHandlerRegistry>() ?? new RawUpdateHandlerRegistry(),
 			provider.GetServices<IUpdateRouter>(),
+			provider.GetServices<IUpdateCompletionHook>(),
 			Options.Create(new VexelClientOptions()),
 			NullLogger<UpdateDispatcher>.Instance);
 

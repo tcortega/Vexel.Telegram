@@ -8,6 +8,13 @@ internal sealed record CommandRouteModel(
 	string AssemblyDisplayName,
 	EquatableReadOnlyList<RequestParameterModel> Parameters);
 
+internal sealed record CallbackRouteModel(
+	string RouteKey,
+	string HandlerFullyQualifiedName,
+	string RequestFullyQualifiedName,
+	string AssemblyDisplayName,
+	bool HasStringParameter);
+
 internal sealed record RequestParameterModel(
 	string FullyQualifiedTypeName,
 	string ParameterName,
@@ -27,4 +34,5 @@ internal enum BindableParameterKind
 internal sealed record AssemblyRoutesModel(
 	string AssemblyIdentifier,
 	string RootNamespace,
-	EquatableReadOnlyList<CommandRouteModel> Commands);
+	EquatableReadOnlyList<CommandRouteModel> Commands,
+	EquatableReadOnlyList<CallbackRouteModel> Callbacks);
