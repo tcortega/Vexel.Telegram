@@ -6,6 +6,7 @@ namespace Vexel.Telegram.Hosting;
 
 /// <summary>
 /// Background service that runs <see cref="VexelClient"/>.
+/// Fatal receive-loop failures rethrow so the host stops (no zombie process).
 /// </summary>
 public sealed class VexelService(VexelClient client, ILogger<VexelService> logger) : BackgroundService
 {
@@ -58,8 +59,10 @@ public sealed class VexelService(VexelClient client, ILogger<VexelService> logge
 		}
 		catch (Exception ex)
 		{
-			// Fail-fast polish lands in T9; shell logs for now so the host can still stop cleanly.
-			logger.LogError(ex, "An error occurred while running the Vexel Telegram client.");
+			// Fail-fast: rethrow so BackgroundServiceExceptionBehavior.StopHost tears the process
+			// down instead of leaving a zombie host with a dead bot.
+			logger.LogCritical(ex, "Fatal error while running the Vexel Telegram client; stopping host.");
+			throw;
 		}
 	}
 }

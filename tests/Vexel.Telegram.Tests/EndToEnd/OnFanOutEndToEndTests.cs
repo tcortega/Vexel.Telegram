@@ -285,17 +285,21 @@ public sealed class OnFanOutEndToEndTests(ITestOutputHelper output)
 		await host.StartAsync();
 		await WaitForAsync(() => api.GetUpdatesCalls >= 2);
 
+		// Start-up publishes the command menu and clears any leftover webhook before the first poll;
+		// the fan-out assertions below count from the first update-driven call, not from those.
+		var startup = api.OutboundCalls.Count;
+
 		// 1. A routed command: routed reply, then the three message observers, then raw.
 		transcript.Write("user in chat 100 sends \"/ping\"");
 		api.Enqueue(FakeTelegramBotApi.CommandUpdate(901, chatId: 100, "/ping"));
-		await WaitForAsync(() => OutboundSince(api, 0).Count == 5);
-		var commandCalls = OutboundSince(api, 0);
+		await WaitForAsync(() => OutboundSince(api, startup).Count == 5);
+		var commandCalls = OutboundSince(api, startup);
 
 		// 2. Plain text nobody routes: the observers still run.
 		transcript.Write("user in chat 100 sends \"just chatting\"");
 		api.Enqueue(FakeTelegramBotApi.MessageUpdate(902, chatId: 100, "just chatting"));
-		await WaitForAsync(() => OutboundSince(api, 5).Count == 4);
-		var unroutedCalls = OutboundSince(api, 5);
+		await WaitForAsync(() => OutboundSince(api, startup + 5).Count == 4);
+		var unroutedCalls = OutboundSince(api, startup + 5);
 
 		// 3. A callback tap: routed, observer, raw, then the fail-closed answer obligation.
 		transcript.Write("user in chat 100 taps the \"confirm\" button");
@@ -305,14 +309,14 @@ public sealed class OnFanOutEndToEndTests(ITestOutputHelper output)
 			botMessageId: 55,
 			callbackQueryId: "cq-903",
 			data: "confirm"));
-		await WaitForAsync(() => OutboundSince(api, 9).Count == 4);
-		var callbackCalls = OutboundSince(api, 9);
+		await WaitForAsync(() => OutboundSince(api, startup + 9).Count == 4);
+		var callbackCalls = OutboundSince(api, startup + 9);
 
 		// 4. An inline query, then the result the user picks out of it.
 		transcript.Write("user 300 types \"@vexel_bot search widgets\"");
 		api.Enqueue(FakeTelegramBotApi.InlineQueryUpdate(904, userId: 300, "iq-904", "search widgets"));
-		await WaitForAsync(() => OutboundSince(api, 13).Count == 3);
-		var inlineCalls = OutboundSince(api, 13);
+		await WaitForAsync(() => OutboundSince(api, startup + 13).Count == 3);
+		var inlineCalls = OutboundSince(api, startup + 13);
 
 		transcript.Write("user 300 picks the \"item|widgets\" result");
 		api.Enqueue(FakeTelegramBotApi.ChosenInlineResultUpdate(
@@ -321,8 +325,8 @@ public sealed class OnFanOutEndToEndTests(ITestOutputHelper output)
 			resultId: "item|widgets",
 			query: "search widgets",
 			inlineMessageId: "im-905"));
-		await WaitForAsync(() => OutboundSince(api, 16).Count == 3);
-		var chosenCalls = OutboundSince(api, 16);
+		await WaitForAsync(() => OutboundSince(api, startup + 16).Count == 3);
+		var chosenCalls = OutboundSince(api, startup + 16);
 
 		await host.StopAsync();
 		transcript.Write("host stopped");

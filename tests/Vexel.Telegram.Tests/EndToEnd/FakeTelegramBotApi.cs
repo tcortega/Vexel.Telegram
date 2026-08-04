@@ -348,7 +348,7 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 		}
 
 		var fields = new List<string>();
-		foreach (var key in (string[])["chat_id", "message_id", "inline_message_id", "callback_query_id", "inline_query_id", "text", "show_alert", "cache_time"])
+		foreach (var key in (string[])["chat_id", "message_id", "inline_message_id", "callback_query_id", "inline_query_id", "text", "show_alert", "cache_time", "url", "secret_token", "drop_pending_updates"])
 		{
 			if (request[key] is { } value)
 			{
@@ -365,6 +365,12 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 		if (request["results"] is JsonArray results)
 		{
 			fields.Add(DescribeResults(results));
+		}
+
+		// setMyCommands is only meaningful with the menu it publishes.
+		if (request["commands"] is JsonArray commands)
+		{
+			fields.Add(DescribeCommands(commands));
 		}
 
 		if (request["reply_markup"] is not null)
@@ -400,6 +406,26 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 			.ToArray();
 
 		return $"results=[{string.Join("; ", described)}]";
+	}
+
+	/// <summary>
+	/// Summarises a <c>setMyCommands</c> payload as the <c>/command - description</c> menu
+	/// BotFather would show the user.
+	/// </summary>
+	private static string DescribeCommands(JsonArray commands)
+	{
+		var described = commands
+			.OfType<JsonObject>()
+			.Select(static command =>
+			{
+				var name = command["command"]?.GetValue<string>() ?? string.Empty;
+				var description = command["description"]?.GetValue<string>() ?? string.Empty;
+
+				return $"/{name} - \"{description}\"";
+			})
+			.ToArray();
+
+		return $"commands=[{string.Join("; ", described)}]";
 	}
 
 	/// <summary>

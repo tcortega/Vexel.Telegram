@@ -35,6 +35,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\src\Vexel.Telegram.AspNetCore\Vexel.Telegram.AspNetCore.csproj"/>
 		<ProjectReference Include="..\..\src\Vexel.Telegram.Client\Vexel.Telegram.Client.csproj"/>
 		<ProjectReference Include="..\..\src\Vexel.Telegram.Handlers\Vexel.Telegram.Handlers.csproj"/>
 		<ProjectReference Include="..\..\src\Vexel.Telegram.Hosting\Vexel.Telegram.Hosting.csproj"/>
