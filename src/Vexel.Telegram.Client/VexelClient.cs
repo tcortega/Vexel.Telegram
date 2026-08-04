@@ -109,6 +109,17 @@ public sealed class VexelClient(
 			_options.DropPendingUpdates,
 			_options.LaneCapacity);
 
+		if (!WebhookPathsMatch(webhook.Url!.AbsolutePath, webhook.Path))
+		{
+			// Not fatal: a reverse proxy or ingress may legitimately rewrite the public path.
+			logger.LogWarning(
+				"Webhook Url path '{UrlPath}' differs from the mapped endpoint path '{Path}'. "
+				+ "Telegram POSTs to the Url exactly, so every delivery 404s unless something in "
+				+ "front of the app rewrites the path.",
+				webhook.Url.AbsolutePath,
+				webhook.Path);
+		}
+
 		await botClient.SetWebhook(
 			url: webhook.Url!.AbsoluteUri,
 			dropPendingUpdates: _options.DropPendingUpdates,
@@ -126,6 +137,10 @@ public sealed class VexelClient(
 			// Normal shutdown.
 		}
 	}
+
+	// Routing matches case-insensitively and ignores surrounding slashes, so neither is a mismatch.
+	internal static bool WebhookPathsMatch(string urlPath, string mappedPath) =>
+		string.Equals(urlPath.Trim('/'), mappedPath.Trim('/'), StringComparison.OrdinalIgnoreCase);
 
 	private async Task HandleUpdateAsync(ITelegramBotClient _, Update update, CancellationToken cancellationToken)
 	{

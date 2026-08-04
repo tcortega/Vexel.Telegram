@@ -33,24 +33,26 @@ public sealed class SetMyCommandsInitializer(
 			return;
 		}
 
-		var descriptors = catalogList
-			.SelectMany(static c => c.Commands)
-			.GroupBy(static c => c.Name, StringComparer.OrdinalIgnoreCase)
-			.Select(static g => g.First())
-			.OrderBy(static c => c.Name, StringComparer.Ordinal)
-			.ToArray();
-
-		var payload = BotCommandRegistration.BuildPayload(descriptors);
-		if (payload.Count == 0)
-		{
-			// An empty setMyCommands payload deletes the menu; leave whatever Telegram already has alone.
-			logger.LogDebug("SetMyCommands skipped (catalog contributed no commands).");
-			return;
-		}
-
 		try
 		{
+			var descriptors = catalogList
+				.SelectMany(static c => c.Commands)
+				.GroupBy(static c => c.Name, StringComparer.OrdinalIgnoreCase)
+				.Select(static g => g.First())
+				.OrderBy(static c => c.Name, StringComparer.Ordinal)
+				.ToArray();
+
+			var payload = BotCommandRegistration.BuildPayload(descriptors);
+			if (payload.Count == 0)
+			{
+				// An empty setMyCommands payload deletes the menu; leave whatever Telegram already has alone.
+				logger.LogDebug("SetMyCommands skipped (catalog contributed no commands).");
+				return;
+			}
+
 			await botClient.SetMyCommands(payload, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+			logger.LogInformation("Registered {Count} bot command(s) with Telegram (setMyCommands).", payload.Count);
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 		{
@@ -58,12 +60,10 @@ public sealed class SetMyCommandsInitializer(
 		}
 		catch (Exception ex)
 		{
-			// Command metadata is cosmetic: never turn a Telegram-side failure into a failed host start.
-			logger.LogError(ex, "Failed to register {Count} bot command(s) with Telegram (setMyCommands).", payload.Count);
-			return;
+			// Command metadata is cosmetic: a bad catalog or a Telegram-side failure must never
+			// turn into a failed host start.
+			logger.LogError(ex, "Failed to register bot commands with Telegram (setMyCommands).");
 		}
-
-		logger.LogInformation("Registered {Count} bot command(s) with Telegram (setMyCommands).", payload.Count);
 	}
 
 	/// <inheritdoc />

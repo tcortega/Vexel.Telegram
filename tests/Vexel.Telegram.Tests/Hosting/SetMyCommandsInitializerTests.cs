@@ -133,6 +133,42 @@ public sealed class SetMyCommandsInitializerTests
 	}
 
 	[Fact]
+	public async Task StartAsync_InvalidDescriptor_DoesNotAbortHostStart()
+	{
+		var bot = new RecordingTelegramBotClient();
+		var logger = new RecordingLogger<SetMyCommandsInitializer>();
+
+		var initializer = new SetMyCommandsInitializer(
+			bot,
+			Options.Create(new VexelClientOptions()),
+			[new StaticCatalog([new BotCommandDescriptor("  ", "Blank name")])],
+			logger);
+
+		await initializer.StartAsync(CancellationToken.None);
+
+		Assert.Empty(bot.OfType<SetMyCommandsRequest>());
+		Assert.Contains(logger.Entries, static e => e.Level == LogLevel.Error && e.Exception is not null);
+	}
+
+	[Fact]
+	public async Task StartAsync_ThrowingCatalog_DoesNotAbortHostStart()
+	{
+		var bot = new RecordingTelegramBotClient();
+		var logger = new RecordingLogger<SetMyCommandsInitializer>();
+
+		var initializer = new SetMyCommandsInitializer(
+			bot,
+			Options.Create(new VexelClientOptions()),
+			[new ThrowingCatalog()],
+			logger);
+
+		await initializer.StartAsync(CancellationToken.None);
+
+		Assert.Empty(bot.OfType<SetMyCommandsRequest>());
+		Assert.Contains(logger.Entries, static e => e.Level == LogLevel.Error && e.Exception is not null);
+	}
+
+	[Fact]
 	public async Task StartAsync_CancelledToken_Propagates()
 	{
 		var bot = new RecordingTelegramBotClient
@@ -173,5 +209,11 @@ public sealed class SetMyCommandsInitializerTests
 	private sealed class StaticCatalog(IReadOnlyList<BotCommandDescriptor> commands) : IBotCommandCatalog
 	{
 		public IReadOnlyList<BotCommandDescriptor> Commands { get; } = commands;
+	}
+
+	private sealed class ThrowingCatalog : IBotCommandCatalog
+	{
+		public IReadOnlyList<BotCommandDescriptor> Commands =>
+			throw new InvalidOperationException("catalog is broken");
 	}
 }

@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Telegram.Bot;
+using Telegram.Bot.Requests;
 using Telegram.Bot.Types;
 using Vexel.Telegram.Client;
 using Vexel.Telegram.Client.Dispatch;
@@ -144,6 +146,78 @@ public sealed class ReceiveModeValidationTests
 		var ex = await Assert.ThrowsAsync<InvalidOperationException>(
 			() => client.RunAsync(CancellationToken.None));
 		Assert.Contains("both polling and webhook", ex.Message, StringComparison.Ordinal);
+	}
+
+	[Theory]
+	[InlineData("/telegram/webhook", "/telegram/webhook", true)]
+	[InlineData("/telegram/webhook", "telegram/webhook", true)]
+	[InlineData("/Telegram/Webhook", "/telegram/webhook", true)]
+	[InlineData("/", "/telegram/webhook", false)]
+	[InlineData("/hooks/tg", "/telegram/webhook", false)]
+	public void WebhookPathsMatch_IgnoresSlashesAndCase(string urlPath, string mappedPath, bool expected) =>
+		Assert.Equal(expected, VexelClient.WebhookPathsMatch(urlPath, mappedPath));
+
+	[Fact]
+	public async Task VexelClient_RunAsync_WebhookUrlPathMismatch_WarnsAndContinues()
+	{
+		var logger = new RecordingLogger<VexelClient>();
+		var options = Options.Create(new VexelClientOptions
+		{
+			ReceiveMode = TelegramReceiveMode.Webhook,
+			Webhook = new WebhookOptions
+			{
+				Url = new Uri("https://example.test/"),
+				SecretToken = "AbC_12-xyz",
+				Path = "/telegram/webhook",
+			},
+		});
+
+		await using var scheduler = new UpdateScheduler(
+			new NoopDispatcher(),
+			options,
+			NullLogger<UpdateScheduler>.Instance);
+		var bot = new RecordingTelegramBotClient();
+		var client = new VexelClient(logger, bot, options, scheduler);
+
+		using var cts = new CancellationTokenSource();
+		await cts.CancelAsync();
+
+		await client.RunAsync(cts.Token);
+
+		_ = Assert.Single(bot.OfType<SetWebhookRequest>());
+		Assert.Contains(
+			logger.Entries,
+			static e => e.Level == LogLevel.Warning
+				&& e.Message.Contains("differs from the mapped endpoint path", StringComparison.Ordinal));
+	}
+
+	[Fact]
+	public async Task VexelClient_RunAsync_WebhookUrlPathMatches_DoesNotWarn()
+	{
+		var logger = new RecordingLogger<VexelClient>();
+		var options = Options.Create(new VexelClientOptions
+		{
+			ReceiveMode = TelegramReceiveMode.Webhook,
+			Webhook = new WebhookOptions
+			{
+				Url = new Uri("https://example.test/telegram/webhook"),
+				SecretToken = "AbC_12-xyz",
+				Path = "/telegram/webhook",
+			},
+		});
+
+		await using var scheduler = new UpdateScheduler(
+			new NoopDispatcher(),
+			options,
+			NullLogger<UpdateScheduler>.Instance);
+		var client = new VexelClient(logger, new RecordingTelegramBotClient(), options, scheduler);
+
+		using var cts = new CancellationTokenSource();
+		await cts.CancelAsync();
+
+		await client.RunAsync(cts.Token);
+
+		Assert.DoesNotContain(logger.Entries, static e => e.Level == LogLevel.Warning);
 	}
 
 	private sealed class NoopDispatcher : IUpdateDispatcher
