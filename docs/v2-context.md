@@ -314,6 +314,8 @@ Mitigations for dual-attr DX:
 13. No Remora.Results. Handlers use ValueTask/ValueTask<T>; errors via exceptions (+ optional behaviors).
 14. Route attrs: `[Command]`, `[Callback]`, `[InlineQuery]`, `[ChosenInlineResult]`, plus first-class text/conversation routing (not deferred).
 15. Common-workflow-first DX: commands, callback menus, inline mode, multi-step text prompts/FSM - not only fire-and-forget commands.
+16. UX model: button-first (`[Callback]`), commands as entry/deep link/cancel, typed `IFlow.PromptAsync<TNext>` for text steps, per-scope draft/store for multi-question state. No reflection. No Immediate.Cache required for flow (that package is response caching, not FSM). Pluggable `IFlowStore` (memory sample, redis/etc prod).
+
 
 
 ### Proposed (not fully approved)
