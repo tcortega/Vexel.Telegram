@@ -1,7 +1,9 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Telegram.Bot;
+using Telegram.Bot.Exceptions;
 using Telegram.Bot.Requests;
 using Telegram.Bot.Types;
 using Vexel.Telegram.Handlers;
@@ -206,6 +208,71 @@ public sealed class CallbackRouterTests
 				await obligation.CompleteAsync(u, services, CancellationToken.None);
 				_ = Assert.Single(bot.OfType<AnswerCallbackQueryRequest>());
 			});
+	}
+
+	[Fact]
+	public async Task Callback_updates_do_not_warn_when_no_callback_routes_are_registered()
+	{
+		var logger = new RecordingLogger<TelegramRouter>();
+		var bot = new RecordingTelegramBotClient();
+		var contribution = new TelegramRouteContribution(
+			"TestAsm",
+			commands: new Dictionary<string, RouteBinder>(StringComparer.OrdinalIgnoreCase),
+			commandMetadata: [],
+			callbacks: new Dictionary<string, RouteBinder>(StringComparer.Ordinal));
+		var router = new TelegramRouter([contribution], bot, logger);
+
+		var services = new ServiceCollection();
+		await using var provider = services.BuildServiceProvider(validateScopes: true);
+		await router.RouteAsync(CallbackUpdate("raw|handled"), provider, CancellationToken.None);
+
+		Assert.Empty(logger.Entries);
+	}
+
+	[Fact]
+	public async Task Unmatched_callback_key_logs_below_warning()
+	{
+		var logger = new RecordingLogger<TelegramRouter>();
+		var bot = new RecordingTelegramBotClient();
+		var router = new TelegramRouter(
+			[CallbackContribution("known", static (_, _, _) => ValueTask.FromResult(true))],
+			bot,
+			logger);
+
+		var services = new ServiceCollection();
+		await using var provider = services.BuildServiceProvider(validateScopes: true);
+		await router.RouteAsync(CallbackUpdate("unknown"), provider, CancellationToken.None);
+
+		Assert.All(logger.Entries, static e => Assert.True(e.Level < LogLevel.Warning));
+	}
+
+	[Fact]
+	public async Task Already_answered_rejection_of_default_answer_is_not_a_warning()
+	{
+		var logger = new RecordingLogger<CallbackAnswerObligation>();
+		var bot = new RecordingTelegramBotClient
+		{
+			FailRequest = static request => request is AnswerCallbackQueryRequest
+				? new ApiRequestException(
+					"Bad Request: query is too old and response timeout expired or query ID is invalid",
+					400)
+				: null,
+		};
+		var obligation = new CallbackAnswerObligation(bot, logger);
+
+		var services = new ServiceCollection();
+		_ = services.AddSingleton<ITelegramBotClient>(bot);
+		_ = services.AddScoped<UpdateContextHolder>();
+		_ = services.AddScoped<Feedback>();
+		await using var provider = services.BuildServiceProvider(validateScopes: true);
+		using var scope = provider.CreateScope();
+		var update = CallbackUpdate("gone");
+		scope.ServiceProvider.GetRequiredService<UpdateContextHolder>().Set(update);
+
+		await obligation.CompleteAsync(update, scope.ServiceProvider, CancellationToken.None);
+
+		_ = Assert.Single(bot.OfType<AnswerCallbackQueryRequest>());
+		Assert.All(logger.Entries, static e => Assert.True(e.Level < LogLevel.Warning));
 	}
 
 	private static async Task UsingPipelineAsync(

@@ -66,6 +66,18 @@ public sealed class InlineKeyboardBuilderTests
 		_ = Assert.Throws<ArgumentException>(() => CallbackData.Format(key));
 	}
 
+	[Theory]
+	[InlineData("")]
+	[InlineData("   ")]
+	public void CallbackData_Format_rejects_blank_route_key(string routeKey)
+	{
+		var ex = Assert.Throws<ArgumentException>(() => CallbackData.Format(routeKey));
+		Assert.Contains("empty or whitespace", ex.Message, StringComparison.Ordinal);
+
+		var builder = new InlineKeyboardBuilder();
+		_ = Assert.Throws<ArgumentException>(() => builder.AddCallbackButton("X", routeKey));
+	}
+
 	[Fact]
 	public void Multi_row_keyboard_preserves_structure()
 	{

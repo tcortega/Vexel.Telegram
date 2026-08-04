@@ -122,6 +122,11 @@ public sealed class Feedback(ITelegramBotClient botClient, UpdateContextHolder h
 	/// wins; concurrent and later calls no-op. A failed send does not latch, so a caller that
 	/// catches the exception can retry instead of leaving the client spinning.
 	/// </summary>
+	/// <remarks>
+	/// This is the only answer path the B4 obligation observes: answering through an injected
+	/// <see cref="ITelegramBotClient"/> bypasses the latch, so the obligation still attempts its
+	/// default empty answer afterwards. Use this method even from raw update handlers.
+	/// </remarks>
 	/// <param name="text">Optional notification/alert text.</param>
 	/// <param name="showAlert">Whether to show an alert instead of a toast.</param>
 	/// <param name="url">Optional URL to open.</param>

@@ -75,6 +75,30 @@ public sealed class AnalyzerTests
 	}
 
 	[Fact]
+	public async Task VEX0002_fires_when_callback_key_is_blank()
+	{
+		const string source = """
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[Callback("  ")]
+			public static class Blank
+			{
+				public sealed record Command;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new CallbackDataTooLongAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0002");
+	}
+
+	[Fact]
 	public async Task VEX0002_fires_when_callback_key_contains_pipe()
 	{
 		const string source = """

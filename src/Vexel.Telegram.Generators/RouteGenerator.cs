@@ -118,7 +118,7 @@ public sealed class RouteGenerator : IIncrementalGenerator
 
 		token.ThrowIfCancellationRequested();
 
-		if (!TryGetBindableCommandRequest(type, out var requestType, out var parameters, out _))
+		if (!TryGetBindableRequest(type, out var requestType, out var parameters, out _))
 		{
 			// VEX0004 reports; skip emission.
 			return null;
@@ -174,16 +174,6 @@ public sealed class RouteGenerator : IIncrementalGenerator
 			RequestFullyQualifiedName: requestType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
 			AssemblyDisplayName: type.ContainingAssembly.Name,
 			HasStringParameter: hasStringParameter);
-	}
-
-	internal static bool TryGetBindableCommandRequest(
-		INamedTypeSymbol handlerType,
-		[System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ITypeSymbol? requestType,
-		out EquatableReadOnlyList<RequestParameterModel> parameters,
-		out string? errorMessage)
-	{
-		// Back-compat alias used by analyzers and older call sites.
-		return TryGetBindableRequest(handlerType, out requestType, out parameters, out errorMessage);
 	}
 
 	internal static bool TryGetBindableRequest(

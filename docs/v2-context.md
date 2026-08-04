@@ -166,7 +166,8 @@ Update
          resolve generated Immediate handler
          await HandleAsync
     -> raw IRawUpdateHandler escape hatches (always last; cannot suppress routing)
-    -> IUpdateCompletionHook (B4: default answerCallbackQuery/answerInlineQuery if Feedback did not answer)
+    -> IUpdateCompletionHook (B4: default answerCallbackQuery if Feedback did not answer;
+                              the answerInlineQuery leg is planned with the inline leg in T7)
 ```
 
 Hot path: compile-time map, no reflection invoke.

@@ -41,26 +41,12 @@ public sealed class UnbindableRequestAnalyzer : DiagnosticAnalyzer
 
 		if (type.GetCommandAttribute() is not null)
 		{
-			if (!RouteGenerator.TryGetBindableRequest(type, out _, out _, out error) && error is not null)
-			{
-				// fall through to report
-			}
-			else
-			{
-				error = null;
-			}
+			_ = RouteGenerator.TryGetBindableRequest(type, out _, out _, out error);
 		}
 
 		if (error is null && type.GetCallbackAttribute() is not null)
 		{
-			if (!RouteGenerator.TryGetBindableCallbackRequest(type, out _, out _, out error) && error is not null)
-			{
-				// fall through to report
-			}
-			else
-			{
-				error = null;
-			}
+			_ = RouteGenerator.TryGetBindableCallbackRequest(type, out _, out _, out error);
 		}
 
 		if (error is null)

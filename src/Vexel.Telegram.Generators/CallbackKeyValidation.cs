@@ -11,12 +11,17 @@ internal static class CallbackKeyValidation
 	public const int MaxUtf8ByteLength = 64;
 
 	/// <summary>
-	/// Returns whether <paramref name="key"/> is a valid callback route key: no <c>|</c> separator
-	/// and UTF-8 byte length at most <see cref="MaxUtf8ByteLength"/>.
+	/// Returns whether <paramref name="key"/> is a valid callback route key: non-blank, no <c>|</c>
+	/// separator, and UTF-8 byte length at most <see cref="MaxUtf8ByteLength"/>.
 	/// </summary>
 	/// <param name="key">Candidate route key from <c>[Callback]</c>.</param>
 	public static bool IsValid(string key)
 	{
+		if (string.IsNullOrWhiteSpace(key))
+		{
+			return false;
+		}
+
 		if (key.IndexOf('|') >= 0)
 		{
 			return false;
@@ -31,6 +36,11 @@ internal static class CallbackKeyValidation
 	/// <param name="key">Invalid key.</param>
 	public static string DescribeFailure(string key)
 	{
+		if (string.IsNullOrWhiteSpace(key))
+		{
+			return $"Callback route key must not be empty or whitespace; Telegram requires 1-{MaxUtf8ByteLength} UTF-8 bytes of callback_data";
+		}
+
 		if (key.IndexOf('|') >= 0)
 		{
 			return $"Callback route key '{key}' must not contain '|' (the key/suffix separator)";

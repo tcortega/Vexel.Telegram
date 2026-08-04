@@ -148,10 +148,16 @@ public sealed class TelegramRouter : IUpdateRouter
 		CancellationToken cancellationToken)
 	{
 		// Answer obligation (B4) is discharged by CallbackAnswerObligation after the full pipeline
-		// so raw handlers can still answer unrouted callbacks first.
+		// so raw handlers can still answer unrouted callbacks first. Apps that handle callbacks
+		// only through raw handlers are a supported shape, so a miss is not a warning.
+		if (_callbacks.Count == 0)
+		{
+			return;
+		}
+
 		if (!CallbackKeyExtractor.TryExtract(callbackQuery.Data, out var key, out var suffix))
 		{
-			_logger.LogWarning(
+			_logger.LogDebug(
 				"Unrouted callback query {CallbackId} for update {UpdateId}: no callback data",
 				callbackQuery.Id,
 				update.Id);
@@ -160,7 +166,7 @@ public sealed class TelegramRouter : IUpdateRouter
 
 		if (!_callbacks.TryGetValue(key, out var entry))
 		{
-			_logger.LogWarning(
+			_logger.LogDebug(
 				"Unrouted callback query {CallbackId} for update {UpdateId}: no route for key '{CallbackKey}'",
 				callbackQuery.Id,
 				update.Id,

@@ -16,8 +16,8 @@ public static class CallbackData
 
 	/// <summary>
 	/// Builds callback data as <paramref name="routeKey"/> or
-	/// <c>{routeKey}|{suffix}</c>. Throws when the key contains
-	/// <see cref="Separator"/> or the result exceeds <see cref="MaxUtf8ByteLength"/> UTF-8 bytes.
+	/// <c>{routeKey}|{suffix}</c>. Throws when the key is blank, contains
+	/// <see cref="Separator"/>, or the result exceeds <see cref="MaxUtf8ByteLength"/> UTF-8 bytes.
 	/// </summary>
 	/// <param name="routeKey">Route key matching a <c>[Callback]</c> attribute.</param>
 	/// <param name="suffix">Optional suffix bound to the handler's string parameter.</param>
@@ -25,6 +25,13 @@ public static class CallbackData
 	public static string Format(string routeKey, string? suffix = null)
 	{
 		ArgumentNullException.ThrowIfNull(routeKey);
+
+		if (string.IsNullOrWhiteSpace(routeKey))
+		{
+			throw new ArgumentException(
+				$"Callback route key must not be empty or whitespace; Telegram requires 1-{MaxUtf8ByteLength} UTF-8 bytes of callback_data.",
+				nameof(routeKey));
+		}
 
 		if (routeKey.Contains(Separator.ToString(), StringComparison.Ordinal))
 		{
