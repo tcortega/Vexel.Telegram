@@ -1,4 +1,4 @@
-# VEX0006: a bad `PromptAsync` target fails the build
+# VEX0007: a bad `PromptAsync` target fails the build
 
 The bot author writes this and hits Build:
 
@@ -57,9 +57,9 @@ public static class Prompts
 Compiler output (error severity, so the build stops):
 
 ```text
-Bot.cs(39,20): error VEX0006: Type 'SignupBot.NotAHandlerRequest' is not a registered flow step request; it must be the request of a [Handler] with no route attribute and be empty or take a single string (binding convention rule 5).
-Bot.cs(42,20): error VEX0006: Type 'SignupBot.Ping.Command' is the request of a routed handler ('SignupBot.Ping' carries [Command]/[Callback]) and is not a flow step. Flow.PromptAsync targets a [Handler] with no route attribute (a pure text step).
-Bot.cs(45,20): error VEX0006: Flow request 'SignupBot.CollectCount.Command' on 'CollectCount' must be an empty record or a single string parameter receiving Message.Text ?? Caption (binding convention rule 5).
+Bot.cs(39,20): error VEX0007: Type 'SignupBot.NotAHandlerRequest' is not a registered flow step request; it must be the request of a [Handler] with no route attribute and be empty or take a single string (binding convention rule 5).
+Bot.cs(42,20): error VEX0007: Type 'SignupBot.Ping.Command' is the request of a routed handler ('SignupBot.Ping' carries [Command]/[Callback]) and is not a flow step. Flow.PromptAsync targets a [Handler] with no route attribute (a pure text step).
+Bot.cs(45,20): error VEX0007: Flow request 'SignupBot.CollectCount.Command' on 'CollectCount' must be an empty record or a single string parameter receiving Message.Text ?? Caption (binding convention rule 5).
 ```
 
 `ValidStep`, which prompts the request of a routeless `[Handler]` with a single-string request, produces no diagnostic.

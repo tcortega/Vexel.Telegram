@@ -424,7 +424,7 @@ public sealed class FlowEndToEndTests(ITestOutputHelper output)
 		""";
 
 	[Fact]
-	public async Task Prompting_a_non_step_target_breaks_the_build_with_VEX0006()
+	public async Task Prompting_a_non_step_target_breaks_the_build_with_VEX0007()
 	{
 		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
 			BadPromptBotSource,
@@ -446,7 +446,7 @@ public sealed class FlowEndToEndTests(ITestOutputHelper output)
 		}
 
 		var evidence = new StringBuilder();
-		evidence.AppendLine("# VEX0006: a bad `PromptAsync` target fails the build");
+		evidence.AppendLine("# VEX0007: a bad `PromptAsync` target fails the build");
 		evidence.AppendLine();
 		evidence.AppendLine("The bot author writes this and hits Build:");
 		evidence.AppendLine();
@@ -469,11 +469,11 @@ public sealed class FlowEndToEndTests(ITestOutputHelper output)
 			+ "request, produces no diagnostic.");
 		evidence.AppendLine();
 
-		_ = EvidenceWriter.TryWrite("flow-vex0006-build-errors.md", evidence.ToString());
+		_ = EvidenceWriter.TryWrite("flow-vex0007-build-errors.md", evidence.ToString());
 
 		// The three bad prompts each fail the build; the valid one is left alone.
 		Assert.Equal(3, reported.Length);
-		Assert.All(diagnostics, static d => Assert.Equal("VEX0006", d.Id));
+		Assert.All(diagnostics, static d => Assert.Equal("VEX0007", d.Id));
 		Assert.All(diagnostics, static d => Assert.Equal(DiagnosticSeverity.Error, d.Severity));
 		Assert.DoesNotContain(reported, static r => r.Contains("CollectName", StringComparison.Ordinal));
 	}

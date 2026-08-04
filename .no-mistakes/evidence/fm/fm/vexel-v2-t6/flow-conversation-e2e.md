@@ -93,6 +93,16 @@ public static partial class TelegramServiceCollectionExtensions
 		{
 		};
 
+		var inlineQueries = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
+			global::System.StringComparer.Ordinal)
+		{
+		};
+
+		var chosenInlineResults = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
+			global::System.StringComparer.Ordinal)
+		{
+		};
+
 		var flowSteps = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
 			global::System.StringComparer.Ordinal)
 		{
@@ -117,6 +127,8 @@ public static partial class TelegramServiceCollectionExtensions
 				commands,
 				metadata,
 				callbacks,
+				inlineQueries,
+				chosenInlineResults,
 				flowSteps));
 
 		return services;
@@ -127,83 +139,84 @@ public static partial class TelegramServiceCollectionExtensions
 ## 3. Live session log
 
 ```text
-[ 0.582s] compiled SignupBot with Immediate + Vexel generators; loaded generated route table
-[ 0.593s] fake Telegram Bot API listening on http://127.0.0.1:61573 (bot username @vexel_bot)
-[ 0.613s] Information Lifetime         Application started. Press Ctrl+C to shut down.
-[ 0.613s] Information Lifetime         Hosting environment: Production
-[ 0.613s] Information Lifetime         Content root path: /Users/shiki/.no-mistakes/worktrees/b6147a1cfc26/01KZ6XW7AQ5GVRTMQRJRJ8MXYD/tests/Vexel.Telegram.Tests/bin/Debug/net10.0/
-[ 0.613s] Information VexelClient      VexelClient starting polling (DropPendingUpdates=True, LaneCapacity=64)
-[ 0.646s] telegram-api  getUpdates(offset=-1) -> no updates
-[ 0.815s] telegram-api  getUpdates(offset=0) -> no updates
-[ 0.829s] user sends "/signup"
-[ 0.943s] telegram-api  getUpdates(offset=0) -> update 901
-[ 0.948s] telegram-api  getUpdates(offset=902) -> no updates
-[ 1.063s] telegram-api  <- bot calls sendMessage chat_id=100 text="What's your name?"
+[ 0.636s] compiled SignupBot with Immediate + Vexel generators; loaded generated route table
+[ 0.647s] fake Telegram Bot API listening on http://127.0.0.1:62492 (bot username @vexel_bot)
+[ 0.672s] Information Lifetime         Application started. Press Ctrl+C to shut down.
+[ 0.672s] Information Lifetime         Hosting environment: Production
+[ 0.672s] Information VexelClient      VexelClient starting polling (DropPendingUpdates=True, LaneCapacity=64)
+[ 0.672s] Information Lifetime         Content root path: /Users/shiki/.no-mistakes/worktrees/b6147a1cfc26/01KZ6XW7AQ5GVRTMQRJRJ8MXYD/tests/Vexel.Telegram.Tests/bin/Debug/net11.0/
+[ 0.694s] telegram-api  getUpdates(offset=-1) -> no updates
+[ 0.924s] telegram-api  getUpdates(offset=0) -> no updates
+[ 0.968s] user sends "/signup"
+[ 1.058s] telegram-api  getUpdates(offset=0) -> update 901
 [ 1.063s] telegram-api  getUpdates(offset=902) -> no updates
-[ 1.086s] user sends "Ada Lovelace"
-[ 1.175s] telegram-api  getUpdates(offset=902) -> update 902
-[ 1.176s] telegram-api  getUpdates(offset=903) -> no updates
-[ 1.323s] telegram-api  <- bot calls sendMessage chat_id=100 text="Nice to meet you, Ada Lovelace. How old are you?"
-[ 1.324s] telegram-api  getUpdates(offset=903) -> no updates
-[ 1.418s] user sends "thirty six"
-[ 1.440s] telegram-api  getUpdates(offset=903) -> update 903
-[ 1.442s] telegram-api  getUpdates(offset=904) -> no updates
-[ 1.447s] Error       TelegramRouter   Flow step 'SignupBot.CollectAge+Command' failed for update 903 (FormatException: age was not a number)
-[ 1.552s] telegram-api  <- bot calls sendMessage chat_id=100 text="Something went wrong - try again, or /cancel."
-[ 1.552s] telegram-api  getUpdates(offset=904) -> no updates
-[ 1.647s] user sends "36"
-[ 1.673s] telegram-api  getUpdates(offset=904) -> update 904
-[ 1.674s] telegram-api  getUpdates(offset=905) -> no updates
-[ 1.811s] telegram-api  <- bot calls sendMessage chat_id=100 text="Registered Ada Lovelace, age 36."
-[ 1.812s] telegram-api  getUpdates(offset=905) -> no updates
-[ 1.900s] user sends "are you still there?"
-[ 1.948s] telegram-api  getUpdates(offset=905) -> update 905
-[ 1.949s] telegram-api  getUpdates(offset=906) -> no updates
-[ 2.099s] telegram-api  getUpdates(offset=906) -> no updates
-[ 2.216s] telegram-api  getUpdates(offset=906) -> no updates
-[ 2.318s] telegram-api  getUpdates(offset=906) -> no updates
-[ 2.462s] user sends "/signup"
-[ 2.463s] telegram-api  getUpdates(offset=906) -> update 906
-[ 2.463s] telegram-api  getUpdates(offset=907) -> no updates
-[ 2.582s] telegram-api  <- bot calls sendMessage chat_id=100 text="What's your name?"
-[ 2.583s] telegram-api  getUpdates(offset=907) -> no updates
-[ 2.674s] user sends "/whoami"
-[ 2.713s] telegram-api  getUpdates(offset=907) -> update 907
-[ 2.714s] telegram-api  getUpdates(offset=908) -> no updates
-[ 2.842s] telegram-api  getUpdates(offset=908) -> no updates
-[ 3.009s] telegram-api  getUpdates(offset=908) -> no updates
-[ 3.117s] telegram-api  getUpdates(offset=908) -> no updates
-[ 3.212s] user sends "Grace Hopper"
-[ 3.232s] telegram-api  getUpdates(offset=908) -> update 908
-[ 3.233s] telegram-api  getUpdates(offset=909) -> no updates
-[ 3.404s] telegram-api  <- bot calls sendMessage chat_id=100 text="Nice to meet you, Grace Hopper. How old are you?"
-[ 3.405s] telegram-api  getUpdates(offset=909) -> no updates
-[ 3.495s] user sends "/cancel"
-[ 3.539s] telegram-api  getUpdates(offset=909) -> update 909
-[ 3.540s] telegram-api  getUpdates(offset=910) -> no updates
-[ 3.690s] telegram-api  <- bot calls sendMessage chat_id=100 text="Cancelled."
-[ 3.690s] telegram-api  getUpdates(offset=910) -> no updates
-[ 3.711s] user sends "42"
-[ 3.840s] telegram-api  getUpdates(offset=910) -> update 910
-[ 3.840s] telegram-api  getUpdates(offset=911) -> no updates
-[ 4.014s] telegram-api  getUpdates(offset=911) -> no updates
-[ 4.189s] telegram-api  getUpdates(offset=911) -> no updates
-[ 4.269s] user sends "/signup"
-[ 4.304s] telegram-api  getUpdates(offset=911) -> update 911
-[ 4.304s] telegram-api  getUpdates(offset=912) -> no updates
-[ 4.450s] telegram-api  <- bot calls sendMessage chat_id=100 text="What's your name?"
-[ 4.451s] telegram-api  getUpdates(offset=912) -> no updates
-[ 4.541s] clock advances 16 minutes to 2026-01-01 09:16:00Z
-[ 4.541s] user sends "Alan Turing"
-[ 4.572s] telegram-api  getUpdates(offset=912) -> update 912
-[ 4.572s] telegram-api  getUpdates(offset=913) -> no updates
-[ 4.687s] telegram-api  getUpdates(offset=913) -> no updates
-[ 4.792s] telegram-api  getUpdates(offset=913) -> no updates
-[ 4.964s] telegram-api  getUpdates(offset=913) -> no updates
-[ 5.133s] telegram-api  getUpdates(offset=913) -> no updates
-[ 5.136s] Information Lifetime         Application is shutting down...
-[ 5.143s] Information VexelClient      VexelClient stopped
-[ 5.145s] host stopped
+[ 1.186s] telegram-api  <- bot calls sendMessage chat_id=100 text="What's your name?"
+[ 1.187s] telegram-api  getUpdates(offset=902) -> no updates
+[ 1.278s] user sends "Ada Lovelace"
+[ 1.292s] telegram-api  getUpdates(offset=902) -> update 902
+[ 1.294s] telegram-api  getUpdates(offset=903) -> no updates
+[ 1.419s] telegram-api  <- bot calls sendMessage chat_id=100 text="Nice to meet you, Ada Lovelace. How old are you?"
+[ 1.419s] telegram-api  getUpdates(offset=903) -> no updates
+[ 1.506s] user sends "thirty six"
+[ 1.559s] telegram-api  getUpdates(offset=903) -> update 903
+[ 1.560s] telegram-api  getUpdates(offset=904) -> no updates
+[ 1.567s] Error       TelegramRouter   Flow step 'SignupBot.CollectAge+Command' failed for update 903 (FormatException: age was not a number)
+[ 1.705s] telegram-api  <- bot calls sendMessage chat_id=100 text="Something went wrong - try again, or /cancel."
+[ 1.706s] telegram-api  getUpdates(offset=904) -> no updates
+[ 1.772s] user sends "36"
+[ 1.854s] telegram-api  getUpdates(offset=904) -> update 904
+[ 1.854s] telegram-api  getUpdates(offset=905) -> no updates
+[ 2.010s] telegram-api  <- bot calls sendMessage chat_id=100 text="Registered Ada Lovelace, age 36."
+[ 2.010s] telegram-api  getUpdates(offset=905) -> no updates
+[ 2.086s] user sends "are you still there?"
+[ 2.149s] telegram-api  getUpdates(offset=905) -> update 905
+[ 2.150s] telegram-api  getUpdates(offset=906) -> no updates
+[ 2.281s] telegram-api  getUpdates(offset=906) -> no updates
+[ 2.419s] telegram-api  getUpdates(offset=906) -> no updates
+[ 2.524s] telegram-api  getUpdates(offset=906) -> no updates
+[ 2.644s] telegram-api  getUpdates(offset=906) -> no updates
+[ 2.648s] user sends "/signup"
+[ 2.752s] telegram-api  getUpdates(offset=906) -> update 906
+[ 2.754s] telegram-api  getUpdates(offset=907) -> no updates
+[ 2.888s] telegram-api  <- bot calls sendMessage chat_id=100 text="What's your name?"
+[ 2.889s] telegram-api  getUpdates(offset=907) -> no updates
+[ 2.981s] user sends "/whoami"
+[ 3.008s] telegram-api  getUpdates(offset=907) -> update 907
+[ 3.008s] telegram-api  getUpdates(offset=908) -> no updates
+[ 3.126s] telegram-api  getUpdates(offset=908) -> no updates
+[ 3.293s] telegram-api  getUpdates(offset=908) -> no updates
+[ 3.418s] telegram-api  getUpdates(offset=908) -> no updates
+[ 3.528s] user sends "Grace Hopper"
+[ 3.529s] telegram-api  getUpdates(offset=908) -> update 908
+[ 3.530s] telegram-api  getUpdates(offset=909) -> no updates
+[ 3.690s] telegram-api  <- bot calls sendMessage chat_id=100 text="Nice to meet you, Grace Hopper. How old are you?"
+[ 3.691s] telegram-api  getUpdates(offset=909) -> no updates
+[ 3.782s] user sends "/cancel"
+[ 3.820s] telegram-api  getUpdates(offset=909) -> update 909
+[ 3.821s] telegram-api  getUpdates(offset=910) -> no updates
+[ 3.969s] telegram-api  <- bot calls sendMessage chat_id=100 text="Cancelled."
+[ 3.969s] telegram-api  getUpdates(offset=910) -> no updates
+[ 4.023s] user sends "42"
+[ 4.119s] telegram-api  getUpdates(offset=910) -> update 910
+[ 4.119s] telegram-api  getUpdates(offset=911) -> no updates
+[ 4.291s] telegram-api  getUpdates(offset=911) -> no updates
+[ 4.429s] telegram-api  getUpdates(offset=911) -> no updates
+[ 4.536s] telegram-api  getUpdates(offset=911) -> no updates
+[ 4.643s] user sends "/signup"
+[ 4.645s] telegram-api  getUpdates(offset=911) -> update 911
+[ 4.645s] telegram-api  getUpdates(offset=912) -> no updates
+[ 4.759s] telegram-api  <- bot calls sendMessage chat_id=100 text="What's your name?"
+[ 4.759s] telegram-api  getUpdates(offset=912) -> no updates
+[ 4.818s] clock advances 16 minutes to 2026-01-01 09:16:00Z
+[ 4.818s] user sends "Alan Turing"
+[ 4.899s] telegram-api  getUpdates(offset=912) -> update 912
+[ 4.900s] telegram-api  getUpdates(offset=913) -> no updates
+[ 5.025s] telegram-api  getUpdates(offset=913) -> no updates
+[ 5.147s] telegram-api  getUpdates(offset=913) -> no updates
+[ 5.307s] telegram-api  getUpdates(offset=913) -> no updates
+[ 5.460s] Information Lifetime         Application is shutting down...
+[ 5.461s] Information VexelClient      VexelClient stopped
+[ 5.461s] host stopped
 ```
 
 ### Bot -> Telegram Bot API calls, in order

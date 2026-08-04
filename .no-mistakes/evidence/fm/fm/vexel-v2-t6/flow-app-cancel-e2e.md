@@ -72,6 +72,16 @@ public static partial class TelegramServiceCollectionExtensions
 		{
 		};
 
+		var inlineQueries = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
+			global::System.StringComparer.Ordinal)
+		{
+		};
+
+		var chosenInlineResults = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
+			global::System.StringComparer.Ordinal)
+		{
+		};
+
 		var flowSteps = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
 			global::System.StringComparer.Ordinal)
 		{
@@ -90,6 +100,8 @@ public static partial class TelegramServiceCollectionExtensions
 				commands,
 				metadata,
 				callbacks,
+				inlineQueries,
+				chosenInlineResults,
 				flowSteps));
 
 		return services;
@@ -100,29 +112,29 @@ public static partial class TelegramServiceCollectionExtensions
 ## 3. Live session log
 
 ```text
-[ 0.102s] Information Lifetime         Application started. Press Ctrl+C to shut down.
-[ 0.102s] Information VexelClient      VexelClient starting polling (DropPendingUpdates=True, LaneCapacity=64)
-[ 0.102s] Information Lifetime         Hosting environment: Production
-[ 0.102s] Information Lifetime         Content root path: /Users/shiki/.no-mistakes/worktrees/b6147a1cfc26/01KZ6XW7AQ5GVRTMQRJRJ8MXYD/tests/Vexel.Telegram.Tests/bin/Debug/net10.0/
-[ 0.102s] telegram-api  getUpdates(offset=-1) -> no updates
-[ 0.222s] telegram-api  getUpdates(offset=0) -> no updates
+[ 0.106s] Information Lifetime         Application started. Press Ctrl+C to shut down.
+[ 0.106s] Information VexelClient      VexelClient starting polling (DropPendingUpdates=True, LaneCapacity=64)
+[ 0.106s] Information Lifetime         Hosting environment: Production
+[ 0.106s] Information Lifetime         Content root path: /Users/shiki/.no-mistakes/worktrees/b6147a1cfc26/01KZ6XW7AQ5GVRTMQRJRJ8MXYD/tests/Vexel.Telegram.Tests/bin/Debug/net11.0/
+[ 0.107s] telegram-api  getUpdates(offset=-1) -> no updates
+[ 0.255s] telegram-api  getUpdates(offset=0) -> no updates
 [ 0.317s] user sends "/note"
-[ 0.342s] telegram-api  getUpdates(offset=0) -> update 921
-[ 0.342s] telegram-api  getUpdates(offset=922) -> no updates
-[ 0.461s] telegram-api  <- bot calls sendMessage chat_id=100 text="Type your note."
-[ 0.462s] telegram-api  getUpdates(offset=922) -> no updates
-[ 0.482s] user sends "/cancel"
-[ 0.582s] telegram-api  getUpdates(offset=922) -> update 922
-[ 0.582s] telegram-api  getUpdates(offset=923) -> no updates
-[ 0.694s] telegram-api  <- bot calls sendMessage chat_id=100 text="App cancel here - your note is still open."
-[ 0.694s] telegram-api  getUpdates(offset=923) -> no updates
-[ 0.707s] user sends "buy milk"
-[ 0.797s] telegram-api  getUpdates(offset=923) -> update 923
-[ 0.797s] telegram-api  getUpdates(offset=924) -> no updates
-[ 0.924s] telegram-api  <- bot calls sendMessage chat_id=100 text="Saved note: buy milk"
-[ 0.924s] telegram-api  getUpdates(offset=924) -> no updates
-[ 1.012s] Information Lifetime         Application is shutting down...
-[ 1.012s] Information VexelClient      VexelClient stopped
+[ 0.383s] telegram-api  getUpdates(offset=0) -> update 921
+[ 0.384s] telegram-api  getUpdates(offset=922) -> no updates
+[ 0.487s] telegram-api  <- bot calls sendMessage chat_id=100 text="Type your note."
+[ 0.488s] telegram-api  getUpdates(offset=922) -> no updates
+[ 0.498s] user sends "/cancel"
+[ 0.596s] telegram-api  getUpdates(offset=922) -> update 922
+[ 0.596s] telegram-api  getUpdates(offset=923) -> no updates
+[ 0.710s] telegram-api  <- bot calls sendMessage chat_id=100 text="App cancel here - your note is still open."
+[ 0.710s] telegram-api  getUpdates(offset=923) -> no updates
+[ 0.743s] user sends "buy milk"
+[ 0.824s] telegram-api  getUpdates(offset=923) -> update 923
+[ 0.824s] telegram-api  getUpdates(offset=924) -> no updates
+[ 0.928s] telegram-api  <- bot calls sendMessage chat_id=100 text="Saved note: buy milk"
+[ 0.929s] telegram-api  getUpdates(offset=924) -> no updates
+[ 0.970s] Information Lifetime         Application is shutting down...
+[ 0.970s] Information VexelClient      VexelClient stopped
 ```
 
 ### Bot -> Telegram Bot API calls, in order

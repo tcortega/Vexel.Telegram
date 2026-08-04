@@ -610,8 +610,9 @@ public sealed class AnalyzerTests
 			{
 				public sealed record Query(int Count);
 
-				private static ValueTask HandleAsync(Query _, CancellationToken token)
+				private static ValueTask HandleAsync(Query query, CancellationToken token)
 				{
+					_ = query;
 					_ = token;
 					return default;
 				}
