@@ -325,6 +325,7 @@ Mitigations for dual-attr DX:
 24. Boot DX: `AddTelegramBot(...)` wires client/host/Vexel routes; app still calls Immediate `AddXxxHandlers()`. Sample shows both. No hiding Immediate.
 25. No v1 master inline hotfix parallel track; effort on `v2` only.
 26. Drop Remora.Commands (and Remora.Results) on `v2` entirely.
+27. v1→v2: **breaking major**; sample + short differences doc. No compat shims.
 
 
 
