@@ -270,42 +270,41 @@ public sealed class UpdateDispatcher(
 		}
 	}
 
-	private async Task InvokeRouterAsync(
+	private Task InvokeRouterAsync(
 		IUpdateRouter router,
 		Update update,
 		IServiceProvider scope,
-		CancellationToken cancellationToken)
-	{
-		try
-		{
-			if (_options.HandlerTimeout is { } timeout)
-			{
-				using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-				timeoutCts.CancelAfter(timeout);
-				await router.RouteAsync(update, scope, timeoutCts.Token).ConfigureAwait(false);
-			}
-			else
-			{
-				await router.RouteAsync(update, scope, cancellationToken).ConfigureAwait(false);
-			}
-		}
-		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-		{
-			throw;
-		}
-		catch (Exception ex)
-		{
-			// Fault isolation: a router fault must not kill the lane or skip remaining stages.
-			logger.LogError(
-				ex,
-				"Update router {RouterType} failed for update {UpdateId}",
-				router.GetType().FullName,
-				update.Id);
-		}
-	}
+		CancellationToken cancellationToken) =>
+		// Fault isolation: a router fault must not kill the lane or skip remaining stages.
+		RunIsolatedAsync(
+			token => router.RouteAsync(update, scope, token),
+			"Update router",
+			router.GetType(),
+			update,
+			cancellationToken);
 
-	private async Task InvokeHandlerAsync(
+	private Task InvokeHandlerAsync(
 		IRawUpdateHandler handler,
+		Update update,
+		CancellationToken cancellationToken) =>
+		// Fault isolation: one handler must not kill the lane or skip remaining handlers.
+		// No automatic error text is sent to the chat (P2).
+		RunIsolatedAsync(
+			token => handler.HandleAsync(update, token),
+			"Raw update handler",
+			handler.GetType(),
+			update,
+			cancellationToken);
+
+	/// <summary>
+	/// Runs one dispatch stage under the shared timeout and fault-isolation contract: the configured
+	/// <see cref="VexelClientOptions.HandlerTimeout"/> bounds the stage, cancellation of the lane's own
+	/// token still propagates, and every other fault is logged and swallowed so the lane survives.
+	/// </summary>
+	private async Task RunIsolatedAsync(
+		Func<CancellationToken, Task> body,
+		string stageName,
+		Type stageType,
 		Update update,
 		CancellationToken cancellationToken)
 	{
@@ -315,11 +314,11 @@ public sealed class UpdateDispatcher(
 			{
 				using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 				timeoutCts.CancelAfter(timeout);
-				await handler.HandleAsync(update, timeoutCts.Token).ConfigureAwait(false);
+				await body(timeoutCts.Token).ConfigureAwait(false);
 			}
 			else
 			{
-				await handler.HandleAsync(update, cancellationToken).ConfigureAwait(false);
+				await body(cancellationToken).ConfigureAwait(false);
 			}
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -328,12 +327,11 @@ public sealed class UpdateDispatcher(
 		}
 		catch (Exception ex)
 		{
-			// Fault isolation: one handler must not kill the lane or skip remaining handlers.
-			// No automatic error text is sent to the chat (P2).
 			logger.LogError(
 				ex,
-				"Raw update handler {HandlerType} failed for update {UpdateId}",
-				handler.GetType().FullName,
+				"{Stage} {StageType} failed for update {UpdateId}",
+				stageName,
+				stageType.FullName,
 				update.Id);
 		}
 	}

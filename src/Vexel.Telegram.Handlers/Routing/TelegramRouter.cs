@@ -17,6 +17,7 @@ public sealed class TelegramRouter : IUpdateRouter
 	private readonly FrozenDictionary<string, RouteEntry> _commands;
 	private string? _botUsername;
 	private int _botUsernameResolved; // 0 = unset, 1 = resolved
+	private long _botUsernameRetryAfterTicks;
 
 	/// <summary>
 	/// Initializes a new router from all registered <see cref="TelegramRouteContribution"/>s.
@@ -53,6 +54,13 @@ public sealed class TelegramRouter : IUpdateRouter
 		}
 	}
 
+	/// <summary>
+	/// How long to wait before retrying <c>GetMe</c> after a failed bot-username lookup. Keeps a
+	/// persistently failing lookup off the per-update path without disabling <c>@suffix</c> matching
+	/// for the process lifetime.
+	/// </summary>
+	public TimeSpan BotUsernameRetryBackoff { get; set; } = TimeSpan.FromSeconds(30);
+
 	/// <summary>Composed command metadata across all contributions (for SetMyCommands).</summary>
 	public IReadOnlyList<CommandRouteMetadata> CommandMetadata { get; private set; } = [];
 
@@ -67,10 +75,21 @@ public sealed class TelegramRouter : IUpdateRouter
 			return;
 		}
 
-		var botUsername = await ResolveBotUsernameAsync(cancellationToken).ConfigureAwait(false);
-		if (!CommandKeyExtractor.TryExtract(message, botUsername, out var command, out var arguments))
+		if (!CommandKeyExtractor.TryExtract(message, out var command, out var botSuffix, out var arguments))
 		{
 			return;
+		}
+
+		// GetMe is only needed to adjudicate an @Suffix, so plain commands never pay for it.
+		if (botSuffix is not null)
+		{
+			var botUsername = await ResolveBotUsernameAsync(cancellationToken).ConfigureAwait(false);
+			if (botUsername is not null
+				&& !botSuffix.Equals(botUsername, StringComparison.OrdinalIgnoreCase))
+			{
+				// Directed at another bot - fall through to flow/On*.
+				return;
+			}
 		}
 
 		if (!_commands.TryGetValue(command, out var entry))
@@ -114,6 +133,14 @@ public sealed class TelegramRouter : IUpdateRouter
 			return _botUsername;
 		}
 
+		// A transient GetMe failure must not disable @suffix matching for the process lifetime, so the
+		// resolved flag latches on success only. The backoff keeps a persistent failure from putting a
+		// GetMe round-trip on every suffixed command.
+		if (Environment.TickCount64 < Volatile.Read(ref _botUsernameRetryAfterTicks))
+		{
+			return null;
+		}
+
 		try
 		{
 			var me = await _botClient.GetMe(cancellationToken).ConfigureAwait(false);
@@ -123,13 +150,15 @@ public sealed class TelegramRouter : IUpdateRouter
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 		{
+			Volatile.Write(ref _botUsernameRetryAfterTicks, Environment.TickCount64 + (long)BotUsernameRetryBackoff.TotalMilliseconds);
 			throw;
 		}
 		catch (Exception ex)
 		{
-			_logger.LogWarning(ex, "Failed to resolve bot username via GetMe; @suffix matching disabled");
-			_botUsername = null;
-			Volatile.Write(ref _botUsernameResolved, 1);
+			_logger.LogWarning(
+				ex,
+				"Failed to resolve bot username via GetMe; @suffix matching disabled until the next retry");
+			Volatile.Write(ref _botUsernameRetryAfterTicks, Environment.TickCount64 + (long)BotUsernameRetryBackoff.TotalMilliseconds);
 			return null;
 		}
 	}
@@ -148,8 +177,12 @@ public sealed class TelegramRouter : IUpdateRouter
 				if (owners.TryGetValue(pair.Key, out var otherAssembly))
 				{
 					throw new InvalidOperationException(
-						$"Duplicate command route '{pair.Key}' registered by assemblies "
-						+ $"'{otherAssembly}' and '{contribution.AssemblyName}'.");
+						string.Equals(otherAssembly, contribution.AssemblyName, StringComparison.Ordinal)
+							? $"Assembly '{contribution.AssemblyName}' contributed command route "
+								+ $"'{pair.Key}' more than once. Call Add{contribution.AssemblyName}Telegram() "
+								+ "exactly once (a library that already calls it must not be re-registered by the app)."
+							: $"Duplicate command route '{pair.Key}' registered by assemblies "
+								+ $"'{otherAssembly}' and '{contribution.AssemblyName}'.");
 				}
 
 				owners[pair.Key] = contribution.AssemblyName;

@@ -31,9 +31,48 @@ public static class CommandKeyExtractor
 		[NotNullWhen(true)] out string? command,
 		[NotNullWhen(true)] out string? arguments)
 	{
+		if (!TryExtract(message, out command, out var botSuffix, out arguments))
+		{
+			return false;
+		}
+
+		if (botSuffix is not null
+			&& botUsername is not null
+			&& !botSuffix.Equals(botUsername, StringComparison.OrdinalIgnoreCase))
+		{
+			// Directed at another bot - fall through to flow/On*.
+			command = null;
+			arguments = null;
+			return false;
+		}
+
+		return true;
+	}
+
+	/// <summary>
+	/// Tries to read a bot command from <paramref name="message"/> without resolving this bot's
+	/// username, reporting any <c>@Suffix</c> so the caller can match it lazily.
+	/// </summary>
+	/// <param name="message">Inbound message.</param>
+	/// <param name="command">Command name without leading slash or suffix, when this method returns true.</param>
+	/// <param name="botSuffix">
+	/// The <c>@Suffix</c> the user typed without <c>@</c>, or <see langword="null"/> when the command
+	/// carried none. Only when this is non-null does the caller need this bot's username.
+	/// </param>
+	/// <param name="arguments">
+	/// Text after the command entity, trimmed. Empty when the user sent only the command.
+	/// </param>
+	/// <returns><see langword="true"/> when a command entity sits at offset 0.</returns>
+	public static bool TryExtract(
+		Message message,
+		[NotNullWhen(true)] out string? command,
+		out string? botSuffix,
+		[NotNullWhen(true)] out string? arguments)
+	{
 		ArgumentNullException.ThrowIfNull(message);
 
 		command = null;
+		botSuffix = null;
 		arguments = null;
 
 		// Captions are not command-routed in 2.0.
@@ -74,17 +113,11 @@ public static class CommandKeyExtractor
 		var at = body.IndexOf('@', StringComparison.Ordinal);
 		if (at >= 0)
 		{
-			var suffix = body[(at + 1)..];
-			if (botUsername is not null
-				&& !suffix.Equals(botUsername, StringComparison.OrdinalIgnoreCase))
-			{
-				// Directed at another bot - fall through to flow/On*.
-				return false;
-			}
-
+			botSuffix = body[(at + 1)..];
 			body = body[..at];
 			if (body.Length == 0)
 			{
+				botSuffix = null;
 				return false;
 			}
 		}
