@@ -278,6 +278,55 @@ public sealed class FeedbackTests
 		Assert.Equal(["any"], [.. ran]);
 	}
 
+	[Fact]
+	public async Task ContainerHandlers_HealthySiblingBeforeFaulty_IsBuiltOnceAndDisposedPerUpdate()
+	{
+		var tracker = new HandlerLifetimeTracker();
+		var services = new ServiceCollection();
+		_ = services.AddSingleton<ITelegramBotClient>(new RecordingTelegramBotClient());
+		_ = services.AddSingleton(tracker);
+		_ = services.AddSingleton(new ConcurrentBag<string>());
+		_ = services.AddLogging(static b => b.ClearProviders());
+		_ = services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+		_ = services.AddTelegramBot(static _ => "test-token");
+		_ = services.AddScoped<IRawUpdateHandler, LifetimeTrackedRawHandler>();
+		_ = services.AddScoped<IRawUpdateHandler, CallbackOnlyRawHandler>();
+
+		await using var provider = services.BuildServiceProvider(validateScopes: true);
+		var dispatcher = provider.GetRequiredService<IUpdateDispatcher>();
+
+		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 7), CancellationToken.None);
+
+		Assert.Equal(1, tracker.Created);
+		Assert.Equal(1, tracker.Handled);
+		Assert.Equal(1, tracker.Disposed);
+	}
+
+	[Fact]
+	public async Task ContainerHandlers_SingletonRegistration_IsBuiltOnceAcrossUpdates()
+	{
+		var tracker = new HandlerLifetimeTracker();
+		var services = new ServiceCollection();
+		_ = services.AddSingleton<ITelegramBotClient>(new RecordingTelegramBotClient());
+		_ = services.AddSingleton(tracker);
+		_ = services.AddSingleton(new ConcurrentBag<string>());
+		_ = services.AddLogging(static b => b.ClearProviders());
+		_ = services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+		_ = services.AddTelegramBot(static _ => "test-token");
+		_ = services.AddSingleton<IRawUpdateHandler, LifetimeTrackedRawHandler>();
+		_ = services.AddScoped<IRawUpdateHandler, CallbackOnlyRawHandler>();
+
+		await using var provider = services.BuildServiceProvider(validateScopes: true);
+		var dispatcher = provider.GetRequiredService<IUpdateDispatcher>();
+
+		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 7), CancellationToken.None);
+		await dispatcher.DispatchAsync(MessageUpdate(2, chatId: 7), CancellationToken.None);
+
+		Assert.Equal(1, tracker.Created);
+		Assert.Equal(2, tracker.Handled);
+		Assert.Equal(0, tracker.Disposed);
+	}
+
 	private static Update MessageUpdate(int id, long chatId) =>
 		new()
 		{
@@ -358,6 +407,44 @@ public sealed class FeedbackTests
 			ran.Add(callback.Id);
 			return Task.CompletedTask;
 		}
+	}
+
+	private sealed class HandlerLifetimeTracker
+	{
+		private int _created;
+		private int _handled;
+		private int _disposed;
+
+		public int Created => Volatile.Read(ref _created);
+
+		public int Handled => Volatile.Read(ref _handled);
+
+		public int Disposed => Volatile.Read(ref _disposed);
+
+		public void MarkCreated() => _ = Interlocked.Increment(ref _created);
+
+		public void MarkHandled() => _ = Interlocked.Increment(ref _handled);
+
+		public void MarkDisposed() => _ = Interlocked.Increment(ref _disposed);
+	}
+
+	private sealed class LifetimeTrackedRawHandler : IRawUpdateHandler, IDisposable
+	{
+		private readonly HandlerLifetimeTracker _tracker;
+
+		public LifetimeTrackedRawHandler(HandlerLifetimeTracker tracker)
+		{
+			_tracker = tracker;
+			tracker.MarkCreated();
+		}
+
+		public Task HandleAsync(Update update, CancellationToken cancellationToken)
+		{
+			_tracker.MarkHandled();
+			return Task.CompletedTask;
+		}
+
+		public void Dispose() => _tracker.MarkDisposed();
 	}
 
 	private sealed class StartCounter

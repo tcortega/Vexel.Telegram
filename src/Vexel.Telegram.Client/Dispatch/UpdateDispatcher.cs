@@ -54,16 +54,24 @@ public sealed class UpdateDispatcher(
 			await InvokeHandlerAsync(handler, update, cancellationToken).ConfigureAwait(false);
 		}
 
-		foreach (var handler in ResolveContainerHandlers(scope.ServiceProvider, update))
+		var containerHandlers = ResolveContainerHandlers(scope.ServiceProvider, update);
+		try
 		{
-			// The registry loop already ran this implementation; registering both ways is not two handlers.
-			if (registry.Contains(handler.GetType()))
+			foreach (var resolved in containerHandlers)
 			{
-				continue;
-			}
+				// The registry loop already ran this implementation; registering both ways is not two handlers.
+				if (registry.Contains(resolved.Handler.GetType()))
+				{
+					continue;
+				}
 
-			cancellationToken.ThrowIfCancellationRequested();
-			await InvokeHandlerAsync(handler, update, cancellationToken).ConfigureAwait(false);
+				cancellationToken.ThrowIfCancellationRequested();
+				await InvokeHandlerAsync(resolved.Handler, update, cancellationToken).ConfigureAwait(false);
+			}
+		}
+		finally
+		{
+			await DisposeOwnedHandlersAsync(containerHandlers, update).ConfigureAwait(false);
 		}
 	}
 
@@ -105,39 +113,51 @@ public sealed class UpdateDispatcher(
 	}
 
 	/// <summary>
-	/// Resolves handlers registered directly against <see cref="IRawUpdateHandler"/>. The container
-	/// materializes that set as a unit, so one handler with unresolvable dependencies (an injected
-	/// context that does not match the update kind, for example) would take every sibling with it.
-	/// When the set fails, resolution degrades to one registration at a time so only the faulty
-	/// handler is skipped. <c>AddRawUpdateHandler&lt;THandler&gt;</c> is the preferred raw path: it is
-	/// isolated by construction and keeps full container lifetime semantics.
+	/// Resolves handlers registered directly against <see cref="IRawUpdateHandler"/>, one
+	/// registration at a time. The container materializes that set as a single unit, so one handler
+	/// with unresolvable dependencies (an injected context that does not match the update kind, for
+	/// example) would otherwise take every sibling with it. Scoped and transient registrations are
+	/// built for this update and disposed with it; singleton registrations are built once and
+	/// reused. <c>AddRawUpdateHandler&lt;THandler&gt;</c> stays the preferred raw path: it resolves
+	/// straight from the container and keeps full lifetime, disposal, and decoration semantics.
 	/// </summary>
-	private IRawUpdateHandler[] ResolveContainerHandlers(IServiceProvider provider, Update update)
+	private ResolvedRawHandler[] ResolveContainerHandlers(IServiceProvider provider, Update update)
 	{
+		if (registry.ContainerRegistrations is { Count: > 0 } registrations)
+		{
+			return ResolvePerRegistration(registrations, provider, update);
+		}
+
+		// A registry built outside AddVexelTelegramClient has no registration snapshot, so the
+		// container's set is the only view of these handlers.
 		try
 		{
-			return [.. provider.GetServices<IRawUpdateHandler>()];
+			var handlers = provider.GetServices<IRawUpdateHandler>();
+			return [.. handlers.Select(static handler => new ResolvedRawHandler(handler, Owned: false))];
 		}
 		catch (Exception ex)
 		{
-			logger.LogError(
-				ex,
-				"Failed to resolve the raw update handler set for update {UpdateId}; "
-				+ "falling back to per-registration resolution",
-				update.Id);
-
-			return ResolveContainerHandlersPerRegistration(provider, update);
+			logger.LogError(ex, "Failed to resolve raw update handlers for update {UpdateId}", update.Id);
+			return [];
 		}
 	}
 
-	private IRawUpdateHandler[] ResolveContainerHandlersPerRegistration(
+	private ResolvedRawHandler[] ResolvePerRegistration(
+		IReadOnlyList<ServiceDescriptor> registrations,
 		IServiceProvider provider,
 		Update update)
 	{
-		var handlers = new List<IRawUpdateHandler>();
+		var handlers = new List<ResolvedRawHandler>(registrations.Count);
 
-		foreach (var descriptor in registry.ContainerRegistrations)
+		foreach (var descriptor in registrations)
 		{
+			// Dedup before construction: the registry loop already owns this implementation.
+			if (descriptor.ImplementationType is { } implementationType
+				&& registry.Contains(implementationType))
+			{
+				continue;
+			}
+
 			try
 			{
 				handlers.Add(CreateContainerHandler(descriptor, provider));
@@ -157,21 +177,57 @@ public sealed class UpdateDispatcher(
 		return [.. handlers];
 	}
 
-	private static IRawUpdateHandler CreateContainerHandler(
-		ServiceDescriptor descriptor,
-		IServiceProvider provider)
+	private ResolvedRawHandler CreateContainerHandler(ServiceDescriptor descriptor, IServiceProvider provider)
 	{
 		if (descriptor.ImplementationInstance is IRawUpdateHandler instance)
 		{
-			return instance;
+			return new ResolvedRawHandler(instance, Owned: false);
 		}
 
-		if (descriptor.ImplementationFactory is { } factory)
+		if (descriptor.Lifetime == ServiceLifetime.Singleton)
 		{
-			return (IRawUpdateHandler)factory(provider);
+			return new ResolvedRawHandler(
+				registry.GetOrCreateSingletonHandler(descriptor, provider, CreateHandler),
+				Owned: false);
 		}
 
-		return (IRawUpdateHandler)ActivatorUtilities.CreateInstance(provider, descriptor.ImplementationType!);
+		return new ResolvedRawHandler(CreateHandler(descriptor, provider), Owned: true);
+	}
+
+	private static IRawUpdateHandler CreateHandler(ServiceDescriptor descriptor, IServiceProvider provider) =>
+		descriptor.ImplementationFactory is { } factory
+			? (IRawUpdateHandler)factory(provider)
+			: (IRawUpdateHandler)ActivatorUtilities.CreateInstance(provider, descriptor.ImplementationType!);
+
+	private async ValueTask DisposeOwnedHandlersAsync(ResolvedRawHandler[] handlers, Update update)
+	{
+		foreach (var resolved in handlers)
+		{
+			if (!resolved.Owned)
+			{
+				continue;
+			}
+
+			try
+			{
+				if (resolved.Handler is IAsyncDisposable asyncDisposable)
+				{
+					await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+				}
+				else if (resolved.Handler is IDisposable disposable)
+				{
+					disposable.Dispose();
+				}
+			}
+			catch (Exception ex)
+			{
+				logger.LogError(
+					ex,
+					"Failed to dispose raw update handler {HandlerType} for update {UpdateId}",
+					resolved.Handler.GetType().FullName,
+					update.Id);
+			}
+		}
 	}
 
 	private async Task InvokeHandlerAsync(
@@ -207,4 +263,10 @@ public sealed class UpdateDispatcher(
 				update.Id);
 		}
 	}
+
+	/// <param name="Handler">The resolved raw handler.</param>
+	/// <param name="Owned">
+	/// True when the dispatcher constructed the handler outside the container and must dispose it.
+	/// </param>
+	private readonly record struct ResolvedRawHandler(IRawUpdateHandler Handler, bool Owned);
 }
