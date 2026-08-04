@@ -109,6 +109,9 @@ For webhook bots, reference `Vexel.Telegram.AspNetCore` and map the endpoint you
 app.MapTelegramWebhook(); // nothing is auto-mapped; secret_token is the auth
 ```
 
+`AddTelegramService` is not gone: it is still the `Vexel.Telegram.Hosting` primitive (client + hosted receive loop + `SetMyCommands`).
+`AddTelegramBot` calls it for you and adds contexts, `Feedback`, `Flow`, and the router, so app code should call `AddTelegramBot`.
+
 Receive mode is exclusive: polling (default) **or** webhook, validated at host start.
 `SetMyCommands` runs automatically from `[Command]` metadata; opt out with `VexelClientOptions.RegisterBotCommands = false`.
 
