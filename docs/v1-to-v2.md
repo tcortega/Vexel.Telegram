@@ -22,7 +22,7 @@ Prefer that over this page when the two disagree: the sample compiles.
 | DI entry | `AddTelegramService` + `AddTelegramCommands().AddCommandTree()…` | Three explicit calls (see below) |
 | Webhook HTTP | Hosting-adjacent | Separate `Vexel.Telegram.AspNetCore` + explicit `MapTelegramWebhook` |
 | Inline query routing | Broken (routed on Telegram’s opaque query id) | Routes on **query text** |
-| Packages | Client, Commands, Interactivity, Abstractions, Extensions, Hosting, metapackage | Client, Handlers (+ embedded generator), Hosting, AspNetCore, metapackage |
+| Packages | Client, Commands, Interactivity, Abstractions, Extensions, Hosting, metapackage | Client, Handlers, Hosting, AspNetCore, metapackage (generator ships as an analyzer) |
 
 Legacy v1 projects (`Abstractions`, `Commands`, `Interactivity`, `Extensions`) may still sit on disk on the branch as reference only.
 They are **out of the solution build** and are not part of the v2 API.
@@ -64,7 +64,7 @@ Route attributes:
 
 Handlers must be `partial`.
 Request shape is a nested record bound from the update (empty, single `string`, or tokenized primitives for commands).
-See the sample and the analyzer diagnostics (`VEX0001`…`VEX0006`) when a shape is wrong.
+See the sample and the analyzer diagnostics (`VEX0001`…`VEX0007`) when a shape is wrong.
 
 ### What replaced what
 
@@ -83,8 +83,10 @@ See the sample and the analyzer diagnostics (`VEX0001`…`VEX0006`) when a shape
 ### Package layout
 
 * **`Vexel.Telegram.Client`**: receive (polling or webhook), per-chat `UpdateScheduler`, raw handler registry
-* **`Vexel.Telegram.Handlers`**: attributes, contexts, `Feedback`, `Flow`/`IFlowStore`, router, keyboards; packs the generator/analyzers for package consumers
-* **`Vexel.Telegram.Generators`**: Roslyn generator + analyzers (not published alone; monorepo apps must `ProjectReference` it as `OutputItemType=Analyzer`)
+* **`Vexel.Telegram.Handlers`**: attributes, contexts, `Feedback`, `Flow`/`IFlowStore`, router, keyboards
+* **`Vexel.Telegram.Generators`**: Roslyn generator + analyzers (not published alone).
+  Today every app project must `ProjectReference` it itself with `OutputItemType="Analyzer"`; analyzer project references do not flow transitively.
+  Embedding it in the `Handlers` nupkg (`analyzers/dotnet/cs`) so package consumers get it for free is planned work (T15), not current behavior.
 * **`Vexel.Telegram.Hosting`**: `BackgroundService` receive loop + auto `SetMyCommands` (no ASP.NET Core framework reference)
 * **`Vexel.Telegram.AspNetCore`**: sole `FrameworkReference` to ASP.NET Core; owns `MapTelegramWebhook`
 * **`Vexel.Telegram`**: metapackage of Client + Handlers + Hosting (**excludes** AspNetCore)
@@ -157,10 +159,15 @@ App answers via `Feedback` still win (first successful send latches).
 ### Flow (replaces conversation state)
 
 ```csharp
+// arm the next step (from a command, a callback, or an earlier step)
 await flow.PromptAsync<CollectName.Command>(cancellationToken: token);
-// ...
+
+// inside the armed step handler (its request carries the user's text): read, mutate, write back
+var draft = await flow.GetDraftAsync<SignupDraft>(token) ?? new SignupDraft();
+draft.Name = command.Name.Trim();
 await flow.SetDraftAsync(draft, token);
-var draft = await flow.GetDraftAsync<SignupDraft>(token);
+await flow.PromptAsync<CollectAge.Command>(cancellationToken: token);
+
 await flow.CancelAsync(token); // or built-in /cancel
 ```
 
@@ -184,7 +191,8 @@ v2 keeps the step armed until success-without-rearm, cancel, or TTL.
 Use `InlineKeyboardBuilder` and `CallbackData.Format` from `Vexel.Telegram.Handlers.Keyboards`.
 
 * Callback route key = data up to first `|`; optional suffix binds as a single string
-* Analyzer enforces the Bot API 64-byte UTF-8 cap at compile time
+* The analyzer (`VEX0002`) checks the literal key on `[Callback]` / `[ChosenInlineResult]` at compile time
+* The full `key|suffix` payload is composed at runtime, so the Bot API 64-byte UTF-8 cap is enforced there: `CallbackData.Format` / `CallbackData.EnsureWithinLimit` throw, and `CallbackData.IsWithinLimit` checks without throwing
 
 Do not build Remora-style interaction tree paths.
 
@@ -193,7 +201,7 @@ Do not build Remora-style interaction tree paths.
 | Suite | Status on v2 |
 | --- | --- |
 | `tests/Vexel.Telegram.Tests` | Unit + generator snapshots + in-process host E2E against a **fake** Bot API (always CI) |
-| Real Telegram **test-DC** E2E (`tests/Vexel.Telegram.E2E`, WTelegram user client, shared secrets) | **Still separate / not the default CI path.** Needs provisioned secrets and is tracked as its own work. Do not assume a green unit suite means a real-user pass. |
+| Real Telegram **test-DC** E2E (planned as `tests/Vexel.Telegram.E2E`, WTelegram user client, shared secrets) | **Does not exist yet on this branch.** Planned as its own suite outside the default CI path; needs provisioned secrets. Do not assume a green unit suite means a real-user pass. |
 
 The sample bot is the fixture both the in-process host tests and the future test-DC suite drive.
 
