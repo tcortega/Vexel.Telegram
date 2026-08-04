@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<IsPackable>true</IsPackable>
+		<Description>Handler attributes, contexts, routing, and source generators for Vexel.Telegram.</Description>
+		<RootNamespace>Vexel.Telegram.Handlers</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- Normal reference so consumers get Immediate.Handlers transitively. -->
+		<PackageReference Include="Immediate.Handlers"/>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions"/>
+		<PackageReference Include="Telegram.Bot"/>
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Vexel.Telegram.Client\Vexel.Telegram.Client.csproj"/>
+		<!-- Development-time analyzer; nupkg embedding is asserted in T15 pack dry-run. -->
+		<ProjectReference Include="..\Vexel.Telegram.Generators\Vexel.Telegram.Generators.csproj"
+		                  ReferenceOutputAssembly="false"
+		                  OutputItemType="Analyzer"/>
+	</ItemGroup>
+
+	<PropertyGroup Label="MinVer">
+		<MinVerAutoIncrement>minor</MinVerAutoIncrement>
+		<MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
+		<MinVerTagPrefix>v</MinVerTagPrefix>
+	</PropertyGroup>
+
+</Project>

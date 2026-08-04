@@ -1,7 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<IsPackable>true</IsPackable>
+		<Description>Generic host integration for Vexel.Telegram.</Description>
+		<RootNamespace>Vexel.Telegram.Hosting</RootNamespace>
 	</PropertyGroup>
 
 	<ItemGroup>

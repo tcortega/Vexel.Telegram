@@ -1,107 +1,34 @@
-using Vexel.Telegram.Abstractions.Responders;
-using Vexel.Telegram.Client.Responders;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
-using Remora.Extensions.Options.Immutable;
 using Telegram.Bot;
 
 namespace Vexel.Telegram.Client.Extensions;
 
 /// <summary>
-/// Defines extension methods for the <see cref="IServiceCollection"/> class.
+/// DI registration helpers for the Vexel Telegram client.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
 	/// <summary>
-	/// Adds services required by the Vexel Telegram client system.
+	/// Adds the Vexel Telegram client shell and a configured <see cref="ITelegramBotClient"/>.
 	/// </summary>
-	/// <param name="serviceCollection">The service collection.</param>
-	/// <param name="tokenFactory">A factory function to retrieve the bot token.</param>
-	///     /// <param name="configureOptions">A delegate to configure the client options.</param>
-	/// <returns>The service collection, with the services added.</returns>
-	public static IServiceCollection AddVexelTelegramClient
-	(
-		this IServiceCollection serviceCollection,
+	/// <param name="services">The service collection.</param>
+	/// <param name="tokenFactory">Factory that returns the bot token.</param>
+	/// <param name="configureOptions">Optional client options configuration.</param>
+	/// <returns>The same service collection.</returns>
+	public static IServiceCollection AddVexelTelegramClient(
+		this IServiceCollection services,
 		Func<IServiceProvider, string> tokenFactory,
-		Action<VexelClientOptions>? configureOptions = null
-	)
+		Action<VexelClientOptions>? configureOptions = null)
 	{
-		configureOptions ??= _ => { };
-		_ = serviceCollection.Configure(configureOptions);
+		ArgumentNullException.ThrowIfNull(services);
+		ArgumentNullException.ThrowIfNull(tokenFactory);
 
-		serviceCollection.TryAddSingleton<IResponderDispatchService, ResponderDispatchService>();
-		serviceCollection.TryAddSingleton<IResponderTypeRepository>
-		(s => s.GetRequiredService<IOptions<ResponderService>>().Value
-		);
+		_ = services.Configure(configureOptions ?? (static _ => { }));
 
-		serviceCollection.TryAddSingleton<VexelClient>();
-		_ = serviceCollection.Configure<ResponderDispatchOptions>(() => new());
+		services.TryAddSingleton<ITelegramBotClient>(sp => new TelegramBotClient(tokenFactory(sp)));
+		services.TryAddSingleton<VexelClient>();
 
-		serviceCollection.TryAddSingleton<ITelegramBotClient>(sp => new TelegramBotClient(tokenFactory(sp)));
-
-		return serviceCollection;
-	}
-
-	/// <summary>
-	/// Adds a responder to the service collection. This method registers the responder as being available for all
-	/// <see cref="IResponder{T}"/> implementations it supports.
-	/// </summary>
-	/// <param name="serviceCollection">The service collection.</param>
-	/// <param name="group">The group the responder belongs to.</param>
-	/// <typeparam name="TResponder">The concrete responder type.</typeparam>
-	/// <returns>The service collection, with the responder added.</returns>
-	public static IServiceCollection AddResponder<TResponder>
-	(
-		this IServiceCollection serviceCollection,
-		ResponderGroup group = ResponderGroup.Normal
-	)
-		where TResponder : IResponder
-	{
-		return serviceCollection.AddResponder(typeof(TResponder), group);
-	}
-
-	/// <summary>
-	/// Adds a responder to the service collection. This method registers the responder as being available for all
-	/// <see cref="IResponder{T}"/> implementations it supports.
-	/// </summary>
-	/// <param name="serviceCollection">The service collection.</param>
-	/// <param name="responderType">The type implementing <see cref="IResponder"/>.</param>
-	/// <param name="group">The group the responder belongs to.</param>
-	/// <returns>The service collection, with the responder added.</returns>
-	/// <exception cref="ArgumentException">
-	/// Thrown if responderType does not implement <see cref="IResponder"/>.
-	/// </exception>
-	public static IServiceCollection AddResponder
-	(
-		this IServiceCollection serviceCollection,
-		Type responderType,
-		ResponderGroup group = ResponderGroup.Normal
-	)
-	{
-		if (!responderType.IsResponder())
-		{
-			throw new ArgumentException
-			(
-				$"{nameof(responderType)} must implement {nameof(IResponder)}.",
-				nameof(responderType)
-			);
-		}
-
-		var responderTypeInterfaces = responderType.GetInterfaces();
-		var responderInterfaces = responderTypeInterfaces.Where
-		(r => r.IsGenericType && r.GetGenericTypeDefinition() == typeof(IResponder<>)
-		);
-
-		foreach (var responderInterface in responderInterfaces)
-		{
-			_ = serviceCollection.AddScoped(responderInterface, responderType);
-		}
-
-		_ = serviceCollection.AddScoped(responderType);
-
-		_ = serviceCollection.Configure<ResponderService>(responderService => responderService.RegisterResponderType(responderType, group));
-
-		return serviceCollection;
+		return services;
 	}
 }

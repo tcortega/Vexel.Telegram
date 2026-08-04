@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!-- Single-TFM analyzer; clear multi-TFM inherited from Directory.Build.props. -->
+		<TargetFrameworks></TargetFrameworks>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<IsPackable>false</IsPackable>
+		<IsRoslynComponent>true</IsRoslynComponent>
+		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+		<!-- Required so IDE0005 (unnecessary usings) can run under TreatWarningsAsErrors. -->
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+		<RootNamespace>Vexel.Telegram.Generators</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all"/>
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all"/>
+		<PackageReference Include="PolySharp" PrivateAssets="all"/>
+	</ItemGroup>
+
+	<!-- No MinVer - not published standalone; packed into Handlers. -->
+
+</Project>
