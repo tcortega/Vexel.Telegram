@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Telegram.Bot;
+using Vexel.Telegram.Generators.Analyzers;
 using Vexel.Telegram.Handlers;
 using Vexel.Telegram.Handlers.DependencyInjection;
 using Vexel.Telegram.Handlers.Routing;
@@ -427,7 +428,7 @@ public sealed class FlowEndToEndTests(ITestOutputHelper output)
 	{
 		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
 			BadPromptBotSource,
-			new Vexel.Telegram.Generators.Analyzers.InvalidPromptTargetAnalyzer());
+			new InvalidPromptTargetAnalyzer());
 
 		var reported = diagnostics
 			.OrderBy(static d => d.Location.GetLineSpan().StartLinePosition.Line)
