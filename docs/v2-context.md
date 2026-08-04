@@ -5,7 +5,7 @@ Not an approved spec.
 Decisions below are labeled `agreed`, `proposed`, or `open`.
 Do not treat proposed items as authorization to implement product code.
 
-Last updated: 2026-03-22
+Last updated: 2026-03-22 (option A locked: dual [Handler] + Telegram attrs)
 Branch: `v2` (created to hold this context and future V2 work)
 Repo stays public. Private-repo idea was rejected.
 
@@ -247,23 +247,38 @@ Exact interface name **open** (`IUpdateHandler<T>`, keep `IResponder<T>`, etc.).
 
 ## 6. Attribute / DX decisions
 
-### Dual `[Handler]` + Telegram attribute
+### Dual `[Handler]` + Telegram attribute - **agreed (option A)**
 
-- **Proposed default for V2 ship:** Apis parity (both attributes).
-- Captain dislike: forcing two attributes always.
-- Research result: cannot inherit `HandlerAttribute` today; sealed + exact metadata name.
-- **Proposed parallel track:** upstream Immediate.Handlers change so discovery accepts derived or alternate markers; then `[Command]` alone can be enough for both gens. Helps Apis too.
-- Mitigations on dual-attr path: analyzer + code fix (copy Apis), samples, snippets.
+V2 ships **Immediate.Apis parity**: every routed Telegram handler type **must** carry:
+
+1. `[Handler]` (Immediate.Handlers) - required for handler/pipeline/DI generation
+2. A Vexel Telegram attribute (`[Command]`, `[Callback]`, `[InlineQuery]`, …) - required for route-table generation
+
+Users are forced to use `[Handler]`. That is an accepted product cost, not a temporary oversight.
+
+Reasons this locked:
+
+- `HandlerAttribute` is sealed; FAWMN matches exact metadata name only (CA1813 + Roslyn cookbook favor this).
+- Upstream Immediate.Handlers will not take pay-as-you-go extra marker discovery / FAWMN extension for this (issue outcome).
+- **Rejected:** public fork of Immediate.Handlers; vendoring Immediate as a hidden internal fork.
+- **Rejected for V2.0:** option B (Vexel owns full handler engine) as the starting path.
+- Option B remains a **possible later major** if dual-attr pain justifies owning pipeline gen. Design A so migration stays feasible: Vexel owns Telegram attrs + routing; mirror Immediate handler shape; do not leak Immediate types through Vexel’s Telegram-facing APIs beyond the package peer dependency.
+
+Mitigations for dual-attr DX:
+
+- Analyzer + code fix when a Vexel route attr is present without `[Handler]` (same idea as Immediate.Apis IAPI0001).
+- Samples and docs always show the pair; never document Telegram attrs alone as sufficient.
 
 ### Do not
 
 - Hide Immediate as a private implementation detail while leaking its types.
-- Build a second full mediator "inspired by Immediate" just to save one attribute line.
+- Fork or publish a competing Immediate.Handlers.
+- Build a second full mediator in V2.0 just to save one attribute line.
 - Over-abstract packages before the sample bot feels good.
 
 ### Simple vs power users
 
-- Simple: one handler file, obvious attributes, feedback + context inject, copy sample.
+- Simple: one handler file, `[Handler]` + route attr, feedback + context inject, copy sample.
 - Power: behaviors, tags/lifetimes, manual handler inject, raw update handlers, full Telegram.Bot access.
 
 ---
@@ -286,37 +301,38 @@ Exact interface name **open** (`IUpdateHandler<T>`, keep `IResponder<T>`, etc.).
 
 1. V2 work happens on branch `v2`, repository stays public.
 2. Direction is Immediate-style source generation, not more Remora.Commands reflection.
-3. Immediate.Handlers should be the handler engine (open composition like Apis), not a buried rewrite of the same idea.
-4. Vexel owns Telegram transport binding, host, concurrency, contexts, feedback, builders.
-5. Inline queries must route on query text / empty default, not `InlineQuery.Id` interaction-tree checks.
-6. DX is a first-class goal: short happy path, strong analyzers, samples as spec.
-7. This context file is committed so design chat can switch topics without losing research.
+3. **Option A:** Immediate.Handlers is the handler engine (open peer dependency, Apis-style composition), not a buried or forked rewrite.
+4. Vexel owns Telegram transport binding, host, concurrency, contexts, feedback, builders, and route-table source generation.
+5. **Dual attributes required:** `[Handler]` + Vexel route attribute on every routed handler type. Users must use `[Handler]`.
+6. No public fork of Immediate.Handlers; no vendoring Immediate as a hidden fork for V2.0.
+7. Inline queries must route on query text / empty default, not `InlineQuery.Id` interaction-tree checks.
+8. DX remains first-class within option A: analyzers/code fix for missing `[Handler]`, samples as spec.
+9. This context file is committed so design chat can switch topics without losing research.
+10. Option B (Vexel-owned handler engine, single Telegram attr) is deferred; revisit only if dual-attr cost justifies it. Keep A→B migration door open via stable Vexel attrs and Immediate-compatible handler shape.
 
 ### Proposed (not fully approved)
 
 1. Exact package split and names above.
 2. Drop Remora.Commands entirely on `v2`.
-3. Dual-attribute API for first V2 milestones (Apis parity).
-4. Keep vs drop Remora.Results.
-5. Feedback and context interface shapes.
-6. Callback payload format and size/analyzer rules.
-7. Concurrency defaults (what is ordered per chat vs parallel).
-8. Whether `SetMyCommands` is generated from `[Command]` metadata automatically.
-9. Metapackage vs explicit package references guidance for production apps.
-10. Delivery cadence (skeleton -> gen -> sample -> delete dead v1 surface on branch).
+3. Keep vs drop Remora.Results.
+4. Feedback and context interface shapes.
+5. Callback payload format and size/analyzer rules.
+6. Concurrency defaults (what is ordered per chat vs parallel).
+7. Whether `SetMyCommands` is generated from `[Command]` metadata automatically.
+8. Metapackage vs explicit package references guidance for production apps.
+9. Delivery cadence (skeleton -> gen -> sample -> delete dead v1 surface on branch).
 
 ### Open questions
 
-1. Approve full architecture as implementation charter, or keep grilling API details first?
-2. Upstream Immediate change for single-attribute discovery: do before V2 coding, parallel, or later?
-3. Public type names: `[Command]` vs `[BotCommand]`, `[Callback]` vs `[CallbackButton]`, etc.?
-4. One handler type per route only (Immediate style), or any grouping sugar?
-5. Webhook vs polling configuration surface for hosting?
-6. Minimum TFMs / Telegram.Bot version floor for V2?
-7. Result type philosophy: `ValueTask`, exceptions, custom result, mix?
-8. How much v1 migration guide is required before calling V2 usable?
-9. Optional v1 inline-query hotfix on master?
-10. Exact generated registration API names and assembly identifier story (mirror ImmediateAssemblyIdentifier?).
+1. Approve remaining architecture details as implementation charter, or keep grilling API names/binding first?
+2. Public type names: `[Command]` vs `[BotCommand]`, `[Callback]` vs `[CallbackButton]`, etc.?
+3. One handler type per route only (Immediate style), or any grouping sugar?
+4. Webhook vs polling configuration surface for hosting?
+5. Minimum TFMs / Telegram.Bot version floor for V2?
+6. Result type philosophy: `ValueTask`, exceptions, custom result, mix?
+7. How much v1 migration guide is required before calling V2 usable?
+8. Optional v1 inline-query hotfix on master?
+9. Exact generated registration API names and assembly identifier story (mirror ImmediateAssemblyIdentifier?).
 
 ---
 
