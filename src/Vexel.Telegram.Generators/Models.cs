@@ -32,6 +32,13 @@ internal sealed record ChosenInlineResultRouteModel(
 	string AssemblyDisplayName,
 	bool HasStringParameter);
 
+internal sealed record FlowStepModel(
+	string StepKey,
+	string HandlerFullyQualifiedName,
+	string RequestFullyQualifiedName,
+	string AssemblyDisplayName,
+	bool HasStringParameter);
+
 internal sealed record RequestParameterModel(
 	string FullyQualifiedTypeName,
 	string ParameterName,
@@ -54,4 +61,5 @@ internal sealed record AssemblyRoutesModel(
 	EquatableReadOnlyList<CommandRouteModel> Commands,
 	EquatableReadOnlyList<CallbackRouteModel> Callbacks,
 	EquatableReadOnlyList<InlineQueryRouteModel> InlineQueries,
-	EquatableReadOnlyList<ChosenInlineResultRouteModel> ChosenInlineResults);
+	EquatableReadOnlyList<ChosenInlineResultRouteModel> ChosenInlineResults,
+	EquatableReadOnlyList<FlowStepModel> FlowSteps);

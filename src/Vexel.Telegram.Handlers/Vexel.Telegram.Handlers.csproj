@@ -10,6 +10,7 @@
 		<!-- Normal reference so consumers get Immediate.Handlers transitively. -->
 		<PackageReference Include="Immediate.Handlers"/>
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions"/>
+		<PackageReference Include="Microsoft.Extensions.Options"/>
 		<PackageReference Include="Telegram.Bot"/>
 	</ItemGroup>
 

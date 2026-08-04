@@ -179,6 +179,7 @@ internal static class GeneratorTestHelper
 		refs.Add(MetadataReference.CreateFromFile(typeof(ITelegramBotClient).Assembly.Location));
 		refs.Add(MetadataReference.CreateFromFile(typeof(Feedback).Assembly.Location));
 		refs.Add(MetadataReference.CreateFromFile(typeof(MessageContext).Assembly.Location));
+		refs.Add(MetadataReference.CreateFromFile(typeof(Flow).Assembly.Location));
 		refs.Add(MetadataReference.CreateFromFile(typeof(RouteBinder).Assembly.Location));
 		refs.Add(MetadataReference.CreateFromFile(typeof(object).Assembly.Location));
 

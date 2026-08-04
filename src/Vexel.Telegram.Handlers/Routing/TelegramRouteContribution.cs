@@ -31,13 +31,18 @@ public sealed class TelegramRouteContribution
 	/// Chosen-inline-result key (ordinal, case-sensitive ResultId prefix) to binder map.
 	/// Must already use an ordinal comparer.
 	/// </param>
+	/// <param name="flowSteps">
+	/// Flow step-key (<see cref="Type.FullName"/> of the handler type, ordinal) to binder map.
+	/// Must already use an ordinal comparer.
+	/// </param>
 	public TelegramRouteContribution(
 		string assemblyName,
 		IReadOnlyDictionary<string, RouteBinder> commands,
 		IReadOnlyList<CommandRouteMetadata> commandMetadata,
 		IReadOnlyDictionary<string, RouteBinder>? callbacks = null,
 		IReadOnlyDictionary<string, RouteBinder>? inlineQueries = null,
-		IReadOnlyDictionary<string, RouteBinder>? chosenInlineResults = null)
+		IReadOnlyDictionary<string, RouteBinder>? chosenInlineResults = null,
+		IReadOnlyDictionary<string, RouteBinder>? flowSteps = null)
 	{
 		ArgumentNullException.ThrowIfNull(assemblyName);
 		ArgumentNullException.ThrowIfNull(commands);
@@ -49,6 +54,7 @@ public sealed class TelegramRouteContribution
 		Callbacks = callbacks ?? new Dictionary<string, RouteBinder>(StringComparer.Ordinal);
 		InlineQueries = inlineQueries ?? new Dictionary<string, RouteBinder>(StringComparer.Ordinal);
 		ChosenInlineResults = chosenInlineResults ?? new Dictionary<string, RouteBinder>(StringComparer.Ordinal);
+		FlowSteps = flowSteps ?? new Dictionary<string, RouteBinder>(StringComparer.Ordinal);
 	}
 
 	/// <summary>Display name of the contributing assembly.</summary>
@@ -68,4 +74,7 @@ public sealed class TelegramRouteContribution
 
 	/// <summary>Chosen-inline-result route map for this assembly.</summary>
 	public IReadOnlyDictionary<string, RouteBinder> ChosenInlineResults { get; }
+
+	/// <summary>Flow step map for this assembly (handler <see cref="Type.FullName"/> → binder).</summary>
+	public IReadOnlyDictionary<string, RouteBinder> FlowSteps { get; }
 }

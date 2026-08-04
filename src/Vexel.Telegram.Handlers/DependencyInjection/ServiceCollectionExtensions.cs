@@ -15,24 +15,28 @@ public static class ServiceCollectionExtensions
 {
 	/// <summary>
 	/// Adds the Vexel Telegram client, hosted receive loop, per-update contexts,
-	/// <see cref="Feedback"/>, and the <see cref="TelegramRouter"/>.
+	/// <see cref="Feedback"/>, <see cref="Flow"/> / <see cref="IFlowStore"/>, and the
+	/// <see cref="TelegramRouter"/>.
 	/// Compose with Immediate <c>AddXxxHandlers()</c> and the generated
 	/// <c>AddXxxTelegram()</c> route registration in the app.
 	/// </summary>
 	/// <param name="services">The service collection.</param>
 	/// <param name="tokenFactory">Factory that returns the bot token.</param>
 	/// <param name="configureClientOptions">Optional client options configuration.</param>
+	/// <param name="configureFlowOptions">Optional flow options configuration.</param>
 	/// <returns>The same service collection.</returns>
 	public static IServiceCollection AddTelegramBot(
 		this IServiceCollection services,
 		Func<IServiceProvider, string> tokenFactory,
-		Action<VexelClientOptions>? configureClientOptions = null)
+		Action<VexelClientOptions>? configureClientOptions = null,
+		Action<FlowOptions>? configureFlowOptions = null)
 	{
 		ArgumentNullException.ThrowIfNull(services);
 		ArgumentNullException.ThrowIfNull(tokenFactory);
 
 		_ = services.AddTelegramService(tokenFactory, configureClientOptions);
 		_ = services.AddVexelUpdateContexts();
+		_ = services.AddTelegramFlow(configureFlowOptions);
 		_ = services.AddTelegramRouter();
 
 		return services;
@@ -63,6 +67,35 @@ public static class ServiceCollectionExtensions
 			ServiceDescriptor.Singleton<IUpdateCompletionHook, CallbackAnswerObligation>());
 		services.TryAddEnumerable(
 			ServiceDescriptor.Singleton<IUpdateCompletionHook, InlineAnswerObligation>());
+
+		return services;
+	}
+
+	/// <summary>
+	/// Registers <see cref="IFlowStore"/> (<see cref="MemoryFlowStore"/>), <see cref="Flow"/>,
+	/// and <see cref="FlowOptions"/>. Used by <see cref="AddTelegramBot"/>; exposed for tests.
+	/// </summary>
+	/// <param name="services">The service collection.</param>
+	/// <param name="configure">Optional flow options configuration.</param>
+	/// <returns>The same service collection.</returns>
+	public static IServiceCollection AddTelegramFlow(
+		this IServiceCollection services,
+		Action<FlowOptions>? configure = null)
+	{
+		ArgumentNullException.ThrowIfNull(services);
+
+		services.TryAddSingleton(TimeProvider.System);
+		services.TryAddSingleton<IFlowStore, MemoryFlowStore>();
+		services.TryAddScoped<Flow>();
+
+		if (configure is not null)
+		{
+			_ = services.Configure(configure);
+		}
+		else
+		{
+			_ = services.AddOptions<FlowOptions>();
+		}
 
 		return services;
 	}
