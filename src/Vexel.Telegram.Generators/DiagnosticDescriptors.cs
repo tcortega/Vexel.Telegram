@@ -15,6 +15,17 @@ internal static class DiagnosticDescriptors
 		isEnabledByDefault: true,
 		description: "A Vexel route attribute requires Immediate.Handlers [Handler] on the same type (Option A dual-attr model).");
 
+	public static readonly DiagnosticDescriptor VEX0002CallbackDataTooLong = new(
+		id: "VEX0002",
+		title: "Callback data too long or invalid",
+		messageFormat: "{0}",
+		category: Category,
+		defaultSeverity: DiagnosticSeverity.Error,
+		isEnabledByDefault: true,
+		description:
+			"Telegram rejects callback_data over 64 UTF-8 bytes. Callback route keys must also not contain "
+			+ "the '|' key/suffix separator.");
+
 	public static readonly DiagnosticDescriptor VEX0003InvalidCommandName = new(
 		id: "VEX0003",
 		title: "Invalid Telegram command name",
@@ -33,7 +44,8 @@ internal static class DiagnosticDescriptors
 		isEnabledByDefault: true,
 		description:
 			"Request records must follow the Vexel binding convention: one public ctor; command params from "
-			+ "string/int/long/bool/decimal/enum; DI services never bind from payload.");
+			+ "string/int/long/bool/decimal/enum; callback/inline/flow params empty or single string; "
+			+ "DI services never bind from payload.");
 
 	public static readonly DiagnosticDescriptor VEX0005DuplicateRouteKey = new(
 		id: "VEX0005",

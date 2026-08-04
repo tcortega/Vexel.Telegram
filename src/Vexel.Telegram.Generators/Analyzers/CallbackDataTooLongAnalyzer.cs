@@ -5,14 +5,15 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace Vexel.Telegram.Generators.Analyzers;
 
 /// <summary>
-/// VEX0004: request shapes must follow the binding convention table.
+/// VEX0002: callback route keys must fit in Telegram's 64-byte UTF-8 callback_data limit and must
+/// not contain the <c>|</c> key/suffix separator.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class UnbindableRequestAnalyzer : DiagnosticAnalyzer
+public sealed class CallbackDataTooLongAnalyzer : DiagnosticAnalyzer
 {
 	/// <inheritdoc />
 	public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
-		[DiagnosticDescriptors.VEX0004UnbindableRequest];
+		[DiagnosticDescriptors.VEX0002CallbackDataTooLong];
 
 	/// <inheritdoc />
 	public override void Initialize(AnalysisContext context)
@@ -31,33 +32,29 @@ public sealed class UnbindableRequestAnalyzer : DiagnosticAnalyzer
 			return;
 		}
 
-		// Only validate types that are dual-attr complete; VEX0001 covers missing [Handler].
-		if (!type.HasHandlerAttribute())
+		var attribute = type.GetCallbackAttribute();
+		if (attribute is null)
 		{
 			return;
 		}
 
-		string? error = null;
-
-		if (type.GetCommandAttribute() is not null)
-		{
-			_ = RouteGenerator.TryGetBindableRequest(type, out _, out _, out error);
-		}
-
-		if (error is null && type.GetCallbackAttribute() is not null)
-		{
-			_ = RouteGenerator.TryGetBindableCallbackRequest(type, out _, out _, out error);
-		}
-
-		if (error is null)
+		if (attribute.ConstructorArguments is not [{ Value: string key }])
 		{
 			return;
 		}
+
+		if (CallbackKeyValidation.IsValid(key))
+		{
+			return;
+		}
+
+		var location = attribute.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken).GetLocation()
+			?? type.Locations.FirstOrDefault();
 
 		context.ReportDiagnostic(
 			Diagnostic.Create(
-				DiagnosticDescriptors.VEX0004UnbindableRequest,
-				type.Locations.FirstOrDefault(),
-				error));
+				DiagnosticDescriptors.VEX0002CallbackDataTooLong,
+				location,
+				CallbackKeyValidation.DescribeFailure(key)));
 	}
 }

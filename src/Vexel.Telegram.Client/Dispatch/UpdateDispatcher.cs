@@ -18,6 +18,9 @@ namespace Vexel.Telegram.Client.Dispatch;
 /// </param>
 /// <param name="registry">Raw handler registry.</param>
 /// <param name="routers">Routed-handler stages run before raw handlers, in registration order.</param>
+/// <param name="completionHooks">
+/// Post-pipeline hooks (answer obligations, etc.) run after routers and raw handlers, still in-scope.
+/// </param>
 /// <param name="options">Client options.</param>
 /// <param name="logger">Logger.</param>
 public sealed class UpdateDispatcher(
@@ -25,11 +28,14 @@ public sealed class UpdateDispatcher(
 	IServiceProvider rootProvider,
 	RawUpdateHandlerRegistry registry,
 	IEnumerable<IUpdateRouter> routers,
+	IEnumerable<IUpdateCompletionHook> completionHooks,
 	IOptions<VexelClientOptions> options,
 	ILogger<UpdateDispatcher> logger) : IUpdateDispatcher, IDisposable, IAsyncDisposable
 {
 	private readonly VexelClientOptions _options = options.Value;
 	private readonly IUpdateRouter[] _routers = routers as IUpdateRouter[] ?? [.. routers];
+	private readonly IUpdateCompletionHook[] _completionHooks =
+		completionHooks as IUpdateCompletionHook[] ?? [.. completionHooks];
 	private readonly ConcurrentDictionary<ServiceDescriptor, Lazy<IRawUpdateHandler>> _singletonHandlers = new();
 
 	/// <inheritdoc />
@@ -93,6 +99,15 @@ public sealed class UpdateDispatcher(
 		finally
 		{
 			await DisposeOwnedHandlersAsync(containerHandlers, update).ConfigureAwait(false);
+		}
+
+		// Fail-closed obligations (B4 callback/inline answers) run after every app stage so handlers
+		// that answer themselves win, and unrouted updates still get a default answer.
+		foreach (var hook in _completionHooks)
+		{
+			cancellationToken.ThrowIfCancellationRequested();
+			await InvokeCompletionHookAsync(hook, update, scope.ServiceProvider, cancellationToken)
+				.ConfigureAwait(false);
 		}
 	}
 
@@ -281,6 +296,19 @@ public sealed class UpdateDispatcher(
 			token => router.RouteAsync(update, scope, token),
 			"Update router",
 			router.GetType(),
+			update,
+			cancellationToken);
+
+	private Task InvokeCompletionHookAsync(
+		IUpdateCompletionHook hook,
+		Update update,
+		IServiceProvider scope,
+		CancellationToken cancellationToken) =>
+		// Fault isolation: a completion hook must not kill the lane or skip remaining hooks.
+		RunIsolatedAsync(
+			token => hook.CompleteAsync(update, scope, token),
+			"Update completion hook",
+			hook.GetType(),
 			update,
 			cancellationToken);
 

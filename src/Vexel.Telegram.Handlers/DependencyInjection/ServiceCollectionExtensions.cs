@@ -57,6 +57,10 @@ public static class ServiceCollectionExtensions
 			ServiceDescriptor.Singleton<IUpdateRouter, TelegramRouter>(
 				static sp => sp.GetRequiredService<TelegramRouter>()));
 
+		// B4: discharge default answerCallbackQuery after the full pipeline when Feedback did not answer.
+		services.TryAddEnumerable(
+			ServiceDescriptor.Singleton<IUpdateCompletionHook, CallbackAnswerObligation>());
+
 		return services;
 	}
 
