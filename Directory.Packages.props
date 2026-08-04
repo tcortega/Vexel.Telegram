@@ -7,6 +7,7 @@
 		<!-- Microsoft.Extensions (10.0.x satisfies Immediate.Handlers TFM floors incl. 10.0.9) -->
 		<PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.10"/>
 		<PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.10"/>
+		<PackageVersion Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.10"/>
 		<PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.10"/>
 		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10"/>
 		<PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10"/>

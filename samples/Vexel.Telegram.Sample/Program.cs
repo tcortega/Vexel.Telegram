@@ -1,44 +1,47 @@
-﻿using Vexel.Telegram.Client.Extensions;
-using Vexel.Telegram.Commands;
-using Vexel.Telegram.Hosting.Extensions;
-using Vexel.Telegram.Interactivity.Extensions;
-using Vexel.Telegram.Sample.Commands;
-using Vexel.Telegram.Sample.Interactions;
-using Vexel.Telegram.Sample.Responders;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Remora.Commands.Extensions;
+using Vexel.Telegram.Handlers.DependencyInjection;
+using Vexel.Telegram.Sample;
 
-var host = Host.CreateDefaultBuilder(args)
-	.AddTelegramService(_ => "<BOT_TOKEN>")
-	.ConfigureServices((ctx, services) =>
-	{
-		_ = services.AddTelegramCommands();
-		_ = services.AddTelegramInteractivity();
+// Three explicit calls - never hide Immediate or the generated route table:
+//   1. AddTelegramBot      - client, host, contexts, Feedback, Flow, router, SetMyCommands
+//   2. AddXxxHandlers      - Immediate.Handlers DI for every [Handler]
+//   3. AddXxxTelegram      - Vexel-generated route / flow-step / On* contribution
+var builder = Host.CreateApplicationBuilder(args);
 
-		_ = services.AddResponder<MessageResponder>();
+builder.Logging.ClearProviders();
+builder.Logging.AddSimpleConsole(options =>
+{
+	options.IncludeScopes = true;
+	options.SingleLine = true;
+	options.TimestampFormat = "HH:mm:ss ";
+});
 
-		_ = services.AddCommandTree()
-			.WithCommandGroup<GeneralCommands>();
+var token = ResolveBotToken(builder.Configuration);
+builder.Services.AddTelegramBot(_ => token);
+builder.Services.AddVexelTelegramSampleHandlers();
+builder.Services.AddVexelTelegramSampleTelegram();
 
-		_ = services.AddInteractionGroup<SampleInteractions>();
-		_ = services.AddInteractionGroup<PaymentInteractions>();
-	})
-	.ConfigureLogging(logging =>
-	{
-		_ = logging.ClearProviders();
-		_ = logging.AddSimpleConsole(options =>
-		{
-			options.IncludeScopes = true;
-			options.SingleLine = true;
-			options.TimestampFormat = "hh:mm:ss ";
-		});
-	})
-	.Build();
-
-await using var scope = host.Services.CreateAsyncScope();
-var registrar = scope.ServiceProvider.GetService<CommandRegistrar>()!;
-await registrar.RegisterCommandsAsync();
-
+var host = builder.Build();
 await host.RunAsync();
+
+static string ResolveBotToken(IConfiguration configuration)
+{
+	// Prefer, in order: env TELEGRAM_BOT_TOKEN, config BotToken (user-secrets / appsettings),
+	// config Telegram:BotToken. See README.md for setup. Test-DC wiring lands in T12a.
+	var token =
+		Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN")
+		?? configuration["BotToken"]
+		?? configuration["Telegram:BotToken"];
+
+	if (string.IsNullOrWhiteSpace(token))
+	{
+		throw new InvalidOperationException(
+			"Bot token missing. Set TELEGRAM_BOT_TOKEN, or `dotnet user-secrets set BotToken <token>` "
+			+ "in samples/Vexel.Telegram.Sample. See README.md.");
+	}
+
+	return token.Trim();
+}
