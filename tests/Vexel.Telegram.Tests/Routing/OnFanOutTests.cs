@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Vexel.Telegram.Handlers;
 using Vexel.Telegram.Handlers.Routing;
 using Vexel.Telegram.Tests.Fakes;
 
@@ -183,6 +184,104 @@ public sealed class OnFanOutTests
 		await router.RouteAsync(update, EmptyScope(), CancellationToken.None);
 
 		Assert.Equal(["routed", "on"], order);
+	}
+
+	[Fact]
+	public async Task On_handlers_run_when_the_routed_stage_faults_on_infrastructure()
+	{
+		var onInvoked = false;
+
+		var contribution = new TelegramRouteContribution(
+			"TestAsm",
+			commands: new Dictionary<string, RouteBinder>(StringComparer.OrdinalIgnoreCase),
+			commandMetadata: [],
+			flowSteps: new Dictionary<string, RouteBinder>(StringComparer.Ordinal)
+			{
+				["Demo.Step+Command"] = (_, _, _) => ValueTask.FromResult(true),
+			},
+			onMessages:
+			[
+				new OnHandlerEntry(
+					"global::Demo.Observer",
+					(_, _, _) =>
+					{
+						onInvoked = true;
+						return ValueTask.FromResult(true);
+					}),
+			]);
+
+		var router = CreateRouter(contribution);
+		var services = new ServiceCollection();
+		_ = services.AddSingleton<IFlowStore>(new ThrowingFlowStore());
+
+		await router.RouteAsync(
+			MessageUpdate("plain text"),
+			services.BuildServiceProvider(),
+			CancellationToken.None);
+
+		Assert.True(onInvoked);
+	}
+
+	[Fact]
+	public void Duplicate_On_contribution_from_one_assembly_fails_fast()
+	{
+		var contribution = new TelegramRouteContribution(
+			"TestAsm",
+			commands: new Dictionary<string, RouteBinder>(StringComparer.OrdinalIgnoreCase),
+			commandMetadata: [],
+			onMessages: [new OnHandlerEntry("global::Demo.Observer", (_, _, _) => ValueTask.FromResult(true))]);
+
+		var ex = Assert.Throws<InvalidOperationException>(() => new TelegramRouter(
+			[contribution, contribution],
+			new RecordingTelegramBotClient { Username = "TestBot" },
+			NullLogger<TelegramRouter>.Instance));
+
+		Assert.Contains("AddTestAsmTelegram() exactly once", ex.Message, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public void On_observers_sharing_a_display_name_across_assemblies_are_allowed()
+	{
+		var a = new TelegramRouteContribution(
+			"AsmA",
+			commands: new Dictionary<string, RouteBinder>(StringComparer.OrdinalIgnoreCase),
+			commandMetadata: [],
+			onMessages: [new OnHandlerEntry("global::Demo.Observer", (_, _, _) => ValueTask.FromResult(true))]);
+
+		var b = new TelegramRouteContribution(
+			"AsmB",
+			commands: new Dictionary<string, RouteBinder>(StringComparer.OrdinalIgnoreCase),
+			commandMetadata: [],
+			onMessages: [new OnHandlerEntry("global::Demo.Observer", (_, _, _) => ValueTask.FromResult(true))]);
+
+		var router = new TelegramRouter(
+			[a, b],
+			new RecordingTelegramBotClient { Username = "TestBot" },
+			NullLogger<TelegramRouter>.Instance);
+
+		Assert.NotNull(router);
+	}
+
+	private sealed class ThrowingFlowStore : IFlowStore
+	{
+		public ValueTask<FlowEntry?> GetAsync(
+			long chatId,
+			long userId,
+			CancellationToken cancellationToken = default) =>
+			throw new InvalidOperationException("store offline");
+
+		public ValueTask SetAsync(
+			long chatId,
+			long userId,
+			FlowEntry entry,
+			CancellationToken cancellationToken = default) =>
+			throw new InvalidOperationException("store offline");
+
+		public ValueTask CompleteAsync(
+			long chatId,
+			long userId,
+			CancellationToken cancellationToken = default) =>
+			throw new InvalidOperationException("store offline");
 	}
 
 	private static RouteBinder Record(string name, List<string> order) =>

@@ -45,7 +45,7 @@ public sealed class TelegramRouter : IUpdateRouter
 	/// <summary>
 	/// Initializes a new router from all registered <see cref="TelegramRouteContribution"/>s.
 	/// Fails fast when two assemblies contribute the same command, callback, inline, chosen, or
-	/// flow step key.
+	/// flow step key, or when one assembly contributes the same On* observer twice.
 	/// </summary>
 	/// <param name="contributions">Per-assembly route contributions.</param>
 	/// <param name="botClient">Bot client used to resolve this bot's username when needed.</param>
@@ -71,10 +71,16 @@ public sealed class TelegramRouter : IUpdateRouter
 		_inlineQueries = ComposeInlineQueries(contributionList);
 		_chosenInlineResults = ComposeChosenInlineResults(contributionList);
 		_flowSteps = ComposeFlowSteps(contributionList);
-		_onMessages = ComposeOnHandlers(contributionList, static c => c.OnMessages);
-		_onCallbackQueries = ComposeOnHandlers(contributionList, static c => c.OnCallbackQueries);
-		_onInlineQueries = ComposeOnHandlers(contributionList, static c => c.OnInlineQueries);
-		_onChosenInlineResults = ComposeOnHandlers(contributionList, static c => c.OnChosenInlineResults);
+		_onMessages = ComposeOnHandlers(contributionList, static c => c.OnMessages, "[OnMessage]");
+		_onCallbackQueries = ComposeOnHandlers(
+			contributionList,
+			static c => c.OnCallbackQueries,
+			"[OnCallbackQuery]");
+		_onInlineQueries = ComposeOnHandlers(contributionList, static c => c.OnInlineQueries, "[OnInlineQuery]");
+		_onChosenInlineResults = ComposeOnHandlers(
+			contributionList,
+			static c => c.OnChosenInlineResults,
+			"[OnChosenInlineResult]");
 		_hasUserCancelCommand = _commands.ContainsKey("cancel");
 	}
 
@@ -121,7 +127,10 @@ public sealed class TelegramRouter : IUpdateRouter
 
 		if (update.CallbackQuery is { } callbackQuery)
 		{
-			await RouteCallbackAsync(callbackQuery, update, scope, cancellationToken).ConfigureAwait(false);
+			await RunRoutedStageAsync(
+				RouteCallbackAsync(callbackQuery, update, scope, cancellationToken),
+				update,
+				cancellationToken).ConfigureAwait(false);
 			await RunOnHandlersAsync(_onCallbackQueries, update, scope, cancellationToken)
 				.ConfigureAwait(false);
 			return;
@@ -129,7 +138,10 @@ public sealed class TelegramRouter : IUpdateRouter
 
 		if (update.InlineQuery is { } inlineQuery)
 		{
-			await RouteInlineQueryAsync(inlineQuery, update, scope, cancellationToken).ConfigureAwait(false);
+			await RunRoutedStageAsync(
+				RouteInlineQueryAsync(inlineQuery, update, scope, cancellationToken),
+				update,
+				cancellationToken).ConfigureAwait(false);
 			await RunOnHandlersAsync(_onInlineQueries, update, scope, cancellationToken)
 				.ConfigureAwait(false);
 			return;
@@ -137,8 +149,10 @@ public sealed class TelegramRouter : IUpdateRouter
 
 		if (update.ChosenInlineResult is { } chosenInlineResult)
 		{
-			await RouteChosenInlineResultAsync(chosenInlineResult, update, scope, cancellationToken)
-				.ConfigureAwait(false);
+			await RunRoutedStageAsync(
+				RouteChosenInlineResultAsync(chosenInlineResult, update, scope, cancellationToken),
+				update,
+				cancellationToken).ConfigureAwait(false);
 			await RunOnHandlersAsync(_onChosenInlineResults, update, scope, cancellationToken)
 				.ConfigureAwait(false);
 			return;
@@ -146,8 +160,36 @@ public sealed class TelegramRouter : IUpdateRouter
 
 		if (update.Message is { } message)
 		{
-			await RouteMessageAsync(message, update, scope, cancellationToken).ConfigureAwait(false);
+			await RunRoutedStageAsync(
+				RouteMessageAsync(message, update, scope, cancellationToken),
+				update,
+				cancellationToken).ConfigureAwait(false);
 			await RunOnHandlersAsync(_onMessages, update, scope, cancellationToken).ConfigureAwait(false);
+		}
+	}
+
+	/// <summary>
+	/// Awaits the routed stage and isolates its faults so the On* fan-out still runs (D9/N3).
+	/// Handler faults are already isolated per binder; this catches the infrastructure faults around
+	/// them (flow store, bot username lookup) that would otherwise skip observers entirely.
+	/// Cancellation still propagates - observers must not run once the lane is shutting down.
+	/// </summary>
+	private async Task RunRoutedStageAsync(Task routed, Update update, CancellationToken cancellationToken)
+	{
+		try
+		{
+			await routed.ConfigureAwait(false);
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(
+				ex,
+				"Routed dispatch failed for update {UpdateId}; continuing with On* observers",
+				update.Id);
 		}
 	}
 
@@ -728,17 +770,38 @@ public sealed class TelegramRouter : IUpdateRouter
 
 	/// <summary>
 	/// Merges On* arrays across assemblies and re-sorts by fully-qualified metadata name so order
-	/// is deterministic regardless of contribution registration order (D9/N3).
+	/// is deterministic regardless of contribution registration order (D9/N3). Fails fast when one
+	/// assembly contributes the same observer twice (double registration would fan out twice); two
+	/// assemblies may legitimately declare distinct handlers that share a display name, so only the
+	/// same-assembly case is a duplicate.
 	/// </summary>
 	private static OnHandlerEntry[] ComposeOnHandlers(
 		IEnumerable<TelegramRouteContribution> contributions,
-		Func<TelegramRouteContribution, IReadOnlyList<OnHandlerEntry>> selector) =>
-		[
-			..
-			contributions
-				.SelectMany(selector)
-				.OrderBy(static e => e.HandlerFullyQualifiedName, StringComparer.Ordinal),
-		];
+		Func<TelegramRouteContribution, IReadOnlyList<OnHandlerEntry>> selector,
+		string kind)
+	{
+		var entries = new List<OnHandlerEntry>();
+		var seen = new HashSet<(string Assembly, string Handler)>();
+
+		foreach (var contribution in contributions)
+		{
+			foreach (var entry in selector(contribution))
+			{
+				if (!seen.Add((contribution.AssemblyName, entry.HandlerFullyQualifiedName)))
+				{
+					throw new InvalidOperationException(
+						$"Assembly '{contribution.AssemblyName}' contributed {kind} observer "
+						+ $"'{entry.HandlerFullyQualifiedName}' more than once. "
+						+ $"Call Add{contribution.AssemblyName}Telegram() exactly once "
+						+ "(a library that already calls it must not be re-registered by the app).");
+				}
+
+				entries.Add(entry);
+			}
+		}
+
+		return [.. entries.OrderBy(static e => e.HandlerFullyQualifiedName, StringComparer.Ordinal)];
+	}
 
 	private readonly record struct RouteEntry(string RouteKey, RouteBinder Binder);
 
