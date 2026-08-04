@@ -23,7 +23,7 @@ many of its design principles and philosophies.
 
 #### Examples
 
-* [Vexel.Telegram.Sample](./samples/Vexel.Telegram.Sample)
+* [Vexel.Telegram.Sample](./samples/Vexel.Telegram.Sample) - on `v2` this is the Immediate.Handlers rewrite (see the sample README). The v1 sample lived here on `master`.
 
 ## Installing Vexel.Telegram
 

@@ -28,14 +28,26 @@ internal static class GeneratorTestHelper
 	public static GeneratorDriverRunResult RunGenerators(
 		string source,
 		string assemblyName,
+		out Compilation compilation) =>
+		RunGenerators([source], assemblyName, out compilation);
+
+	/// <summary>
+	/// Multi-file overload, so a real bot project split across several files (the sample) can be
+	/// compiled the way its own csproj compiles it.
+	/// </summary>
+	public static GeneratorDriverRunResult RunGenerators(
+		IReadOnlyList<string> sources,
+		string assemblyName,
 		out Compilation compilation)
 	{
 		var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
-		var syntaxTree = CSharpSyntaxTree.ParseText(source, parseOptions);
+		var syntaxTrees = sources
+			.Select(s => CSharpSyntaxTree.ParseText(s, parseOptions))
+			.ToArray();
 
 		var inputCompilation = CSharpCompilation.Create(
 			assemblyName: assemblyName,
-			syntaxTrees: [syntaxTree],
+			syntaxTrees: syntaxTrees,
 			references: GetReferences(),
 			options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
@@ -80,9 +92,16 @@ internal static class GeneratorTestHelper
 	/// Compiles <paramref name="source"/> plus everything both generators emitted into a real
 	/// assembly and loads it, the way a bot author's own project ships to production.
 	/// </summary>
-	public static Assembly EmitBotAssembly(string source, string assemblyName, out string generatedRoutes)
+	public static Assembly EmitBotAssembly(string source, string assemblyName, out string generatedRoutes) =>
+		EmitBotAssembly([source], assemblyName, out generatedRoutes);
+
+	/// <summary>Multi-file overload of <see cref="EmitBotAssembly(string, string, out string)"/>.</summary>
+	public static Assembly EmitBotAssembly(
+		IReadOnlyList<string> sources,
+		string assemblyName,
+		out string generatedRoutes)
 	{
-		var result = RunGenerators(source, assemblyName, out var compilation);
+		var result = RunGenerators(sources, assemblyName, out var compilation);
 		generatedRoutes = GetVexelGeneratedSource(result);
 
 		using var peStream = new MemoryStream();

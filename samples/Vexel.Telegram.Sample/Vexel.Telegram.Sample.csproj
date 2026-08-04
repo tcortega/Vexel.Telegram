@@ -1,19 +1,36 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
-		<TargetFramework>net9.0</TargetFramework>
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Nullable>enable</Nullable>
+		<!-- Exe sample: single TFM. Clear the multi-TFM list inherited from Directory.Build.props. -->
+		<TargetFrameworks></TargetFrameworks>
+		<TargetFramework>net10.0</TargetFramework>
+		<IsPackable>false</IsPackable>
+		<GenerateDocumentationFile>false</GenerateDocumentationFile>
+		<!-- Stable id so `dotnet user-secrets set BotToken ...` works from this project. -->
+		<UserSecretsId>vexel-telegram-sample-v2</UserSecretsId>
+		<RootNamespace>Vexel.Telegram.Sample</RootNamespace>
+		<!-- Sample is the living docs; keep noise down without relaxing nullability. -->
+		<!-- IDE0060: handler signatures keep unused Command/token params on purpose (Immediate shape). -->
+		<NoWarn>$(NoWarn);CS1591;CA1707;CA1848;IDE0005;IDE0060;MA0004</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.Hosting"/>
+		<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets"/>
+		<!-- Explicit peer (Immediate.Apis honesty). Also flows transitively from Handlers. -->
+		<PackageReference Include="Immediate.Handlers"/>
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\src\Vexel.Telegram.Interactivity\Vexel.Telegram.Interactivity.csproj"/>
 		<ProjectReference Include="..\..\src\Vexel.Telegram\Vexel.Telegram.csproj"/>
+		<!--
+			ProjectReference analyzers do not flow transitively. Consumers of the Handlers *package*
+			get the generator from the nupkg (T15). In this monorepo sample we reference it directly.
+		-->
+		<ProjectReference Include="..\..\src\Vexel.Telegram.Generators\Vexel.Telegram.Generators.csproj"
+		                  ReferenceOutputAssembly="false"
+		                  OutputItemType="Analyzer"/>
 	</ItemGroup>
 
 </Project>

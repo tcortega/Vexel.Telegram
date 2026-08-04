@@ -18,6 +18,7 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 	private readonly List<(int Id, string Json)> _queue = [];
 	private readonly List<string> _requests = [];
 	private readonly List<string> _outboundCalls = [];
+	private readonly List<(string Method, string Body)> _outboundRequests = [];
 	private readonly Lock _gate = new();
 	private readonly Action<string>? _trace;
 	private Task? _acceptLoop;
@@ -60,6 +61,21 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 			lock (_gate)
 			{
 				return [.. _outboundCalls];
+			}
+		}
+	}
+
+	/// <summary>
+	/// The same bot-initiated calls as <see cref="OutboundCalls"/>, with the raw request body kept,
+	/// so a caller can render exactly what the Telegram client would show the user.
+	/// </summary>
+	public IReadOnlyList<(string Method, string Body)> OutboundRequests
+	{
+		get
+		{
+			lock (_gate)
+			{
+				return [.. _outboundRequests];
 			}
 		}
 	}
@@ -328,6 +344,7 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 		lock (_gate)
 		{
 			_outboundCalls.Add(Describe(method, request));
+			_outboundRequests.Add((method, body));
 		}
 
 		_trace?.Invoke($"telegram-api  <- bot calls {Describe(method, request)}");
