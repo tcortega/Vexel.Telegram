@@ -27,6 +27,9 @@ public sealed class UpdateDispatcher(
 		// singleton nor shared concurrently across lanes.
 		await using var scope = scopeFactory.CreateAsyncScope();
 
+		// Bind write-once update context (and later Feedback defaults) before any handler resolves.
+		InitializeScope(scope.ServiceProvider, update);
+
 		// Routed handler + On* fan-out land in later slices; raw always runs last and cannot suppress routing.
 		foreach (var handlerType in registry.HandlerTypes)
 		{
@@ -61,6 +64,41 @@ public sealed class UpdateDispatcher(
 
 			cancellationToken.ThrowIfCancellationRequested();
 			await InvokeHandlerAsync(handler, update, cancellationToken).ConfigureAwait(false);
+		}
+	}
+
+	private void InitializeScope(IServiceProvider provider, Update update)
+	{
+		IUpdateScopeInitializer[] initializers;
+		try
+		{
+			initializers = [.. provider.GetServices<IUpdateScopeInitializer>()];
+		}
+		catch (Exception ex)
+		{
+			logger.LogError(
+				ex,
+				"Failed to resolve update scope initializers for update {UpdateId}",
+				update.Id);
+			return;
+		}
+
+		foreach (var initializer in initializers)
+		{
+			try
+			{
+				initializer.Initialize(update);
+			}
+			catch (Exception ex)
+			{
+				// Context binding failure is fatal for this update: handlers would see a half-bound scope.
+				logger.LogError(
+					ex,
+					"Update scope initializer {InitializerType} failed for update {UpdateId}",
+					initializer.GetType().FullName,
+					update.Id);
+				throw;
+			}
 		}
 	}
 
