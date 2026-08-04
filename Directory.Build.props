@@ -11,11 +11,11 @@
 
 		<Nullable>enable</Nullable>
 		<WarningsAsErrors>$(WarningsAsErrors);nullable;</WarningsAsErrors>
-		<NoWarn>IDE0130</NoWarn>
+		<NoWarn>IDE0130;IDE0370</NoWarn>
 
 		<ImplicitUsings>enable</ImplicitUsings>
 
-		<AnalysisLevel>latest-all</AnalysisLevel>
+		<AnalysisLevel>9-all</AnalysisLevel>
 		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
