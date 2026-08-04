@@ -320,6 +320,7 @@ Mitigations for dual-attr DX:
 19. Hosting: **polling default**, webhook supported.
 20. Packages (V2.0): **Client + Handlers(+embedded generators/analyzers) + Hosting**. Merge/skip separate Abstractions/Extensions packages initially; builders live with Handlers or Client. Metapackage optional at publish time.
 21. TFMs: **same as Immediate.Handlers** (`net8.0;net9.0;net10.0;net11.0`). Depend on **latest stable Telegram.Bot** at implement time.
+22. Callback data: **short stable route id**; multi-step/large state in store/draft. Analyzer for 64B cap. Optional tiny suffix when needed.
 
 
 
