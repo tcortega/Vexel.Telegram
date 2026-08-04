@@ -1,7 +1,7 @@
 # Vexel.Telegram v2 sample bot
 
 Living docs for the v2 surface.
-Every routed type carries dual attributes (`[Handler]` + a Vexel route or `[On*]` attribute).
+Every routed type carries dual attributes (`[Handler]` + a Vexel route or `[On*]` attribute); pure flow steps are the one exception and carry `[Handler]` alone (`Handlers/SignupFlow.cs`).
 Composition is the three-call pattern - nothing is hidden behind `AddTelegramBot`.
 
 ## What it demonstrates
@@ -68,7 +68,8 @@ Type the answer without a leading slash, or `/cancel` and restart.
 
 ## Test DC / E2E
 
-This sample is meant to run by hand against a normal bot token today.
+Against a real bot token this sample is meant to be driven by hand today.
+Its handler files are also compiled and driven as a whole session by `tests/Vexel.Telegram.Tests/EndToEnd/SampleBotEndToEndTests.cs` against an in-process fake Bot API, so the surfaces listed above stay honest.
 A real Telegram test-DC E2E harness (shared secrets, `useTestEnvironment`, WTelegram user client) is **T12a** and needs captain-provisioned secrets - not part of this sample's run loop yet.
 When that lands, this bot is the fixture the suite drives.
 
