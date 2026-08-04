@@ -5,7 +5,7 @@ Not a frozen API contract.
 Items below are labeled `agreed`, `proposed`, or `open`.
 Do not treat proposed items as authorization to implement product code.
 
-Last updated: 2026-08-04 (decision log through 32; T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, and T5 `[Callback]` + keyboard helpers landed)
+Last updated: 2026-08-05 (decision log through 32; T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, and T7 `[InlineQuery]` / `[ChosenInlineResult]` routing landed)
 Branch: `v2` (created to hold this context and future V2 work)
 Repo stays public. Private-repo idea was rejected.
 
@@ -90,6 +90,8 @@ Contrast:
 `InteractionIdHelper.CreateInlineQueryId` exists, but that does not fix inbound routing of user-typed inline input.
 
 Fixed in V2 only; no parallel master hotfix (decision 25).
+Landed in T7: `InlineQueryKeyExtractor` + `TelegramRouter` route on query text alone; `InlineQuery.Id` is
+never a routing input.
 
 ---
 
@@ -155,7 +157,7 @@ Current build-level details live in `AGENTS.md`; the solution and csproj files a
 
 App references: `Vexel.Telegram` + `Immediate.Handlers` as an **explicit peer** (same honesty as Apis).
 
-### Runtime flow - **command + callback legs settled in T3/T5**
+### Runtime flow - **command, callback, and inline legs settled in T3/T5/T7**
 
 ```
 Update
@@ -166,16 +168,16 @@ Update
          resolve generated Immediate handler
          await HandleAsync
     -> raw IRawUpdateHandler escape hatches (always last; cannot suppress routing)
-    -> IUpdateCompletionHook (B4: default answerCallbackQuery if Feedback did not answer;
-                              the answerInlineQuery leg is planned with the inline leg in T7)
+    -> IUpdateCompletionHook (B4: default answerCallbackQuery / empty answerInlineQuery
+                              if Feedback did not answer)
 ```
 
 Hot path: compile-time map, no reflection invoke.
 
-`[Command]` and `[Callback]` legs exist today: `IUpdateRouter` is the dispatcher seam, `TelegramRouter`
-the runtime implementation. Inline / chosen-result legs are still proposed.
+`[Command]`, `[Callback]`, `[InlineQuery]`, and `[ChosenInlineResult]` legs exist today: `IUpdateRouter`
+is the dispatcher seam, `TelegramRouter` the runtime implementation.
 Binding conventions live in the code that implements them -
-`CommandKeyExtractor`, `CommandArgumentBinder`, `CallbackKeyExtractor` in
+`CommandKeyExtractor`, `CommandArgumentBinder`, `CallbackKeyExtractor`, `InlineQueryKeyExtractor` in
 `src/Vexel.Telegram.Handlers/Routing` - not restated here.
 Keyboard builders emit short `key` / `key|suffix` callback data (`Keyboards/`).
 
@@ -252,9 +254,9 @@ builder.Services.AddXxxTelegram();                      // Vexel generated route
 
 **Settled in T4:** `AddTelegramBot(...)` ships (with `AddVexelUpdateContexts()` as the contexts-only
 seam for manual wiring).
-**Settled in T3/T5:** the generator emits `Add{Assembly}Telegram()`, which registers that assembly's
+**Settled in T3/T5/T7:** the generator emits `Add{Assembly}Telegram()`, which registers that assembly's
 `TelegramRouteContribution`; `TelegramRouter` composes all contributions and fails fast on duplicate
-route keys (command or callback) across assemblies.
+route keys (command, callback, inline query, or chosen inline result) across assemblies.
 
 ### Escape hatch
 
@@ -395,7 +397,7 @@ Not a substitute for unit tests. Not prod userbots.
 ### Open questions
 
 None tracked here.
-The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers landed).
+The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, T7 `[InlineQuery]` / `[ChosenInlineResult]` routing landed).
 
 
 ---

@@ -35,7 +35,8 @@ public sealed class InlineRouterTests
 				seenRoute = "search";
 				seenPayload = payload;
 				return ValueTask.FromResult(true);
-			}),
+			}
+		),
 			("", (scope, payload, ct) =>
 			{
 				_ = scope;
@@ -43,7 +44,8 @@ public sealed class InlineRouterTests
 				seenRoute = "default";
 				seenPayload = payload;
 				return ValueTask.FromResult(true);
-			}));
+			}
+		));
 
 		await UsingPipelineAsync(
 			[contribution],
@@ -76,13 +78,15 @@ public sealed class InlineRouterTests
 			{
 				triggerInvoked.Value = true;
 				return ValueTask.FromResult(true);
-			}),
+			}
+		),
 			("", (_, payload, _) =>
 			{
 				defaultInvoked.Value = true;
 				seenPayload = payload;
 				return ValueTask.FromResult(true);
-			}));
+			}
+		));
 
 		await UsingPipelineAsync(
 			[contribution],
@@ -109,12 +113,14 @@ public sealed class InlineRouterTests
 			{
 				seen = payload;
 				return ValueTask.FromResult(true);
-			}),
+			}
+		),
 			("", (_, payload, _) =>
 			{
 				seen = "default:" + payload;
 				return ValueTask.FromResult(true);
-			}));
+			}
+		));
 
 		var update = InlineUpdate(query: "hello", inlineQueryId: "999001");
 		await UsingPipelineAsync(
@@ -163,7 +169,8 @@ public sealed class InlineRouterTests
 					cacheTime: 30,
 					cancellationToken: ct);
 				throw new InvalidOperationException("after answer");
-			}));
+			}
+		));
 
 		var update = InlineUpdate("flip");
 		await UsingPipelineAsync(
@@ -189,7 +196,8 @@ public sealed class InlineRouterTests
 			{
 				invoked.Value = true;
 				return ValueTask.FromResult(true);
-			}));
+			}
+		));
 
 		var update = InlineUpdate("unknown stuff");
 		await UsingPipelineAsync(
@@ -215,7 +223,8 @@ public sealed class InlineRouterTests
 			{
 				await scope.GetRequiredService<Feedback>().AnswerInlineAsync([], cacheTime: 5, cancellationToken: ct);
 				return true;
-			}));
+			}
+		));
 
 		var update = InlineUpdate("ok");
 		await UsingPipelineAsync(
