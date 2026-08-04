@@ -138,6 +138,19 @@ internal static class SymbolExtensions
 		return false;
 	}
 
+	public static AttributeData? GetHandlerAttribute(this INamedTypeSymbol type)
+	{
+		foreach (var attribute in type.GetAttributes())
+		{
+			if (attribute.AttributeClass.IsHandlerAttribute())
+			{
+				return attribute;
+			}
+		}
+
+		return null;
+	}
+
 	public static AttributeData? GetCommandAttribute(this INamedTypeSymbol type)
 	{
 		foreach (var attribute in type.GetAttributes())

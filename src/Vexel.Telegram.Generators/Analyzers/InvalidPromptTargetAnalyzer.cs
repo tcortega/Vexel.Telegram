@@ -163,7 +163,17 @@ public sealed class InvalidPromptTargetAnalyzer : DiagnosticAnalyzer
 	/// <summary>
 	/// Resolves whether a request type is registered as a flow step. The idiomatic shape nests the
 	/// request inside its handler, so the containing type is checked first; only when that fails is
-	/// the compilation scanned (once) for a <c>[Handler]</c> that declares this request.
+	/// the source assembly scanned (once) for a <c>[Handler]</c> that declares this request.
+	/// <para>
+	/// Requests declared in referenced assemblies are always accepted. A referenced library can
+	/// contribute flow steps through its generated <c>Add{Assembly}Telegram()</c>, but its handlers'
+	/// <c>HandleAsync</c> is private and metadata is imported with
+	/// <see cref="MetadataImportOptions.Public"/>, so the request shape simply cannot be inspected
+	/// across an assembly boundary. Reporting an error there would be an unprovable negative;
+	/// <c>Flow.PromptAsync</c> validates the composed step map at runtime instead. A request declared
+	/// in this compilation cannot have its handler in a referenced assembly (that assembly would have
+	/// to reference this one), so restricting reports to source requests loses no real coverage.
+	/// </para>
 	/// </summary>
 	private sealed class FlowStepIndex(Compilation compilation)
 	{
@@ -174,6 +184,11 @@ public sealed class InvalidPromptTargetAnalyzer : DiagnosticAnalyzer
 		public bool IsRegisteredStepRequest(INamedTypeSymbol requestType, out string? error)
 		{
 			error = null;
+
+			if (!SymbolEqualityComparer.Default.Equals(requestType.ContainingAssembly, compilation.Assembly))
+			{
+				return true;
+			}
 
 			if (requestType.ContainingType is { } handler && handler.HasHandlerAttribute())
 			{

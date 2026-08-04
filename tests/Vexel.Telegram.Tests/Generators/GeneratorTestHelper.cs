@@ -96,8 +96,19 @@ internal static class GeneratorTestHelper
 		return Assembly.Load(peStream.ToArray());
 	}
 
+	public static Task<ImmutableArray<Diagnostic>> RunAnalyzersAsync(
+		string source,
+		params DiagnosticAnalyzer[] analyzers) =>
+		RunAnalyzersAsync(source, [], analyzers);
+
+	/// <summary>
+	/// Runs <paramref name="analyzers"/> over <paramref name="source"/> compiled against
+	/// <paramref name="extraReferences"/>, so a rule that has to reason across assembly boundaries
+	/// can be exercised the way a bot that consumes a handler library really compiles.
+	/// </summary>
 	public static async Task<ImmutableArray<Diagnostic>> RunAnalyzersAsync(
 		string source,
+		MetadataReference[] extraReferences,
 		params DiagnosticAnalyzer[] analyzers)
 	{
 		var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -106,7 +117,7 @@ internal static class GeneratorTestHelper
 		var compilation = CSharpCompilation.Create(
 			assemblyName: "AnalyzerTests",
 			syntaxTrees: [syntaxTree],
-			references: GetReferences(),
+			references: [.. GetReferences(), .. extraReferences],
 			options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
 		// An analyzer test whose own source does not compile proves nothing about the API under test,
@@ -120,6 +131,30 @@ internal static class GeneratorTestHelper
 
 		var withAnalyzers = compilation.WithAnalyzers([.. analyzers]);
 		return await withAnalyzers.GetAnalyzerDiagnosticsAsync();
+	}
+
+	/// <summary>
+	/// Compiles <paramref name="source"/> into a real assembly and hands back a metadata reference to
+	/// it, so analyzer tests can consume handlers the way a referenced handler library ships them.
+	/// </summary>
+	public static MetadataReference CompileLibraryReference(string source, string assemblyName)
+	{
+		var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+		var compilation = CSharpCompilation.Create(
+			assemblyName: assemblyName,
+			syntaxTrees: [CSharpSyntaxTree.ParseText(source, parseOptions)],
+			references: GetReferences(),
+			options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+		using var peStream = new MemoryStream();
+		var emit = compilation.Emit(peStream);
+		Assert.True(
+			emit.Success,
+			string.Join(
+				Environment.NewLine,
+				emit.Diagnostics.Where(static d => d.Severity is DiagnosticSeverity.Error)));
+
+		return MetadataReference.CreateFromImage(peStream.ToArray());
 	}
 
 	public static string GetVexelGeneratedSource(GeneratorDriverRunResult result)

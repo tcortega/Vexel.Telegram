@@ -32,8 +32,9 @@ public sealed class TelegramRouteContribution
 	/// Must already use an ordinal comparer.
 	/// </param>
 	/// <param name="flowSteps">
-	/// Flow step-key (<see cref="Type.FullName"/> of the handler type, ordinal) to binder map.
-	/// Must already use an ordinal comparer.
+	/// Flow step-key to binder map. The key is the <see cref="Type.FullName"/> of the handler's
+	/// <em>request</em> type, not of the handler class - a nested request renders as
+	/// <c>Demo.CollectName+Command</c>. Must already use an ordinal comparer.
 	/// </param>
 	public TelegramRouteContribution(
 		string assemblyName,
@@ -75,6 +76,6 @@ public sealed class TelegramRouteContribution
 	/// <summary>Chosen-inline-result route map for this assembly.</summary>
 	public IReadOnlyDictionary<string, RouteBinder> ChosenInlineResults { get; }
 
-	/// <summary>Flow step map for this assembly (handler <see cref="Type.FullName"/> → binder).</summary>
+	/// <summary>Flow step map for this assembly (request <see cref="Type.FullName"/> → binder).</summary>
 	public IReadOnlyDictionary<string, RouteBinder> FlowSteps { get; }
 }

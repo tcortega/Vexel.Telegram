@@ -251,6 +251,72 @@ public sealed class AnalyzerTests
 	}
 
 	[Fact]
+	public async Task VEX0005_fires_when_two_handlers_share_a_flow_request()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+
+			namespace Demo;
+
+			public sealed record Confirm;
+
+			[Handler]
+			public static class ConfirmDelete
+			{
+				private static ValueTask HandleAsync(Confirm request, CancellationToken token) => default;
+			}
+
+			[Handler]
+			public static class ConfirmExport
+			{
+				private static ValueTask HandleAsync(Confirm request, CancellationToken token) => default;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new DuplicateRouteKeyAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0005");
+	}
+
+	[Fact]
+	public async Task VEX0005_does_not_fire_on_distinct_flow_requests()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+
+			namespace Demo;
+
+			[Handler]
+			public static class CollectName
+			{
+				public sealed record Command(string Name);
+
+				private static ValueTask HandleAsync(Command request, CancellationToken token) => default;
+			}
+
+			[Handler]
+			public static class CollectAge
+			{
+				public sealed record Command(string Age);
+
+				private static ValueTask HandleAsync(Command request, CancellationToken token) => default;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new DuplicateRouteKeyAnalyzer());
+
+		Assert.DoesNotContain(diagnostics, static d => d.Id == "VEX0005");
+	}
+
+	[Fact]
 	public async Task VEX0004_fires_on_unbindable_callback_request()
 	{
 		const string source = """
@@ -611,6 +677,48 @@ public sealed class AnalyzerTests
 
 		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
 			source,
+			new InvalidPromptTargetAnalyzer());
+
+		Assert.DoesNotContain(diagnostics, static d => d.Id == "VEX0007");
+	}
+
+	[Fact]
+	public async Task VEX0007_does_not_fire_on_non_nested_request_from_a_referenced_library()
+	{
+		const string library = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+
+			namespace SharedLib;
+
+			public sealed record AskEmail(string Email);
+
+			[Handler]
+			public static class CollectEmail
+			{
+				private static ValueTask HandleAsync(AskEmail request, CancellationToken token) => default;
+			}
+			""";
+
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using SharedLib;
+			using Vexel.Telegram.Handlers;
+
+			namespace Demo;
+
+			public static class Use
+			{
+				public static ValueTask Go(Flow flow, CancellationToken token) =>
+					flow.PromptAsync<AskEmail>(cancellationToken: token);
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			[GeneratorTestHelper.CompileLibraryReference(library, "SharedLib")],
 			new InvalidPromptTargetAnalyzer());
 
 		Assert.DoesNotContain(diagnostics, static d => d.Id == "VEX0007");

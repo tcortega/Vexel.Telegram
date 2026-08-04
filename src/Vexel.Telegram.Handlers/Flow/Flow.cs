@@ -149,7 +149,7 @@ public sealed class Flow
 		var (chatId, userId) = RequireChatUser();
 		var entry = await _store.GetAsync(chatId, userId, cancellationToken).ConfigureAwait(false)
 			?? throw new InvalidOperationException(
-				"Cannot set a flow draft without an armed step. Call PromptAsync<TNext> first.");
+				"Cannot set a flow draft without an armed step. Call PromptAsync<TRequest> first.");
 
 		var json = JsonSerializer.Serialize(draft, s_serializerOptions);
 		var updated = entry with { DraftJson = json };

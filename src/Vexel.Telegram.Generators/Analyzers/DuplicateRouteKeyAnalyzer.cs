@@ -28,6 +28,7 @@ public sealed class DuplicateRouteKeyAnalyzer : DiagnosticAnalyzer
 			var callbacks = new ConcurrentDictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
 			var inlineQueries = new ConcurrentDictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
 			var chosenInlineResults = new ConcurrentDictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
+			var flowSteps = new ConcurrentDictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
 
 			startContext.RegisterSymbolAction(
 				actionContext =>
@@ -36,6 +37,7 @@ public sealed class DuplicateRouteKeyAnalyzer : DiagnosticAnalyzer
 					AnalyzeCallback(actionContext, callbacks);
 					AnalyzeInlineQuery(actionContext, inlineQueries);
 					AnalyzeChosenInlineResult(actionContext, chosenInlineResults);
+					AnalyzeFlowStep(actionContext, flowSteps);
 				},
 				SymbolKind.NamedType);
 
@@ -47,6 +49,7 @@ public sealed class DuplicateRouteKeyAnalyzer : DiagnosticAnalyzer
 				_ = callbacks;
 				_ = inlineQueries;
 				_ = chosenInlineResults;
+				_ = flowSteps;
 			});
 		});
 	}
@@ -154,16 +157,46 @@ public sealed class DuplicateRouteKeyAnalyzer : DiagnosticAnalyzer
 		ReportIfDuplicate(context, chosenInlineResults, key, type, attribute, kind: "chosen inline result");
 	}
 
+	/// <summary>
+	/// Flow steps are keyed on the request type's metadata name, not on a route attribute, so two
+	/// handlers sharing one request type would silently collapse into a single generated map entry.
+	/// </summary>
+	private static void AnalyzeFlowStep(
+		SymbolAnalysisContext context,
+		ConcurrentDictionary<string, INamedTypeSymbol> flowSteps)
+	{
+		// Mirrors RouteGenerator.TransformHandler: only top-level [Handler] types become flow steps.
+		if (context.Symbol is not INamedTypeSymbol { ContainingType: null } type
+			|| !type.HasHandlerAttribute())
+		{
+			return;
+		}
+
+		if (!RouteGenerator.TryGetBindableFlowRequest(type, out var requestType, out _, out var error)
+			|| error is not null)
+		{
+			return;
+		}
+
+		ReportIfDuplicate(
+			context,
+			flowSteps,
+			requestType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+			type,
+			type.GetHandlerAttribute(),
+			kind: "flow step");
+	}
+
 	private static void ReportIfDuplicate(
 		SymbolAnalysisContext context,
 		ConcurrentDictionary<string, INamedTypeSymbol> map,
 		string key,
 		INamedTypeSymbol type,
-		AttributeData attribute,
+		AttributeData? attribute,
 		string kind,
 		string? displayKey = null)
 	{
-		var location = attribute.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken).GetLocation()
+		var location = attribute?.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken).GetLocation()
 			?? type.Locations.FirstOrDefault();
 
 		if (map.TryAdd(key, type))
