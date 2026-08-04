@@ -280,6 +280,55 @@ public sealed class UpdateSchedulerTests
 	}
 
 	[Fact]
+	public async Task Per_chat_order_holds_under_interleaved_multi_chat_schedule()
+	{
+		// Property-minded: for every chat, completion order equals schedule order even when
+		// many chats are interleaved and handlers yield.
+		var perChat = new ConcurrentDictionary<long, ConcurrentQueue<int>>();
+		var dispatcher = new ScriptedDispatcher(async (update, ct) =>
+		{
+			_ = ct;
+			await Task.Yield();
+			var chatId = update.Message!.Chat.Id;
+			var queue = perChat.GetOrAdd(chatId, static _ => new ConcurrentQueue<int>());
+			queue.Enqueue(update.Id);
+		});
+
+		await using var scheduler = CreateScheduler(dispatcher);
+
+		const int chats = 8;
+		const int perChatCount = 12;
+		var expected = new Dictionary<long, List<int>>();
+		var id = 1;
+		for (var n = 0; n < perChatCount; n++)
+		{
+			for (var chat = 1; chat <= chats; chat++)
+			{
+				var chatId = (long)chat;
+				if (!expected.TryGetValue(chatId, out var list))
+				{
+					list = [];
+					expected[chatId] = list;
+				}
+
+				list.Add(id);
+				await scheduler.ScheduleAsync(MessageUpdate(id, chatId), CancellationToken.None);
+				id++;
+			}
+		}
+
+		await WaitForAsync(() =>
+			perChat.Count == chats
+			&& perChat.Values.All(static q => q.Count == perChatCount)
+			&& scheduler.ActiveLaneCount == 0);
+
+		foreach (var (chatId, expectedIds) in expected)
+		{
+			Assert.Equal(expectedIds, [.. perChat[chatId]]);
+		}
+	}
+
+	[Fact]
 	public async Task Dispatcher_IsolatesRawHandlerFaults()
 	{
 		var goodRan = false;

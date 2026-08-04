@@ -297,6 +297,173 @@ public sealed class FlowRouterTests
 		Assert.Equal("photo note", seen);
 	}
 
+	[Fact]
+	public async Task Stale_step_key_clears_state_without_invoking_handler()
+	{
+		var invoked = false;
+		var store = new MemoryFlowStore();
+		await store.SetAsync(
+			7,
+			9,
+			new FlowEntry("Demo.Missing+Command", DraftJson: null, DateTimeOffset.UtcNow.AddMinutes(15)));
+
+		await using var provider = BuildProvider(store, out var router, FlowContribution(
+			StepKey,
+			(_, _, _) =>
+			{
+				invoked = true;
+				return ValueTask.FromResult(true);
+			}));
+
+		using var scope = provider.CreateScope();
+		var update = TextUpdate("hello");
+		BindMessage(scope.ServiceProvider, update);
+		await router.RouteAsync(update, scope.ServiceProvider, CancellationToken.None);
+
+		Assert.False(invoked);
+		Assert.Null(await store.GetAsync(7, 9));
+	}
+
+	[Fact]
+	public async Task Success_with_cancel_inside_step_does_not_rearm()
+	{
+		var store = new MemoryFlowStore();
+		await store.SetAsync(7, 9, new FlowEntry(StepKey, DraftJson: null, DateTimeOffset.UtcNow.AddMinutes(15)));
+
+		await using var provider = BuildProvider(store, out var router, FlowContribution(
+			StepKey,
+			async (scope, _, ct) =>
+			{
+				await scope.GetRequiredService<Flow>().CancelAsync(ct);
+				return true;
+			}));
+
+		using var scope = provider.CreateScope();
+		var update = TextUpdate("bye");
+		BindMessage(scope.ServiceProvider, update);
+		await router.RouteAsync(update, scope.ServiceProvider, CancellationToken.None);
+
+		// CancelAsync already cleared; auto-complete path must not resurrect state.
+		Assert.Null(await store.GetAsync(7, 9));
+	}
+
+	[Fact]
+	public async Task Step_throw_can_opt_out_of_generic_error_reply()
+	{
+		var store = new MemoryFlowStore();
+		await store.SetAsync(7, 9, new FlowEntry(StepKey, DraftJson: null, DateTimeOffset.UtcNow.AddMinutes(15)));
+
+		var options = Options.Create(new FlowOptions { SendStepErrorReply = false });
+		await using var provider = BuildProvider(
+			store,
+			out var router,
+			FlowContribution(StepKey, static (_, _, _) => throw new InvalidOperationException("boom")),
+			out var bot,
+			options);
+
+		using var scope = provider.CreateScope();
+		var update = TextUpdate("bad");
+		BindMessage(scope.ServiceProvider, update);
+		await router.RouteAsync(update, scope.ServiceProvider, CancellationToken.None);
+
+		Assert.NotNull(await store.GetAsync(7, 9));
+		Assert.Empty(bot.OfType<SendMessageRequest>());
+	}
+
+	[Fact]
+	public async Task Flow_step_binding_failure_keeps_state_armed()
+	{
+		var store = new MemoryFlowStore();
+		await store.SetAsync(7, 9, new FlowEntry(StepKey, DraftJson: null, DateTimeOffset.UtcNow.AddMinutes(15)));
+
+		await using var provider = BuildProvider(store, out var router, FlowContribution(
+			StepKey,
+			static (_, _, _) => ValueTask.FromResult(false)));
+
+		using var scope = provider.CreateScope();
+		var update = TextUpdate("not-an-int");
+		BindMessage(scope.ServiceProvider, update);
+		await router.RouteAsync(update, scope.ServiceProvider, CancellationToken.None);
+
+		Assert.NotNull(await store.GetAsync(7, 9));
+	}
+
+	[Fact]
+	public async Task Message_without_From_skips_flow_step()
+	{
+		var invoked = false;
+		var store = new MemoryFlowStore();
+		await store.SetAsync(7, 9, new FlowEntry(StepKey, DraftJson: null, DateTimeOffset.UtcNow.AddMinutes(15)));
+
+		await using var provider = BuildProvider(store, out var router, FlowContribution(
+			StepKey,
+			(_, _, _) =>
+			{
+				invoked = true;
+				return ValueTask.FromResult(true);
+			}));
+
+		using var scope = provider.CreateScope();
+		var update = new Update
+		{
+			Id = 99,
+			Message = new Message
+			{
+				Id = 99,
+				Date = DateTime.UtcNow,
+				Chat = new Chat { Id = 7 },
+				// No From - channel-style or anonymous admin edge.
+				Text = "Alice",
+			},
+		};
+		BindMessage(scope.ServiceProvider, update);
+		await router.RouteAsync(update, scope.ServiceProvider, CancellationToken.None);
+
+		Assert.False(invoked);
+		Assert.NotNull(await store.GetAsync(7, 9));
+	}
+
+	[Fact]
+	public async Task Known_command_wins_over_armed_flow_step()
+	{
+		var stepInvoked = false;
+		var commandInvoked = false;
+		var store = new MemoryFlowStore();
+		await store.SetAsync(7, 9, new FlowEntry(StepKey, DraftJson: null, DateTimeOffset.UtcNow.AddMinutes(15)));
+
+		var contribution = new TelegramRouteContribution(
+			"TestAsm",
+			commands: new Dictionary<string, RouteBinder>(StringComparer.OrdinalIgnoreCase)
+			{
+				["ping"] = (_, _, _) =>
+				{
+					commandInvoked = true;
+					return ValueTask.FromResult(true);
+				},
+			},
+			commandMetadata: [],
+			flowSteps: new Dictionary<string, RouteBinder>(StringComparer.Ordinal)
+			{
+				[StepKey] = (_, _, _) =>
+				{
+					stepInvoked = true;
+					return ValueTask.FromResult(true);
+				},
+			});
+
+		await using var provider = BuildProvider(store, out var router, contribution);
+
+		using var scope = provider.CreateScope();
+		var update = CommandUpdate("/ping");
+		BindMessage(scope.ServiceProvider, update);
+		await router.RouteAsync(update, scope.ServiceProvider, CancellationToken.None);
+
+		Assert.True(commandInvoked);
+		Assert.False(stepInvoked);
+		// Command path does not auto-complete the armed flow.
+		Assert.NotNull(await store.GetAsync(7, 9));
+	}
+
 	/// <summary>Stands in for the next step's request type, whose FullName is the step key.</summary>
 	private sealed record CollectAgeRequest;
 
@@ -314,19 +481,25 @@ public sealed class FlowRouterTests
 		IFlowStore store,
 		out TelegramRouter router,
 		TelegramRouteContribution contribution) =>
-		BuildProvider(store, out router, contribution, out _);
+		BuildProvider(store, out router, contribution, out _, Options.Create(new FlowOptions()));
 
 	private static ServiceProvider BuildProvider(
 		IFlowStore store,
 		out TelegramRouter router,
 		TelegramRouteContribution contribution,
-		out RecordingTelegramBotClient bot)
+		out RecordingTelegramBotClient bot) =>
+		BuildProvider(store, out router, contribution, out bot, Options.Create(new FlowOptions()));
+
+	private static ServiceProvider BuildProvider(
+		IFlowStore store,
+		out TelegramRouter router,
+		TelegramRouteContribution contribution,
+		out RecordingTelegramBotClient bot,
+		IOptions<FlowOptions> options)
 	{
 		bot = new RecordingTelegramBotClient { Username = "TestBot" };
-		var options = Options.Create(new FlowOptions());
 		router = new TelegramRouter([contribution], bot, NullLogger<TelegramRouter>.Instance, options);
 
-		// Register next-step marker under its FullName when present in the contribution.
 		var services = new ServiceCollection();
 		_ = services.AddSingleton<ITelegramBotClient>(bot);
 		_ = services.AddSingleton(store);
