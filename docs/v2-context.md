@@ -310,6 +310,7 @@ Mitigations for dual-attr DX:
 9. This context file is committed so design chat can switch topics without losing research.
 10. Option B (Vexel-owned handler engine, single Telegram attr) is deferred; revisit only if dual-attr cost justifies it. Keep A→B migration door open via stable Vexel attrs and Immediate-compatible handler shape.
 11. Real-user E2E on Telegram **test DC** (user MTProto client + test bot), plus unit fakes in CI. Not prod server userbots.
+12. One handler type per route (Immediate style). No multi-method CommandGroup/InteractionGroup bags.
 
 ### Proposed (not fully approved)
 
@@ -353,7 +354,6 @@ Not a substitute for unit tests. Not prod userbots.
 
 1. Approve remaining architecture details as implementation charter, or keep grilling API names/binding first?
 2. Public type names: `[Command]` vs `[BotCommand]`, `[Callback]` vs `[CallbackButton]`, etc.?
-3. One handler type per route only (Immediate style), or any grouping sugar?
 4. Webhook vs polling configuration surface for hosting?
 5. Minimum TFMs / Telegram.Bot version floor for V2?
 6. Result type philosophy: `ValueTask`, exceptions, custom result, mix?
