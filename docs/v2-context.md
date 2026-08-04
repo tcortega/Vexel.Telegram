@@ -319,6 +319,7 @@ Mitigations for dual-attr DX:
 18. Concurrency: configurable; **default ordered per chat**, cross-chat parallel. Power can loosen.
 19. Hosting: **polling default**, webhook supported.
 20. Packages (V2.0): **Client + Handlers(+embedded generators/analyzers) + Hosting**. Merge/skip separate Abstractions/Extensions packages initially; builders live with Handlers or Client. Metapackage optional at publish time.
+21. TFMs: **same as Immediate.Handlers** (`net8.0;net9.0;net10.0;net11.0`). Depend on **latest stable Telegram.Bot** at implement time.
 
 
 
