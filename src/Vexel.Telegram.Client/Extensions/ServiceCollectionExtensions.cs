@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Telegram.Bot;
+using Vexel.Telegram.Client.Dispatch;
 
 namespace Vexel.Telegram.Client.Extensions;
 
@@ -10,7 +11,7 @@ namespace Vexel.Telegram.Client.Extensions;
 public static class ServiceCollectionExtensions
 {
 	/// <summary>
-	/// Adds the Vexel Telegram client shell and a configured <see cref="ITelegramBotClient"/>.
+	/// Adds the Vexel Telegram client, update scheduler, and a configured <see cref="ITelegramBotClient"/>.
 	/// </summary>
 	/// <param name="services">The service collection.</param>
 	/// <param name="tokenFactory">Factory that returns the bot token.</param>
@@ -27,6 +28,8 @@ public static class ServiceCollectionExtensions
 		_ = services.Configure(configureOptions ?? (static _ => { }));
 
 		services.TryAddSingleton<ITelegramBotClient>(sp => new TelegramBotClient(tokenFactory(sp)));
+		services.TryAddSingleton<IUpdateDispatcher, UpdateDispatcher>();
+		services.TryAddSingleton<UpdateScheduler>();
 		services.TryAddSingleton<VexelClient>();
 
 		return services;
