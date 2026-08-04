@@ -5,7 +5,7 @@ Not an approved spec.
 Decisions below are labeled `agreed`, `proposed`, or `open`.
 Do not treat proposed items as authorization to implement product code.
 
-Last updated: 2026-03-22 (option A locked: dual [Handler] + Telegram attrs)
+Last updated: 2026-03-22 (opt A + real-user E2E on Telegram test DC)
 Branch: `v2` (created to hold this context and future V2 work)
 Repo stays public. Private-repo idea was rejected.
 
@@ -309,6 +309,7 @@ Mitigations for dual-attr DX:
 8. DX remains first-class within option A: analyzers/code fix for missing `[Handler]`, samples as spec.
 9. This context file is committed so design chat can switch topics without losing research.
 10. Option B (Vexel-owned handler engine, single Telegram attr) is deferred; revisit only if dual-attr cost justifies it. Keep A→B migration door open via stable Vexel attrs and Immediate-compatible handler shape.
+11. Real-user E2E on Telegram **test DC** (user MTProto client + test bot), plus unit fakes in CI. Not prod server userbots.
 
 ### Proposed (not fully approved)
 
@@ -321,6 +322,32 @@ Mitigations for dual-attr DX:
 7. Whether `SetMyCommands` is generated from `[Command]` metadata automatically.
 8. Metapackage vs explicit package references guidance for production apps.
 9. Delivery cadence (skeleton -> gen -> sample -> delete dead v1 surface on branch).
+
+## 12. Test strategy - **agreed direction**
+
+Layers:
+
+1. Unit: fake bot client / in-mem updates (CI always).
+2. **Real-user E2E (primary integration path):** MTProto **user** client + Vexel **bot** on Telegram **test DCs** (not production).
+
+Test DC facts:
+
+- Separate env from prod (my.telegram.org / client test mode).
+- Test phones: `+99966XYYYY` (X=DC 1-3, YYYY=0000-9999); login code often DC digit repeated (e.g. DC2 → `22222`).
+- BotFather on test server → **separate** test bot token (prod token useless there).
+- C# user client candidate: **WTelegramClient** (`server_address` → test DC).
+- Bot side: normal Bot API against test-environment bot; long poll simplest for agents/CI.
+
+Harness shape (proposed detail, direction agreed):
+
+- Secrets: test `api_id`/`api_hash`, user session (or disposable test phone auth), test bot token, fixed test chat id.
+- Tests/scripts: user client sends commands/callbacks/inline as human; assert bot replies/edits.
+- CI: private runner or manual/nightly with secrets; never commit sessions.
+- Agents driving V2 work use this harness as the end-user path.
+
+Not a substitute for unit tests. Not prod userbots.
+
+---
 
 ### Open questions
 
