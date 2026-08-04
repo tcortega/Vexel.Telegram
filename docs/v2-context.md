@@ -1,11 +1,11 @@
 # Vexel.Telegram V2 - design context
 
-Status: working notes from captain design discussion.
-Not an approved spec.
-Decisions below are labeled `agreed`, `proposed`, or `open`.
+Status: design archaeology and decision log for V2, grown out of the captain design discussion.
+Not a frozen API contract.
+Items below are labeled `agreed`, `proposed`, or `open`.
 Do not treat proposed items as authorization to implement product code.
 
-Last updated: 2026-03-22 (opt A + real-user E2E on Telegram test DC)
+Last updated: 2026-08-04 (decision log through 32; T1 skeleton landed)
 Branch: `v2` (created to hold this context and future V2 work)
 Repo stays public. Private-repo idea was rejected.
 
@@ -89,7 +89,7 @@ Contrast:
 
 `InteractionIdHelper.CreateInlineQueryId` exists, but that does not fix inbound routing of user-typed inline input.
 
-V1 hotfix vs fix-only-in-V2 was discussed; leaning put energy into V2 unless a tiny master hotfix is explicitly wanted (**open**).
+Fixed in V2 only; no parallel master hotfix (decision 25).
 
 ---
 
@@ -139,18 +139,19 @@ Cross-generator note: a Vexel generator **cannot** emit `[Handler]` on a partial
 
 Vexel V2 = Immediate.Apis for Telegram: Immediate.Handlers for work units; Vexel for routes, binding, contexts, feedback, and bot host.
 
-### Package layout (proposed)
+### Package layout - **agreed** (decision 20), skeleton shipped in T1
 
 ```
-Vexel.Telegram                  metapackage (Client + Handlers/Telegram bits + Hosting)
-Vexel.Telegram.Abstractions     small shared contracts
+Vexel.Telegram                  metapackage (Client + Handlers + Hosting); IsPackable=false until publish decision
 Vexel.Telegram.Client           receive (poll/webhook), dispatch, concurrency
 Vexel.Telegram.Hosting          generic host integration
-Vexel.Telegram.Handlers         Telegram attributes, contexts, feedback, conversation helpers
+Vexel.Telegram.Handlers         Telegram attributes, contexts, feedback, conversation helpers, builders
 Vexel.Telegram.Generators       source generator + analyzers + code fixes
-                                  (shipped via Handlers package or sibling; app-project analyzer pattern)
-Vexel.Telegram.Extensions       builders; optional
+                                  (netstandard2.0; not published standalone, packed into Handlers)
 ```
+
+No separate `Abstractions` or `Extensions` package in V2.0.
+Current build-level details live in `AGENTS.md`; the solution and csproj files are authoritative.
 
 App references: `Vexel.Telegram` + `Immediate.Handlers` as an **explicit peer** (same honesty as Apis).
 
@@ -289,9 +290,9 @@ Mitigations for dual-attr DX:
 |-------|--------|------|
 | Keep repo public | **agreed** | Captain rejected private |
 | Long-lived `v2` branch | **agreed** | This branch; master remains v1 line |
-| NuGet: v1 from master, v2 major later | **proposed** | No publish plan locked |
-| Rewrite on `v2` rather than piecemeal master break | **proposed** | |
-| Tiny master inline hotfix in parallel | **open** | Optional; not required for V2 |
+| NuGet: v1 from master, v2 breaking major later | **agreed** | Decision 27; publish timing still open |
+| Rewrite on `v2` rather than piecemeal master break | **agreed** | Decision 26 |
+| Tiny master inline hotfix in parallel | **rejected** | Decision 25; effort goes to `v2` only |
 
 ---
 
@@ -337,14 +338,10 @@ Mitigations for dual-attr DX:
 
 ### Proposed (not fully approved)
 
-1. Exact package split and names above.
-2. Drop Remora.Commands entirely on `v2`.
-4. Feedback and context interface shapes.
-5. Callback payload format and size/analyzer rules.
-6. Concurrency defaults (what is ordered per chat vs parallel).
-7. Whether `SetMyCommands` is generated from `[Command]` metadata automatically.
-8. Metapackage vs explicit package references guidance for production apps.
-9. Delivery cadence (skeleton -> gen -> sample -> delete dead v1 surface on branch).
+1. Feedback and context interface shapes.
+2. Callback payload format and size/analyzer rules.
+3. Metapackage vs explicit package references guidance for production apps.
+4. Delivery cadence (skeleton -> gen -> sample -> delete dead v1 surface on branch).
 
 ## 12. Test strategy - **agreed direction**
 
@@ -374,7 +371,8 @@ Not a substitute for unit tests. Not prod userbots.
 
 ### Open questions
 
-5. Ready to freeze charter and run PlanScout?
+None tracked here.
+The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton landed).
 
 
 ---

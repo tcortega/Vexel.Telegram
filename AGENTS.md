@@ -11,6 +11,7 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 * Handlers references `Immediate.Handlers` as a normal PackageReference (no PrivateAssets) so consumers get it transitively.
 * Legacy v1 projects under `src/Vexel.Telegram.{Abstractions,Commands,Interactivity,Extensions}` and the old sample stay on disk as reference only until T14; they are out of the solution build.
 * Central package versions live in `Directory.Packages.props`. Microsoft.Extensions is on 10.0.x to satisfy Immediate.Handlers TFM floors.
+* `docs/v2-context.md` owns the v2 design decisions and decision log; check it before proposing API or architecture changes.
 
 ## Maintaining this file
 

@@ -24,7 +24,7 @@ public static class ServiceCollectionExtensions
 		ArgumentNullException.ThrowIfNull(services);
 		ArgumentNullException.ThrowIfNull(tokenFactory);
 
-		_ = services.Configure<VexelClientOptions>(configureOptions ?? (static _ => { }));
+		_ = services.Configure(configureOptions ?? (static _ => { }));
 
 		services.TryAddSingleton<ITelegramBotClient>(sp => new TelegramBotClient(tokenFactory(sp)));
 		services.TryAddSingleton<VexelClient>();
