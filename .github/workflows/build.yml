@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - 'master'
+      - 'v2'
+      - 'v2/**'
+      - 'fm/**'
     paths-ignore:
       - '**/*.md'
   pull_request:
@@ -24,9 +27,12 @@ jobs:
           dotnet-version: |
             8.0.x
             9.0.x
+            10.0.x
+            11.0.100-preview.6.26359.118
+          include-prerelease: true
 
       - name: Restore dependencies
         run: dotnet restore
-        
+
       - name: Build
         run: dotnet build -c Release --no-restore

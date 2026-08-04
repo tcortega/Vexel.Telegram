@@ -4,16 +4,35 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageVersion Include="Microsoft.Extensions.Hosting" Version="9.0.6"/>
-		<PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="9.0.6"/>
-		<PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.6"/>
-		<PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.6"/>
-		<PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.6"/>
+		<!-- Microsoft.Extensions (10.0.x satisfies Immediate.Handlers TFM floors incl. 10.0.9) -->
+		<PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.10"/>
+		<PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.10"/>
+		<PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.10"/>
+		<PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10"/>
+		<PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10"/>
+		<PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.10"/>
+
+		<!-- Telegram / handlers stack -->
+		<PackageVersion Include="Immediate.Handlers" Version="3.11.1"/>
+		<PackageVersion Include="Telegram.Bot" Version="22.10.2.1"/>
+		<PackageVersion Include="WTelegramClient" Version="4.4.7"/>
+
+		<!-- Generators / analyzers -->
+		<PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0"/>
+		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0"/>
+
+		<!-- Tests -->
+		<PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1"/>
+		<PackageVersion Include="xunit" Version="2.9.3"/>
+		<PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5"/>
+		<PackageVersion Include="Verify.Xunit" Version="30.4.0"/>
+		<PackageVersion Include="coverlet.collector" Version="6.0.4"/>
+
+		<!-- Kept until T14 deletes parked v1 projects -->
 		<PackageVersion Include="Remora.Extensions.Options.Immutable" Version="2.0.0"/>
 		<PackageVersion Include="Remora.Results" Version="8.0.0"/>
 		<PackageVersion Include="Remora.Results.Analyzers" Version="1.0.3" PrivateAssets="all"/>
 		<PackageVersion Include="Remora.Commands" Version="11.0.2"/>
-		<PackageVersion Include="Telegram.Bot" Version="22.5.1"/>
 		<PackageVersion Include="JetBrains.Annotations" Version="2024.3.0"/>
 		<PackageVersion Include="PolySharp" Version="1.15.0"/>
 		<PackageVersion Include="MinVer" Version="6.0.0"/>

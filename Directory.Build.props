@@ -6,7 +6,7 @@
 	</PropertyGroup>
 
 	<PropertyGroup>
-		<TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+		<TargetFrameworks>net8.0;net9.0;net10.0;net11.0</TargetFrameworks>
 		<LangVersion>latest</LangVersion>
 
 		<Nullable>enable</Nullable>
@@ -15,7 +15,8 @@
 
 		<ImplicitUsings>enable</ImplicitUsings>
 
-		<AnalysisLevel>latest-all</AnalysisLevel>
+		<!-- Pin explicitly so new SDK analyzer waves cannot break TreatWarningsAsErrors builds. -->
+		<AnalysisLevel>9-all</AnalysisLevel>
 		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -27,7 +28,7 @@
 
 	<PropertyGroup Label="Nuget">
 		<RepositoryUrl>https://github.com/tcortega/Vexel.Telegram</RepositoryUrl>
-		<RepositoryBranch>master</RepositoryBranch>
+		<RepositoryBranch>v2</RepositoryBranch>
 
 		<PackageProjectUrl>https://github.com/tcortega/Vexel.Telegram</PackageProjectUrl>
 		<PackageTags>vexel;telegram;bot;api;</PackageTags>
@@ -35,11 +36,10 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<None Include="..\..\images\icon.png" Pack="true" PackagePath="\"/>
+		<None Include="..\..\images\icon.png" Pack="true" PackagePath="\" Condition="Exists('..\..\images\icon.png')"/>
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Remora.Results.Analyzers" PrivateAssets="all"/>
 		<PackageReference Include="MinVer" PrivateAssets="all"/>
 	</ItemGroup>
 </Project>
