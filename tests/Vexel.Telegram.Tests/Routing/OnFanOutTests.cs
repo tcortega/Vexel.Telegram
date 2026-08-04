@@ -262,6 +262,144 @@ public sealed class OnFanOutTests
 		Assert.NotNull(router);
 	}
 
+	[Fact]
+	public async Task Inline_On_handlers_run_after_routed_inline_query()
+	{
+		var order = new List<string>();
+
+		var contribution = new TelegramRouteContribution(
+			"TestAsm",
+			commands: new Dictionary<string, RouteBinder>(StringComparer.OrdinalIgnoreCase),
+			commandMetadata: [],
+			inlineQueries: new Dictionary<string, RouteBinder>(StringComparer.Ordinal)
+			{
+				["search"] = (_, _, _) =>
+				{
+					order.Add("routed");
+					return ValueTask.FromResult(true);
+				},
+			},
+			onInlineQueries:
+			[
+				new OnHandlerEntry("global::Demo.Observer", Record("on", order)),
+			]);
+
+		var router = CreateRouter(contribution);
+		var update = new Update
+		{
+			Id = 2,
+			InlineQuery = new InlineQuery
+			{
+				Id = "iq1",
+				From = new User { Id = 7, IsBot = false, FirstName = "U" },
+				Query = "search foo",
+				Offset = string.Empty,
+			},
+		};
+
+		await router.RouteAsync(update, EmptyScope(), CancellationToken.None);
+
+		Assert.Equal(["routed", "on"], order);
+	}
+
+	[Fact]
+	public async Task Chosen_On_handlers_run_after_routed_chosen_result()
+	{
+		var order = new List<string>();
+
+		var contribution = new TelegramRouteContribution(
+			"TestAsm",
+			commands: new Dictionary<string, RouteBinder>(StringComparer.OrdinalIgnoreCase),
+			commandMetadata: [],
+			chosenInlineResults: new Dictionary<string, RouteBinder>(StringComparer.Ordinal)
+			{
+				["item"] = (_, _, _) =>
+				{
+					order.Add("routed");
+					return ValueTask.FromResult(true);
+				},
+			},
+			onChosenInlineResults:
+			[
+				new OnHandlerEntry("global::Demo.Observer", Record("on", order)),
+			]);
+
+		var router = CreateRouter(contribution);
+		var update = new Update
+		{
+			Id = 3,
+			ChosenInlineResult = new ChosenInlineResult
+			{
+				ResultId = "item|42",
+				From = new User { Id = 7, IsBot = false, FirstName = "U" },
+				Query = "q",
+			},
+		};
+
+		await router.RouteAsync(update, EmptyScope(), CancellationToken.None);
+
+		Assert.Equal(["routed", "on"], order);
+	}
+
+	[Fact]
+	public async Task On_handlers_still_run_when_routed_command_handler_throws()
+	{
+		var onInvoked = false;
+
+		var contribution = new TelegramRouteContribution(
+			"TestAsm",
+			commands: new Dictionary<string, RouteBinder>(StringComparer.OrdinalIgnoreCase)
+			{
+				["boom"] = static (_, _, _) => throw new InvalidOperationException("handler boom"),
+			},
+			commandMetadata: [],
+			onMessages:
+			[
+				new OnHandlerEntry(
+					"global::Demo.Observer",
+					(_, _, _) =>
+					{
+						onInvoked = true;
+						return ValueTask.FromResult(true);
+					}),
+			]);
+
+		var router = CreateRouter(contribution);
+		await router.RouteAsync(MessageUpdate("/boom", isCommand: true), EmptyScope(), CancellationToken.None);
+
+		Assert.True(onInvoked);
+	}
+
+	[Fact]
+	public async Task Cancellation_stops_On_fan_out_midway()
+	{
+		var order = new List<string>();
+		using var cts = new CancellationTokenSource();
+
+		var contribution = new TelegramRouteContribution(
+			"TestAsm",
+			commands: new Dictionary<string, RouteBinder>(StringComparer.OrdinalIgnoreCase),
+			commandMetadata: [],
+			onMessages:
+			[
+				new OnHandlerEntry(
+					"global::Demo.Alpha",
+					async (_, _, _) =>
+					{
+						order.Add("Alpha");
+						await cts.CancelAsync();
+						return true;
+					}),
+				new OnHandlerEntry("global::Demo.Beta", Record("Beta", order)),
+			]);
+
+		var router = CreateRouter(contribution);
+		_ = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+			router.RouteAsync(MessageUpdate("hi"), EmptyScope(), cts.Token));
+
+		Assert.Equal(["Alpha"], order);
+	}
+
 	private sealed class ThrowingFlowStore : IFlowStore
 	{
 		public ValueTask<FlowEntry?> GetAsync(
