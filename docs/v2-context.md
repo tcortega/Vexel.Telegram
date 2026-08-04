@@ -323,6 +323,8 @@ Mitigations for dual-attr DX:
 22. Callback data: **short stable route id**; multi-step/large state in store/draft. Analyzer for 64B cap. Optional tiny suffix when needed.
 23. `SetMyCommands`: **auto** from `[Command]`+description at startup; opt-out flag for power users.
 24. Boot DX: `AddTelegramBot(...)` wires client/host/Vexel routes; app still calls Immediate `AddXxxHandlers()`. Sample shows both. No hiding Immediate.
+25. No v1 master inline hotfix parallel track; effort on `v2` only.
+26. Drop Remora.Commands (and Remora.Results) on `v2` entirely.
 
 
 
