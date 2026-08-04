@@ -330,6 +330,7 @@ Mitigations for dual-attr DX:
 29. Dispatch order (per chat): **routed handler first** (command/callback/flow text); **then** `[On*]` fan-out always (observe/side-effect). On* must not replace routing.
 30. On-update attrs: `[OnMessage]`, `[OnCallbackQuery]`, `[OnInlineQuery]`, `[OnChosenInlineResult]`, … (On* prefix).
 31. Prefer **concrete** contexts/`Feedback`/`Flow` (no interface-for-mocking). Keep **`IFlowStore`** (and Telegram.Bot’s `ITelegramBotClient`) where swap is real. No unit-test-driven interface soup.
+32. E2E: `tests/Vexel.Telegram.E2E` (test DC user+bot); light `tests/Vexel.Telegram.Tests`. Secrets: **GitHub Actions secrets** + local **dotnet user-secrets**. Never commit sessions/tokens.
 
 
 
@@ -373,7 +374,6 @@ Not a substitute for unit tests. Not prod userbots.
 
 ### Open questions
 
-4. E2E harness layout in repo (project name, secret injection).
 5. Ready to freeze charter and run PlanScout?
 
 
