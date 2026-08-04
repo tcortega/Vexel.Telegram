@@ -17,14 +17,14 @@ public sealed class FlowTests
 	{
 		var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
 		var store = new MemoryFlowStore(time);
-		var stepKey = Flow.GetStepKey(typeof(StepHandler));
+		var stepKey = Flow.GetStepKey(typeof(StepRequest));
 
 		await using var provider = BuildProvider(store, time, stepKey, out _);
 		using var scope = provider.CreateScope();
 		BindMessage(scope.ServiceProvider);
 		var flow = scope.ServiceProvider.GetRequiredService<Flow>();
 
-		await flow.PromptAsync<StepHandler>();
+		await flow.PromptAsync<StepRequest>();
 
 		var entry = await store.GetAsync(7, 9);
 		Assert.NotNull(entry);
@@ -37,14 +37,14 @@ public sealed class FlowTests
 	public async Task Draft_round_trips_json_poco()
 	{
 		var store = new MemoryFlowStore();
-		var stepKey = Flow.GetStepKey(typeof(StepHandler));
+		var stepKey = Flow.GetStepKey(typeof(StepRequest));
 
 		await using var provider = BuildProvider(store, TimeProvider.System, stepKey, out _);
 		using var scope = provider.CreateScope();
 		BindMessage(scope.ServiceProvider);
 		var flow = scope.ServiceProvider.GetRequiredService<Flow>();
 
-		await flow.PromptAsync<StepHandler>();
+		await flow.PromptAsync<StepRequest>();
 		await flow.SetDraftAsync(new DraftPoCo { Name = "Ada", Age = 36 });
 
 		var draft = await flow.GetDraftAsync<DraftPoCo>();
@@ -57,14 +57,14 @@ public sealed class FlowTests
 	public async Task CancelAsync_clears_store()
 	{
 		var store = new MemoryFlowStore();
-		var stepKey = Flow.GetStepKey(typeof(StepHandler));
+		var stepKey = Flow.GetStepKey(typeof(StepRequest));
 
 		await using var provider = BuildProvider(store, TimeProvider.System, stepKey, out _);
 		using var scope = provider.CreateScope();
 		BindMessage(scope.ServiceProvider);
 		var flow = scope.ServiceProvider.GetRequiredService<Flow>();
 
-		await flow.PromptAsync<StepHandler>();
+		await flow.PromptAsync<StepRequest>();
 		await flow.CancelAsync();
 
 		Assert.Null(await store.GetAsync(7, 9));
@@ -72,7 +72,8 @@ public sealed class FlowTests
 		Assert.False(flow.WasRearmed);
 	}
 
-	private sealed class StepHandler;
+	/// <summary>Stands in for a handler request type; PromptAsync keys on the request FullName.</summary>
+	private sealed record StepRequest;
 
 	private sealed class DraftPoCo
 	{

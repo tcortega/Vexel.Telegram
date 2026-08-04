@@ -94,9 +94,9 @@ public sealed class TelegramRouter : IUpdateRouter
 
 	/// <summary>
 	/// Returns <see langword="true"/> when <paramref name="stepKey"/> is a registered flow step.
-	/// Used by <see cref="Flow.PromptAsync{TNext}"/>.
+	/// Used by <see cref="Flow.PromptAsync{TRequest}"/>.
 	/// </summary>
-	/// <param name="stepKey">Handler <see cref="Type.FullName"/>.</param>
+	/// <param name="stepKey">Request type <see cref="Type.FullName"/>.</param>
 	public bool HasFlowStep(string stepKey)
 	{
 		ArgumentNullException.ThrowIfNull(stepKey);
@@ -140,41 +140,38 @@ public sealed class TelegramRouter : IUpdateRouter
 		IServiceProvider scope,
 		CancellationToken cancellationToken)
 	{
-		// D7: leading-/ commands always win over an armed flow step.
+		// D7: leading-/ commands always win over an armed flow step. C2: an offset-0 BotCommand entity is
+		// never flow-step input, so every command path below returns instead of falling through to the
+		// armed step - a miss (unknown /foo, or /foo@OtherBot) reaches On*/raw handlers only.
 		if (CommandKeyExtractor.TryExtract(message, out var command, out var botSuffix, out var arguments))
 		{
-			var targetsThisBot = true;
 			if (botSuffix is not null)
 			{
 				var botUsername = await ResolveBotUsernameAsync(cancellationToken).ConfigureAwait(false);
 				if (botUsername is not null
 					&& !botSuffix.Equals(botUsername, StringComparison.OrdinalIgnoreCase))
 				{
-					// Directed at another bot - fall through to flow/On*.
-					targetsThisBot = false;
+					// Directed at another bot - not ours to route, and not step input either.
+					return;
 				}
 			}
 
-			if (targetsThisBot)
+			if (_commands.TryGetValue(command, out var entry))
 			{
-				if (_commands.TryGetValue(command, out var entry))
-				{
-					await InvokeCommandAsync(entry, arguments, update, scope, cancellationToken)
-						.ConfigureAwait(false);
-					return;
-				}
-
-				// Built-in /cancel only when the app did not register [Command("cancel")].
-				if (!_hasUserCancelCommand
-					&& command.Equals("cancel", StringComparison.OrdinalIgnoreCase))
-				{
-					await HandleBuiltInCancelAsync(message, scope, cancellationToken).ConfigureAwait(false);
-					return;
-				}
-
-				// C2: unknown /foo mid-flow is a command miss - do not feed it to the armed step.
+				await InvokeCommandAsync(entry, arguments, update, scope, cancellationToken)
+					.ConfigureAwait(false);
 				return;
 			}
+
+			// Built-in /cancel only when the app has flow steps and did not register [Command("cancel")].
+			if (_flowSteps.Count > 0
+				&& !_hasUserCancelCommand
+				&& command.Equals("cancel", StringComparison.OrdinalIgnoreCase))
+			{
+				await HandleBuiltInCancelAsync(message, scope, cancellationToken).ConfigureAwait(false);
+			}
+
+			return;
 		}
 
 		await RouteFlowStepAsync(message, update, scope, cancellationToken).ConfigureAwait(false);
@@ -314,10 +311,20 @@ public sealed class TelegramRouter : IUpdateRouter
 		}
 
 		var store = scope.GetService<IFlowStore>();
-		if (store is not null)
+		if (store is null)
 		{
-			await store.CompleteAsync(message.Chat.Id, userId.Value, cancellationToken).ConfigureAwait(false);
+			return;
 		}
+
+		// Only claim "Cancelled." for a live armed flow; with nothing armed this is an ordinary
+		// command miss that On*/raw handlers own.
+		var entry = await store.GetAsync(message.Chat.Id, userId.Value, cancellationToken).ConfigureAwait(false);
+		if (entry is null)
+		{
+			return;
+		}
+
+		await store.CompleteAsync(message.Chat.Id, userId.Value, cancellationToken).ConfigureAwait(false);
 
 		var feedback = scope.GetService<Feedback>();
 		if (feedback is not null)

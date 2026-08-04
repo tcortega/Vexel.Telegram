@@ -109,6 +109,15 @@ internal static class GeneratorTestHelper
 			references: GetReferences(),
 			options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
+		// An analyzer test whose own source does not compile proves nothing about the API under test,
+		// so a broken fixture must fail loudly instead of silently yielding zero diagnostics.
+		var compileErrors = compilation.GetDiagnostics()
+			.Where(static d => d.Severity is DiagnosticSeverity.Error)
+			.ToArray();
+		Assert.True(
+			compileErrors.Length == 0,
+			string.Join(Environment.NewLine, compileErrors.Select(static d => d.ToString())));
+
 		var withAnalyzers = compilation.WithAnalyzers([.. analyzers]);
 		return await withAnalyzers.GetAnalyzerDiagnosticsAsync();
 	}

@@ -8,8 +8,8 @@ namespace Vexel.Telegram.Generators;
 /// <c>Add{Assembly}Telegram()</c> registration plus frozen command, callback, inline-query,
 /// chosen-inline-result, and flow step binders.
 /// Flow steps include every <c>[Handler]</c> with a flow-bindable request shape (empty or single
-/// string), including handlers with no route attribute, so <c>Flow.PromptAsync&lt;TNext&gt;</c>
-/// can resolve them by <see cref="System.Type.FullName"/>.
+/// string), including handlers with no route attribute, so <c>Flow.PromptAsync&lt;TRequest&gt;</c>
+/// can resolve them by the request type's <see cref="System.Type.FullName"/>.
 /// </summary>
 [Generator]
 public sealed class RouteGenerator : IIncrementalGenerator
@@ -328,12 +328,14 @@ public sealed class RouteGenerator : IIncrementalGenerator
 
 		token.ThrowIfCancellationRequested();
 
-		var handlerFq = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-		// typeof(T).FullName at runtime - match by emitting typeof(...).FullName! as the map key.
+		// The step key is the *request* type: handler classes are static and cannot be type arguments,
+		// so Flow.PromptAsync<TRequest> keys on typeof(TRequest).FullName. Match by emitting
+		// typeof(...).FullName! over the request type as the map key.
+		var requestFq = requestType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 		return new FlowStepModel(
-			StepKey: handlerFq,
-			HandlerFullyQualifiedName: handlerFq,
-			RequestFullyQualifiedName: requestType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+			StepKey: requestFq,
+			HandlerFullyQualifiedName: type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+			RequestFullyQualifiedName: requestFq,
 			AssemblyDisplayName: type.ContainingAssembly.Name,
 			HasStringParameter: hasStringParameter);
 	}

@@ -74,9 +74,9 @@ internal static class RouteRegistrationEmitter
 
 		foreach (var step in model.FlowSteps)
 		{
-			// Key must equal typeof(T).FullName at runtime (Flow.PromptAsync / router lookup).
+			// Key must equal typeof(TRequest).FullName at runtime (Flow.PromptAsync / router lookup).
 			_ = sb.Append("\t\t\t[typeof(")
-				.Append(step.HandlerFullyQualifiedName)
+				.Append(step.RequestFullyQualifiedName)
 				.AppendLine(").FullName!] = static async (scope, payload, cancellationToken) =>");
 			_ = sb.AppendLine("\t\t\t{");
 			EmitStringOrEmptyBinderBody(sb, step.HandlerFullyQualifiedName, step.RequestFullyQualifiedName, step.HasStringParameter, indent: "\t\t\t\t");

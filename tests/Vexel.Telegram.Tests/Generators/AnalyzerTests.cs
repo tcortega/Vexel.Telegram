@@ -164,8 +164,9 @@ public sealed class AnalyzerTests
 			{
 				public sealed record Command(string[] Items);
 
-				private static ValueTask HandleAsync(Command _, CancellationToken token)
+				private static ValueTask HandleAsync(Command command, CancellationToken token)
 				{
+					_ = command;
 					_ = token;
 					return default;
 				}
@@ -266,8 +267,9 @@ public sealed class AnalyzerTests
 			{
 				public sealed record Command(int Count);
 
-				private static ValueTask HandleAsync(Command _, CancellationToken token)
+				private static ValueTask HandleAsync(Command command, CancellationToken token)
 				{
+					_ = command;
 					_ = token;
 					return default;
 				}
@@ -523,7 +525,7 @@ public sealed class AnalyzerTests
 	}
 
 	[Fact]
-	public async Task VEX0007_fires_when_PromptAsync_target_is_not_handler()
+	public async Task VEX0007_fires_when_PromptAsync_target_is_not_a_step_request()
 	{
 		const string source = """
 			using System.Threading;
@@ -532,14 +534,12 @@ public sealed class AnalyzerTests
 
 			namespace Demo;
 
-			public static class NotAHandler
-			{
-			}
+			public sealed record NotAStep;
 
 			public static class Use
 			{
 				public static ValueTask Go(Flow flow, CancellationToken token) =>
-					flow.PromptAsync<NotAHandler>(cancellationToken: token);
+					flow.PromptAsync<NotAStep>(cancellationToken: token);
 			}
 			""";
 
@@ -572,7 +572,7 @@ public sealed class AnalyzerTests
 			public static class Use
 			{
 				public static ValueTask Go(Flow flow, CancellationToken token) =>
-					flow.PromptAsync<Collect>(cancellationToken: token);
+					flow.PromptAsync<Collect.Command>(cancellationToken: token);
 			}
 			""";
 
@@ -581,5 +581,62 @@ public sealed class AnalyzerTests
 			new InvalidPromptTargetAnalyzer());
 
 		Assert.Contains(diagnostics, static d => d.Id == "VEX0007");
+	}
+
+	[Fact]
+	public async Task VEX0007_does_not_fire_on_valid_step_request()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers;
+
+			namespace Demo;
+
+			[Handler]
+			public static class CollectName
+			{
+				public sealed record Command(string Name);
+
+				private static ValueTask HandleAsync(Command _, CancellationToken token) => default;
+			}
+
+			public static class Use
+			{
+				public static ValueTask Go(Flow flow, CancellationToken token) =>
+					flow.PromptAsync<CollectName.Command>(cancellationToken: token);
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new InvalidPromptTargetAnalyzer());
+
+		Assert.DoesNotContain(diagnostics, static d => d.Id == "VEX0007");
+	}
+
+	[Fact]
+	public async Task VEX0007_does_not_fire_on_forwarded_type_parameter()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Vexel.Telegram.Handlers;
+
+			namespace Demo;
+
+			public static class Use
+			{
+				public static ValueTask Ask<T>(Flow flow, CancellationToken token) =>
+					flow.PromptAsync<T>(cancellationToken: token);
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new InvalidPromptTargetAnalyzer());
+
+		Assert.DoesNotContain(diagnostics, static d => d.Id == "VEX0007");
 	}
 }

@@ -7,7 +7,8 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace Vexel.Telegram.Generators.Analyzers;
 
 /// <summary>
-/// VEX0007: <c>Flow.PromptAsync&lt;TNext&gt;</c> requires a <c>[Handler]</c> with a flow-bindable request.
+/// VEX0007: <c>Flow.PromptAsync&lt;TRequest&gt;</c> requires the <em>request</em> type of a
+/// <c>[Handler]</c> whose request is flow-bindable.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class InvalidPromptTargetAnalyzer : DiagnosticAnalyzer
@@ -23,10 +24,16 @@ public sealed class InvalidPromptTargetAnalyzer : DiagnosticAnalyzer
 
 		context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
 		context.EnableConcurrentExecution();
-		context.RegisterSyntaxNodeAction(AnalyzeInvocation, SyntaxKind.InvocationExpression);
+		context.RegisterCompilationStartAction(static compilationStart =>
+		{
+			var flowSteps = new FlowStepIndex(compilationStart.Compilation);
+			compilationStart.RegisterSyntaxNodeAction(
+				nodeContext => AnalyzeInvocation(nodeContext, flowSteps),
+				SyntaxKind.InvocationExpression);
+		});
 	}
 
-	private static void AnalyzeInvocation(SyntaxNodeAnalysisContext context)
+	private static void AnalyzeInvocation(SyntaxNodeAnalysisContext context, FlowStepIndex flowSteps)
 	{
 		if (context.Node is not InvocationExpressionSyntax invocation)
 		{
@@ -48,60 +55,40 @@ public sealed class InvalidPromptTargetAnalyzer : DiagnosticAnalyzer
 			return;
 		}
 
-		var symbolInfo = context.SemanticModel.GetSymbolInfo(invocation, context.CancellationToken);
-		var method = symbolInfo.Symbol as IMethodSymbol
-			?? symbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
-
-		// Fall back to member-access symbol when the invocation itself did not bind cleanly
-		// (e.g. missing optional-arg metadata in sparse test compilations).
-		if (method is null && invocation.Expression is MemberAccessExpressionSyntax memberAccess)
-		{
-			var memberSymbol = context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken);
-			method = memberSymbol.Symbol as IMethodSymbol
-				?? memberSymbol.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
-		}
-
-		if (method is null || !IsFlowType(method.ContainingType))
-		{
-			// Last resort: receiver type is Flow even if the method symbol did not bind.
-			if (invocation.Expression is not MemberAccessExpressionSyntax receiverAccess)
-			{
-				return;
-			}
-
-			var receiverType = context.SemanticModel.GetTypeInfo(receiverAccess.Expression, context.CancellationToken).Type
-				as INamedTypeSymbol;
-			if (!IsFlowType(receiverType))
-			{
-				return;
-			}
-		}
-		else if (!IsFlowType(method.ContainingType))
+		if (!IsFlowInvocation(context, invocation))
 		{
 			return;
 		}
 
 		var typeArgSyntax = genericName.TypeArgumentList.Arguments[0];
-		if (context.SemanticModel.GetTypeInfo(typeArgSyntax, context.CancellationToken).Type is not INamedTypeSymbol targetType
-			|| targetType.TypeKind == TypeKind.Error)
+		var typeArg = context.SemanticModel.GetTypeInfo(typeArgSyntax, context.CancellationToken).Type;
+
+		// An unbound type parameter forwarded from a generic caller can only be validated at runtime.
+		if (typeArg is ITypeParameterSymbol)
+		{
+			return;
+		}
+
+		if (typeArg is not INamedTypeSymbol targetType || targetType.TypeKind == TypeKind.Error)
 		{
 			Report(
 				context,
 				typeArgSyntax,
-				"Flow.PromptAsync type argument must be a named [Handler] type with a flow-bindable request.");
+				"Flow.PromptAsync type argument must be the named request type of a [Handler] (for example CollectName.Command).");
 			return;
 		}
 
-		if (!targetType.HasHandlerAttribute())
+		if (targetType.HasHandlerAttribute())
 		{
 			Report(
 				context,
 				typeArgSyntax,
-				$"Type '{targetType.ToDisplayString()}' is not marked with [Handler]; Flow.PromptAsync requires a handler type (VEX0007).");
+				$"Type '{targetType.ToDisplayString()}' is the handler class; Flow.PromptAsync takes its request type instead "
+				+ $"(for example {targetType.Name}.Command).");
 			return;
 		}
 
-		if (RouteGenerator.TryGetBindableFlowRequest(targetType, out _, out _, out var error) && error is null)
+		if (flowSteps.IsRegisteredStepRequest(targetType, out var error))
 		{
 			return;
 		}
@@ -110,7 +97,38 @@ public sealed class InvalidPromptTargetAnalyzer : DiagnosticAnalyzer
 			context,
 			typeArgSyntax,
 			error
-			?? $"Type '{targetType.ToDisplayString()}' is not a valid Flow.PromptAsync target; request must be empty or a single string (binding convention rule 5).");
+			?? $"Type '{targetType.ToDisplayString()}' is not a registered flow step request; it must be the request of a "
+			+ "[Handler] and be empty or take a single string (binding convention rule 5).");
+	}
+
+	private static bool IsFlowInvocation(SyntaxNodeAnalysisContext context, InvocationExpressionSyntax invocation)
+	{
+		var symbolInfo = context.SemanticModel.GetSymbolInfo(invocation, context.CancellationToken);
+		var method = symbolInfo.Symbol as IMethodSymbol
+			?? symbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
+
+		// Fall back to the member-access symbol, then to the receiver type, when the invocation itself
+		// did not bind cleanly (e.g. missing optional-arg metadata in sparse test compilations).
+		if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess)
+		{
+			return method is not null && IsFlowType(method.ContainingType);
+		}
+
+		if (method is null)
+		{
+			var memberSymbol = context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken);
+			method = memberSymbol.Symbol as IMethodSymbol
+				?? memberSymbol.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
+		}
+
+		if (method is not null && IsFlowType(method.ContainingType))
+		{
+			return true;
+		}
+
+		var receiverType = context.SemanticModel
+			.GetTypeInfo(memberAccess.Expression, context.CancellationToken).Type as INamedTypeSymbol;
+		return IsFlowType(receiverType);
 	}
 
 	// Flow lives in Vexel.Telegram.Handlers (same namespace as Feedback).
@@ -140,5 +158,91 @@ public sealed class InvalidPromptTargetAnalyzer : DiagnosticAnalyzer
 				DiagnosticDescriptors.VEX0007InvalidPromptTarget,
 				node.GetLocation(),
 				message));
+	}
+
+	/// <summary>
+	/// Resolves whether a request type is registered as a flow step. The idiomatic shape nests the
+	/// request inside its handler, so the containing type is checked first; only when that fails is
+	/// the compilation scanned (once) for a <c>[Handler]</c> that declares this request.
+	/// </summary>
+	private sealed class FlowStepIndex(Compilation compilation)
+	{
+		private readonly Lazy<HashSet<INamedTypeSymbol>> _declaredStepRequests = new(
+			() => BuildStepRequests(compilation),
+			LazyThreadSafetyMode.ExecutionAndPublication);
+
+		public bool IsRegisteredStepRequest(INamedTypeSymbol requestType, out string? error)
+		{
+			error = null;
+
+			if (requestType.ContainingType is { } handler && handler.HasHandlerAttribute())
+			{
+				if (RouteGenerator.TryGetBindableFlowRequest(handler, out var request, out _, out var handlerError)
+					&& handlerError is null)
+				{
+					if (SymbolEqualityComparer.Default.Equals(request, requestType))
+					{
+						return true;
+					}
+				}
+				else
+				{
+					error = handlerError;
+					return false;
+				}
+			}
+
+			return _declaredStepRequests.Value.Contains(requestType);
+		}
+
+		private static HashSet<INamedTypeSymbol> BuildStepRequests(Compilation compilation)
+		{
+			var requests = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+			foreach (var type in EnumerateTypes(compilation.Assembly.GlobalNamespace))
+			{
+				if (!type.HasHandlerAttribute())
+				{
+					continue;
+				}
+
+				if (RouteGenerator.TryGetBindableFlowRequest(type, out var request, out _, out var error)
+					&& error is null
+					&& request is INamedTypeSymbol namedRequest)
+				{
+					_ = requests.Add(namedRequest);
+				}
+			}
+
+			return requests;
+		}
+
+		private static IEnumerable<INamedTypeSymbol> EnumerateTypes(INamespaceOrTypeSymbol root)
+		{
+			foreach (var member in root.GetMembers())
+			{
+				switch (member)
+				{
+					case INamespaceSymbol ns:
+						foreach (var nested in EnumerateTypes(ns))
+						{
+							yield return nested;
+						}
+
+						break;
+
+					case INamedTypeSymbol type:
+						yield return type;
+						foreach (var nested in EnumerateTypes(type))
+						{
+							yield return nested;
+						}
+
+						break;
+
+					default:
+						break;
+				}
+			}
+		}
 	}
 }

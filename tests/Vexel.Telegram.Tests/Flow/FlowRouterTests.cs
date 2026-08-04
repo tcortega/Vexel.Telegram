@@ -15,7 +15,8 @@ namespace Vexel.Telegram.Tests.Flows;
 
 public sealed class FlowRouterTests
 {
-	private const string StepKey = "Demo.CollectName";
+	// Step keys are request-type FullNames: a nested request record renders as Handler+Request.
+	private const string StepKey = "Demo.CollectName+Command";
 
 	[Fact]
 	public async Task Arm_then_text_invokes_flow_binder()
@@ -71,7 +72,7 @@ public sealed class FlowRouterTests
 	[Fact]
 	public async Task Success_with_rearm_keeps_new_step()
 	{
-		var nextKey = Flow.GetStepKey(typeof(CollectAgeMarker));
+		var nextKey = Flow.GetStepKey(typeof(CollectAgeRequest));
 		var store = new MemoryFlowStore();
 		await store.SetAsync(7, 9, new FlowEntry(StepKey, DraftJson: null, DateTimeOffset.UtcNow.AddMinutes(15)));
 
@@ -84,7 +85,7 @@ public sealed class FlowRouterTests
 				[StepKey] = async (scope, _, ct) =>
 				{
 					var flow = scope.GetRequiredService<Flow>();
-					await flow.PromptAsync<CollectAgeMarker>(cancellationToken: ct);
+					await flow.PromptAsync<CollectAgeRequest>(cancellationToken: ct);
 					return true;
 				},
 				[nextKey] = static (_, _, _) => ValueTask.FromResult(true),
@@ -147,6 +148,72 @@ public sealed class FlowRouterTests
 		Assert.False(invoked.Value);
 		// State remains armed - message was not consumed as a step answer.
 		Assert.NotNull(await store.GetAsync(7, 9));
+	}
+
+	[Fact]
+	public async Task Command_for_another_bot_mid_flow_does_not_eat_message()
+	{
+		string? seen = null;
+		var store = new MemoryFlowStore();
+		await store.SetAsync(7, 9, new FlowEntry(StepKey, DraftJson: null, DateTimeOffset.UtcNow.AddMinutes(15)));
+
+		await using var provider = BuildProvider(store, out var router, FlowContribution(
+			StepKey,
+			(_, payload, _) =>
+			{
+				seen = payload;
+				return ValueTask.FromResult(true);
+			}));
+
+		using var scope = provider.CreateScope();
+		var update = CommandUpdate("/stats@OtherBot");
+		BindMessage(scope.ServiceProvider, update);
+		await router.RouteAsync(update, scope.ServiceProvider, CancellationToken.None);
+
+		Assert.Null(seen);
+		// C2: an offset-0 BotCommand entity is never step input, even when it targets another bot.
+		Assert.NotNull(await store.GetAsync(7, 9));
+	}
+
+	[Fact]
+	public async Task Built_in_cancel_without_armed_flow_stays_silent()
+	{
+		var store = new MemoryFlowStore();
+
+		await using var provider = BuildProvider(
+			store,
+			out var router,
+			FlowContribution(StepKey, static (_, _, _) => ValueTask.FromResult(true)),
+			out var bot);
+
+		using var scope = provider.CreateScope();
+		var update = CommandUpdate("/cancel");
+		BindMessage(scope.ServiceProvider, update);
+		await router.RouteAsync(update, scope.ServiceProvider, CancellationToken.None);
+
+		Assert.Empty(bot.OfType<SendMessageRequest>());
+	}
+
+	[Fact]
+	public async Task Built_in_cancel_stays_silent_without_registered_flow_steps()
+	{
+		var store = new MemoryFlowStore();
+		await store.SetAsync(7, 9, new FlowEntry(StepKey, DraftJson: null, DateTimeOffset.UtcNow.AddMinutes(15)));
+
+		var contribution = new TelegramRouteContribution(
+			"TestAsm",
+			commands: new Dictionary<string, RouteBinder>(StringComparer.OrdinalIgnoreCase),
+			commandMetadata: [],
+			flowSteps: new Dictionary<string, RouteBinder>(StringComparer.Ordinal));
+
+		await using var provider = BuildProvider(store, out var router, contribution, out var bot);
+
+		using var scope = provider.CreateScope();
+		var update = CommandUpdate("/cancel");
+		BindMessage(scope.ServiceProvider, update);
+		await router.RouteAsync(update, scope.ServiceProvider, CancellationToken.None);
+
+		Assert.Empty(bot.OfType<SendMessageRequest>());
 	}
 
 	[Fact]
@@ -230,8 +297,8 @@ public sealed class FlowRouterTests
 		Assert.Equal("photo note", seen);
 	}
 
-	/// <summary>Marker type whose FullName is the next step key for re-arm tests.</summary>
-	private sealed class CollectAgeMarker;
+	/// <summary>Stands in for the next step's request type, whose FullName is the step key.</summary>
+	private sealed record CollectAgeRequest;
 
 	private static TelegramRouteContribution FlowContribution(string stepKey, RouteBinder binder) =>
 		new(

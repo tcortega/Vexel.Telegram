@@ -52,7 +52,7 @@ public sealed class Flow
 	}
 
 	/// <summary>
-	/// True when <see cref="PromptAsync{TNext}"/> armed (or re-armed) a step during this update.
+	/// True when <see cref="PromptAsync{TRequest}"/> armed (or re-armed) a step during this update.
 	/// Used by the router to decide auto-complete on successful return.
 	/// </summary>
 	public bool WasRearmed { get; private set; }
@@ -63,24 +63,28 @@ public sealed class Flow
 	public bool WasCleared { get; private set; }
 
 	/// <summary>
-	/// Arms the next text step handled by <typeparamref name="TNext"/>.
-	/// The step key is <c>typeof(TNext).FullName</c>; <typeparamref name="TNext"/> must be a
-	/// <c>[Handler]</c> with a flow-bindable request (empty or single <see cref="string"/>) so the
-	/// generator registered it in the flow step map (VEX0007 enforces this at compile time).
+	/// Arms the next text step by its <em>request</em> type, not by the handler class:
+	/// <c>flow.PromptAsync&lt;CollectName.Command&gt;()</c>. Immediate.Handlers handler types are
+	/// <see langword="static"/> and C# rejects static types as type arguments, so the request record
+	/// nested in the handler is what identifies the step.
+	/// The step key is <c>typeof(TRequest).FullName</c>; <typeparamref name="TRequest"/> must be the
+	/// request of a <c>[Handler]</c> and be flow-bindable (empty record or single <see cref="string"/>)
+	/// so the generator registered it in the flow step map (VEX0007 enforces this at compile time).
 	/// </summary>
-	/// <typeparam name="TNext">Handler type that receives the next text message.</typeparam>
+	/// <typeparam name="TRequest">Request type of the handler that receives the next text message.</typeparam>
 	/// <param name="ttl">Optional override of <see cref="FlowOptions.DefaultTtl"/>.</param>
 	/// <param name="cancellationToken">Cancellation token.</param>
-	public async ValueTask PromptAsync<TNext>(
+	public async ValueTask PromptAsync<TRequest>(
 		TimeSpan? ttl = null,
 		CancellationToken cancellationToken = default)
 	{
-		var stepKey = GetStepKey(typeof(TNext));
+		var stepKey = GetStepKey(typeof(TRequest));
 		if (!_router.HasFlowStep(stepKey))
 		{
 			throw new InvalidOperationException(
-				$"Type '{typeof(TNext).FullName}' is not a registered flow step. "
-				+ "It must be a [Handler] with a flow-bindable request (empty record or single string).");
+				$"Type '{typeof(TRequest).FullName}' is not a registered flow step. "
+				+ "Pass the request type of a [Handler] (for example CollectName.Command) whose request "
+				+ "is flow-bindable (empty record or single string).");
 		}
 
 		var (chatId, userId) = RequireChatUser();
@@ -133,7 +137,7 @@ public sealed class Flow
 
 	/// <summary>
 	/// Serializes and stores <paramref name="draft"/> on the active flow entry.
-	/// Requires an armed flow (call <see cref="PromptAsync{TNext}"/> first, or re-arm after).
+	/// Requires an armed flow (call <see cref="PromptAsync{TRequest}"/> first, or re-arm after).
 	/// </summary>
 	/// <typeparam name="T">JSON-serializable draft type.</typeparam>
 	/// <param name="draft">Draft payload.</param>
@@ -152,13 +156,13 @@ public sealed class Flow
 		await _store.SetAsync(chatId, userId, updated, cancellationToken).ConfigureAwait(false);
 	}
 
-	/// <summary>Step key used by the generator and store for <paramref name="handlerType"/>.</summary>
-	internal static string GetStepKey(Type handlerType)
+	/// <summary>Step key used by the generator and store for <paramref name="requestType"/>.</summary>
+	internal static string GetStepKey(Type requestType)
 	{
-		ArgumentNullException.ThrowIfNull(handlerType);
-		return handlerType.FullName
+		ArgumentNullException.ThrowIfNull(requestType);
+		return requestType.FullName
 			?? throw new InvalidOperationException(
-				$"Type '{handlerType.Name}' has no FullName and cannot be a flow step key.");
+				$"Type '{requestType.Name}' has no FullName and cannot be a flow step key.");
 	}
 
 	private (long ChatId, long UserId) RequireChatUser()
