@@ -11,7 +11,8 @@
 > **Status:** this README documents the released v1 line on `master`.
 > The `v2` branch is an in-progress rewrite on top of
 > [Immediate.Handlers](https://github.com/ImmediatePlatform/Immediate.Handlers), and its API is not published yet.
-> The v1 commands, interactivity, and responder projects documented below are not part of the v2 build.
+> The v1 commands, interactivity, and responder projects documented below have been deleted from the `v2` branch;
+> their source lives on `master`.
 > Migrating from v1 to v2: see **[docs/v1-to-v2.md](./docs/v1-to-v2.md)**.
 > Design notes and decision log live in [docs/v2-context.md](./docs/v2-context.md).
 
@@ -321,4 +322,5 @@ await feedbackService.SendContextualPhotoAsync(
 
 The service is automatically registered when you call `AddTelegramCommands()` and returns `Result<T>` types for consistent error handling.
 
-For complete documentation of all available methods and options, see the [IFeedbackService interface](./src/Vexel.Telegram.Commands/Feedback/IFeedbackService.cs).
+For complete documentation of all available methods and options, see the [IFeedbackService interface](https://github.com/tcortega/Vexel.Telegram/blob/master/src/Vexel.Telegram.Commands/Feedback/IFeedbackService.cs)
+on `master`.
