@@ -50,7 +50,7 @@ public sealed class RouterMatrixTests
 		var bot = new RecordingTelegramBotClient { Username = "TestBot" };
 		var router = new TelegramRouter([contribution], bot, logger);
 
-		var ex = await Xunit.Record.ExceptionAsync(() =>
+		var ex = await Record.ExceptionAsync(() =>
 			router.RouteAsync(update, new ServiceCollection().BuildServiceProvider(), CancellationToken.None));
 
 		Assert.Null(ex);
@@ -91,7 +91,7 @@ public sealed class RouterMatrixTests
 			new RecordingTelegramBotClient { Username = "TestBot" },
 			logger);
 
-		var ex = await Xunit.Record.ExceptionAsync(() =>
+		var ex = await Record.ExceptionAsync(() =>
 			router.RouteAsync(update, new ServiceCollection().BuildServiceProvider(), CancellationToken.None));
 
 		Assert.Null(ex);

@@ -128,7 +128,7 @@ public sealed class TelegramRouterTests
 			new RecordingTelegramBotClient { Username = "TestBot" },
 			logger);
 
-		var ex = await Xunit.Record.ExceptionAsync(() =>
+		var ex = await Record.ExceptionAsync(() =>
 			router.RouteAsync(
 				CommandUpdate("/boom"),
 				new ServiceCollection().BuildServiceProvider(),
