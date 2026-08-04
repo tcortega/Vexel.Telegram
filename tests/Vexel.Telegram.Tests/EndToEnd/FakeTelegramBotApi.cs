@@ -332,9 +332,47 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 		if (request["reply_markup"] is not null)
 		{
 			fields.Add("reply_markup=<inline keyboard>");
+
+			// Render the buttons the way the Telegram client would hand them back on a tap, so the
+			// callback_data a keyboard helper produced is visible in the call log.
+			if (DescribeButtons(request["reply_markup"]?["inline_keyboard"] as JsonArray) is { } buttons)
+			{
+				fields.Add(buttons);
+			}
 		}
 
 		return fields.Count == 0 ? method : $"{method} {string.Join(' ', fields)}";
+	}
+
+	/// <summary>
+	/// Summarises an inline keyboard as <c>label -> callback_data</c> (or <c>url</c>) pairs.
+	/// </summary>
+	private static string? DescribeButtons(JsonArray? rows)
+	{
+		if (rows is null)
+		{
+			return null;
+		}
+
+		var buttons = rows
+			.OfType<JsonArray>()
+			.SelectMany(static row => row.OfType<JsonObject>())
+			.Select(static button =>
+			{
+				var label = button["text"]?.GetValue<string>() ?? string.Empty;
+				var target = button["callback_data"] is { } data
+					? $"callback_data=\"{data.GetValue<string>()}\""
+					: button["url"] is { } url
+						? $"url=\"{url.GetValue<string>()}\""
+						: button["switch_inline_query"] is { } query
+							? $"switch_inline_query=\"{query.GetValue<string>()}\""
+							: "<other>";
+
+				return $"\"{label}\" -> {target}";
+			})
+			.ToArray();
+
+		return buttons.Length == 0 ? null : $"buttons=[{string.Join("; ", buttons)}]";
 	}
 
 	private string MessageResult(JsonObject? request)

@@ -252,9 +252,9 @@ builder.Services.AddXxxTelegram();                      // Vexel generated route
 
 **Settled in T4:** `AddTelegramBot(...)` ships (with `AddVexelUpdateContexts()` as the contexts-only
 seam for manual wiring).
-**Settled in T3:** the generator emits `Add{Assembly}Telegram()`, which registers that assembly's
+**Settled in T3/T5:** the generator emits `Add{Assembly}Telegram()`, which registers that assembly's
 `TelegramRouteContribution`; `TelegramRouter` composes all contributions and fails fast on duplicate
-command keys across assemblies.
+route keys (command or callback) across assemblies.
 
 ### Escape hatch
 
@@ -359,9 +359,12 @@ Mitigations for dual-attr DX:
 
 ### Proposed (not fully approved)
 
-1. Callback payload format and size/analyzer rules.
-2. Metapackage vs explicit package references guidance for production apps.
-3. Delivery cadence (skeleton -> gen -> sample -> delete dead v1 surface on branch).
+1. Metapackage vs explicit package references guidance for production apps.
+2. Delivery cadence (skeleton -> gen -> sample -> delete dead v1 surface on branch).
+
+Callback payload format and size/analyzer rules closed in T5 (decision 22): format lives with
+`CallbackKeyExtractor` / `Keyboards/CallbackData`, rule IDs in
+`src/Vexel.Telegram.Generators/AnalyzerReleases.*.md`.
 
 ## 12. Test strategy - **agreed direction**
 
@@ -392,7 +395,7 @@ Not a substitute for unit tests. Not prod userbots.
 ### Open questions
 
 None tracked here.
-The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing landed).
+The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers landed).
 
 
 ---
