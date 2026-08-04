@@ -35,6 +35,10 @@ Until v2 publishes, consume it by project reference from a checkout of this bran
 NuGet consumers of `Vexel.Telegram.Handlers` get the generator automatically from the package.
 Monorepo `ProjectReference` consumers must still reference `Vexel.Telegram.Generators` themselves with `OutputItemType="Analyzer"`; analyzer project references do not flow transitively.
 
+**Build with the .NET 10 SDK or newer.**
+The libraries target `net8.0`-`net11.0`, so an app can still *run* on .NET 8, but the embedded generator is built against Roslyn 4.14.
+Building with the .NET 8 or 9 SDK makes the compiler skip it (`CS9057`): no `AddXxxTelegram()` is generated and no `VEX` diagnostics run.
+
 ## Wiring a bot
 
 Composition is three explicit calls - nothing about Immediate or the generated route table is hidden:

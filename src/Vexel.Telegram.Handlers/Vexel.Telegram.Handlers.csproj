@@ -38,14 +38,35 @@
 	</PropertyGroup>
 
 	<Target Name="_PackEmbeddedGenerators">
-		<!-- Single TFM gate so multi-targeting does not duplicate the analyzer entry. -->
-		<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
-			<_GeneratorDll>$(MSBuildThisFileDirectory)..\Vexel.Telegram.Generators\bin\$(Configuration)\netstandard2.0\Vexel.Telegram.Generators.dll</_GeneratorDll>
+		<!--
+			The analyzer is TFM-agnostic, so exactly one inner build packs it (a second entry for the
+			same package path is a duplicate). The owner is the first entry of $(TargetFrameworks),
+			so changing or dropping a TFM cannot silently turn this target into a no-op.
+		-->
+		<PropertyGroup>
+			<_PackGeneratorsTfm>$(TargetFrameworks)</_PackGeneratorsTfm>
+			<_PackGeneratorsTfm Condition="$(_PackGeneratorsTfm.Contains(';'))">$(_PackGeneratorsTfm.Substring(0, $(_PackGeneratorsTfm.IndexOf(';'))))</_PackGeneratorsTfm>
+			<_PackGeneratorsTfm Condition="'$(_PackGeneratorsTfm)' == ''">$(TargetFramework)</_PackGeneratorsTfm>
+			<_PackGenerators>false</_PackGenerators>
+			<_PackGenerators Condition="'$(TargetFramework)' != '' AND '$(TargetFramework)' == '$(_PackGeneratorsTfm)'">true</_PackGenerators>
 		</PropertyGroup>
-		<Error Text="Generators DLL not found at '$(_GeneratorDll)'. Build Vexel.Telegram.Generators before packing Handlers."
-		       Condition="'$(TargetFramework)' == 'net8.0' AND !Exists('$(_GeneratorDll)')"/>
-		<ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-			<TfmSpecificPackageFile Include="$(_GeneratorDll)" PackagePath="analyzers/dotnet/cs"/>
+
+		<!-- Ask the analyzer ProjectReference itself where its assembly is; no hardcoded output path. -->
+		<MSBuild Projects="@(ProjectReference->WithMetadataValue('OutputItemType', 'Analyzer'))"
+		         Targets="GetTargetPath"
+		         Properties="Configuration=$(Configuration)"
+		         RemoveProperties="TargetFramework"
+		         Condition="'$(_PackGenerators)' == 'true'">
+			<Output TaskParameter="TargetOutputs" ItemName="_EmbeddedGeneratorAssembly"/>
+		</MSBuild>
+
+		<Error Text="No analyzer ProjectReference resolved for Vexel.Telegram.Handlers; the nupkg would ship without the generator."
+		       Condition="'$(_PackGenerators)' == 'true' AND '@(_EmbeddedGeneratorAssembly)' == ''"/>
+		<Error Text="Analyzer assembly '%(_EmbeddedGeneratorAssembly.FullPath)' not found. Build the solution before packing Handlers."
+		       Condition="'$(_PackGenerators)' == 'true' AND !Exists('%(_EmbeddedGeneratorAssembly.FullPath)')"/>
+
+		<ItemGroup Condition="'$(_PackGenerators)' == 'true'">
+			<TfmSpecificPackageFile Include="@(_EmbeddedGeneratorAssembly)" PackagePath="analyzers/dotnet/cs"/>
 		</ItemGroup>
 	</Target>
 

@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  # Manual runs are a pack dry-run only; the publish steps below are gated on a tag ref.
   workflow_dispatch:
   push:
     tags:
@@ -37,18 +38,15 @@ jobs:
         run: dotnet build -c Release --no-restore
 
       - name: Package
-        run: |
-          rm -rf nupkgs
-          mkdir -p nupkgs
-          dotnet pack src/Vexel.Telegram.Client/Vexel.Telegram.Client.csproj -c Release --no-build -o nupkgs
-          dotnet pack src/Vexel.Telegram.Handlers/Vexel.Telegram.Handlers.csproj -c Release --no-build -o nupkgs
-          dotnet pack src/Vexel.Telegram.Hosting/Vexel.Telegram.Hosting.csproj -c Release --no-build -o nupkgs
-          dotnet pack src/Vexel.Telegram.AspNetCore/Vexel.Telegram.AspNetCore.csproj -c Release --no-build -o nupkgs
+        run: bash ./build/pack.sh nupkgs
 
       - name: Assert pack layout
         run: bash ./build/assert-pack-layout.sh nupkgs
 
+      # Publishing is tag-only: a workflow_dispatch run stops here as a pack dry-run, so an
+      # untagged commit can never push MinVer's height-suffixed version (e.g. 2.0.0-preview.1.5).
       - name: Push to NuGet
+        if: startsWith(github.ref, 'refs/tags/v')
         run: >
           dotnet nuget push "./nupkgs/*.nupkg"
           --source "https://api.nuget.org/v3/index.json"
@@ -56,6 +54,7 @@ jobs:
           --skip-duplicate
 
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: ncipollo/release-action@v1
         with:
           generateReleaseNotes: 'true'

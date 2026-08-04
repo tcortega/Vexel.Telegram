@@ -3,6 +3,11 @@
 # Usage: bash ./build/assert-pack-layout.sh [nupkgs-dir]
 set -euo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=./packable-projects.sh
+source "$script_dir/packable-projects.sh"
+
 nupkgs_dir="${1:-nupkgs}"
 
 if [[ ! -d "$nupkgs_dir" ]]; then
@@ -10,14 +15,8 @@ if [[ ! -d "$nupkgs_dir" ]]; then
 	exit 1
 fi
 
-required_packages=(
-	Vexel.Telegram.Client
-	Vexel.Telegram.Handlers
-	Vexel.Telegram.Hosting
-	Vexel.Telegram.AspNetCore
-)
-
-for id in "${required_packages[@]}"; do
+for project in "${packable_projects[@]}"; do
+	id="$(basename "$project" .csproj)"
 	matches=("$nupkgs_dir"/"$id".*.nupkg)
 	if [[ ! -e "${matches[0]}" ]]; then
 		echo "error: missing nupkg for $id in $nupkgs_dir" >&2

@@ -85,7 +85,9 @@ See the sample and the analyzer diagnostics (`VEX0001`…`VEX0007`) when a shape
 * **`Vexel.Telegram.Client`**: receive (polling or webhook), per-chat `UpdateScheduler`, raw handler registry
 * **`Vexel.Telegram.Handlers`**: attributes, contexts, `Feedback`, `Flow`/`IFlowStore`, router, keyboards
 * **`Vexel.Telegram.Generators`**: Roslyn generator + analyzers (not published alone).
-  The `Handlers` nupkg embeds it under `analyzers/dotnet/cs`, so NuGet consumers of Handlers get route generation and VEX diagnostics automatically.
+  The `Handlers` nupkg embeds it under `analyzers/dotnet/cs`, so NuGet consumers of Handlers get route generation and VEX diagnostics automatically **when they build with the .NET 10 SDK or newer**.
+  The generator is built against Roslyn 4.14; on the .NET 8 or 9 SDK the compiler reports `CS9057` and skips it, so no `AddXxxTelegram()` is generated and no `VEX` diagnostic fires.
+  Target frameworks are unaffected - a bot built on the .NET 10 SDK still runs on .NET 8.
   Monorepo `ProjectReference` consumers still need an explicit Generators analyzer reference - analyzer project references do not flow transitively.
 * **`Vexel.Telegram.Hosting`**: `BackgroundService` receive loop + auto `SetMyCommands` (no ASP.NET Core framework reference)
 * **`Vexel.Telegram.AspNetCore`**: sole `FrameworkReference` to ASP.NET Core; owns `MapTelegramWebhook`
