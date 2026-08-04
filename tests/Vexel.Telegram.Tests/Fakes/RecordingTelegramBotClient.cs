@@ -17,6 +17,9 @@ public sealed class RecordingTelegramBotClient : ITelegramBotClient
 	/// <summary>Every request sent through this client, in order.</summary>
 	public ConcurrentQueue<object> Requests { get; } = [];
 
+	/// <summary>Optional hook that fails a recorded request instead of returning a response.</summary>
+	public Func<object, Exception?>? FailRequest { get; set; }
+
 	/// <inheritdoc />
 	public bool LocalBotServer => false;
 
@@ -50,6 +53,11 @@ public sealed class RecordingTelegramBotClient : ITelegramBotClient
 	{
 		ArgumentNullException.ThrowIfNull(request);
 		Requests.Enqueue(request);
+
+		if (FailRequest?.Invoke(request) is { } failure)
+		{
+			return Task.FromException<TResponse>(failure);
+		}
 
 		if (typeof(TResponse) == typeof(Message))
 		{

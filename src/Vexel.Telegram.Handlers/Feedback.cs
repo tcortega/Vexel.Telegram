@@ -14,14 +14,18 @@ namespace Vexel.Telegram.Handlers;
 /// </summary>
 public sealed class Feedback(ITelegramBotClient botClient, UpdateContextHolder holder)
 {
-	private int _callbackAnswered;
-	private int _inlineAnswered;
+	private const int NotAnswered = 0;
+	private const int Answering = 1;
+	private const int Answered = 2;
 
-	/// <summary>True after a successful or attempted first <see cref="AnswerCallbackAsync"/> call.</summary>
-	public bool CallbackAnswered => Volatile.Read(ref _callbackAnswered) != 0;
+	private int _callbackState;
+	private int _inlineState;
 
-	/// <summary>True after a successful or attempted first <see cref="AnswerInlineAsync"/> call.</summary>
-	public bool InlineAnswered => Volatile.Read(ref _inlineAnswered) != 0;
+	/// <summary>True once <see cref="AnswerCallbackAsync"/> has answered the callback query.</summary>
+	public bool CallbackAnswered => Volatile.Read(ref _callbackState) == Answered;
+
+	/// <summary>True once <see cref="AnswerInlineAsync"/> has answered the inline query.</summary>
+	public bool InlineAnswered => Volatile.Read(ref _inlineState) == Answered;
 
 	/// <summary>
 	/// Sends <paramref name="text"/> to the contextual chat.
@@ -49,7 +53,11 @@ public sealed class Feedback(ITelegramBotClient botClient, UpdateContextHolder h
 	}
 
 	/// <summary>
-	/// Edits the contextual message text (chat message or inline message).
+	/// Edits the contextual bot-authored message text (callback chat message, callback inline
+	/// message, or a chosen inline result's message). Plain message updates carry the user's own
+	/// inbound message, which a bot cannot edit, so they have no editable context here: capture the
+	/// <see cref="Message"/> returned by <see cref="ReplyAsync"/> and edit it through
+	/// <see cref="ITelegramBotClient"/> instead.
 	/// </summary>
 	/// <param name="text">New message text.</param>
 	/// <param name="parseMode">Optional parse mode.</param>
@@ -92,18 +100,6 @@ public sealed class Feedback(ITelegramBotClient botClient, UpdateContextHolder h
 				"Cannot edit: callback query has neither a chat message nor an inline message id.");
 		}
 
-		if (holder.Message is { } messageContext)
-		{
-			_ = await botClient.EditMessageText(
-				messageContext.ChatId,
-				messageContext.MessageId,
-				text,
-				parseMode: parseMode,
-				replyMarkup: replyMarkup,
-				cancellationToken: cancellationToken).ConfigureAwait(false);
-			return;
-		}
-
 		if (holder.ChosenInlineResult is { InlineMessageId: { } chosenInlineMessageId })
 		{
 			await botClient.EditMessageText(
@@ -116,11 +112,15 @@ public sealed class Feedback(ITelegramBotClient botClient, UpdateContextHolder h
 		}
 
 		throw new InvalidOperationException(
-			"Cannot edit: the current update has no editable message context.");
+			"Cannot edit: the current update has no editable bot message. " +
+			"Edit is available for callback queries and chosen inline results; a plain message " +
+			"update carries the user's own message, which the bot cannot edit.");
 	}
 
 	/// <summary>
-	/// Answers the contextual callback query. Idempotent: the first call wins; later calls no-op.
+	/// Answers the contextual callback query. Idempotent: the first call that reaches the Bot API
+	/// wins; concurrent and later calls no-op. A failed send does not latch, so a caller that
+	/// catches the exception can retry instead of leaving the client spinning.
 	/// </summary>
 	/// <param name="text">Optional notification/alert text.</param>
 	/// <param name="showAlert">Whether to show an alert instead of a toast.</param>
@@ -134,26 +134,38 @@ public sealed class Feedback(ITelegramBotClient botClient, UpdateContextHolder h
 		int? cacheTime = null,
 		CancellationToken cancellationToken = default)
 	{
-		if (Interlocked.Exchange(ref _callbackAnswered, 1) != 0)
+		if (Interlocked.CompareExchange(ref _callbackState, Answering, NotAnswered) != NotAnswered)
 		{
 			return;
 		}
 
-		var callback = holder.Callback
-			?? throw new InvalidOperationException(
-				"AnswerCallback requires a CallbackQuery update context.");
+		try
+		{
+			var callback = holder.Callback
+				?? throw new InvalidOperationException(
+					"AnswerCallback requires a CallbackQuery update context.");
 
-		await botClient.AnswerCallbackQuery(
-			callback.Id,
-			text: text,
-			showAlert: showAlert,
-			url: url,
-			cacheTime: cacheTime,
-			cancellationToken: cancellationToken).ConfigureAwait(false);
+			await botClient.AnswerCallbackQuery(
+				callback.Id,
+				text: text,
+				showAlert: showAlert,
+				url: url,
+				cacheTime: cacheTime,
+				cancellationToken: cancellationToken).ConfigureAwait(false);
+		}
+		catch
+		{
+			Volatile.Write(ref _callbackState, NotAnswered);
+			throw;
+		}
+
+		Volatile.Write(ref _callbackState, Answered);
 	}
 
 	/// <summary>
-	/// Answers the contextual inline query. Idempotent: the first call wins; later calls no-op.
+	/// Answers the contextual inline query. Idempotent: the first call that reaches the Bot API
+	/// wins; concurrent and later calls no-op. A failed send does not latch, so a caller that
+	/// catches the exception can retry.
 	/// </summary>
 	/// <param name="results">Inline results to show.</param>
 	/// <param name="cacheTime">Optional cache time in seconds.</param>
@@ -171,23 +183,33 @@ public sealed class Feedback(ITelegramBotClient botClient, UpdateContextHolder h
 	{
 		ArgumentNullException.ThrowIfNull(results);
 
-		if (Interlocked.Exchange(ref _inlineAnswered, 1) != 0)
+		if (Interlocked.CompareExchange(ref _inlineState, Answering, NotAnswered) != NotAnswered)
 		{
 			return;
 		}
 
-		var inlineQuery = holder.InlineQuery
-			?? throw new InvalidOperationException(
-				"AnswerInline requires an InlineQuery update context.");
+		try
+		{
+			var inlineQuery = holder.InlineQuery
+				?? throw new InvalidOperationException(
+					"AnswerInline requires an InlineQuery update context.");
 
-		await botClient.AnswerInlineQuery(
-			inlineQuery.Id,
-			results,
-			cacheTime: cacheTime,
-			isPersonal: isPersonal,
-			nextOffset: nextOffset,
-			button: button,
-			cancellationToken: cancellationToken).ConfigureAwait(false);
+			await botClient.AnswerInlineQuery(
+				inlineQuery.Id,
+				results,
+				cacheTime: cacheTime,
+				isPersonal: isPersonal,
+				nextOffset: nextOffset,
+				button: button,
+				cancellationToken: cancellationToken).ConfigureAwait(false);
+		}
+		catch
+		{
+			Volatile.Write(ref _inlineState, NotAnswered);
+			throw;
+		}
+
+		Volatile.Write(ref _inlineState, Answered);
 	}
 
 	/// <summary>

@@ -68,6 +68,86 @@ public sealed class FeedbackTests
 	}
 
 	[Fact]
+	public async Task AnswerCallbackAsync_FailedSend_DoesNotLatch_AndRetrySucceeds()
+	{
+		var bot = new RecordingTelegramBotClient
+		{
+			FailRequest = static request =>
+				request is AnswerCallbackQueryRequest { Text: "first" }
+					? new InvalidOperationException("transient")
+					: null,
+		};
+
+		var holder = new UpdateContextHolder();
+		holder.Set(CallbackUpdate("cb-id", chatId: 10));
+		var feedback = new FeedbackService(bot, holder);
+
+		_ = await Assert.ThrowsAsync<InvalidOperationException>(() => feedback.AnswerCallbackAsync("first"));
+		Assert.False(feedback.CallbackAnswered);
+
+		await feedback.AnswerCallbackAsync("second");
+
+		Assert.True(feedback.CallbackAnswered);
+		string[] answeredTexts = [.. bot.OfType<AnswerCallbackQueryRequest>().Select(static r => r.Text ?? "")];
+		Assert.Equal(["first", "second"], answeredTexts);
+	}
+
+	[Fact]
+	public async Task AnswerInlineAsync_FailedSend_DoesNotLatch_AndRetrySucceeds()
+	{
+		var attempts = 0;
+		var bot = new RecordingTelegramBotClient
+		{
+			FailRequest = request =>
+				request is AnswerInlineQueryRequest && ++attempts == 1
+					? new InvalidOperationException("transient")
+					: null,
+		};
+
+		var holder = new UpdateContextHolder();
+		holder.Set(InlineQueryUpdate("iq-id"));
+		var feedback = new FeedbackService(bot, holder);
+
+		_ = await Assert.ThrowsAsync<InvalidOperationException>(() => feedback.AnswerInlineAsync([]));
+		Assert.False(feedback.InlineAnswered);
+
+		await feedback.AnswerInlineAsync([]);
+
+		Assert.True(feedback.InlineAnswered);
+		Assert.Equal(2, bot.OfType<AnswerInlineQueryRequest>().Count);
+	}
+
+	[Fact]
+	public async Task EditAsync_MessageContext_ThrowsWithoutCallingBot()
+	{
+		var bot = new RecordingTelegramBotClient();
+		var holder = new UpdateContextHolder();
+		holder.Set(MessageUpdate(1, chatId: 55));
+		var feedback = new FeedbackService(bot, holder);
+
+		var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => feedback.EditAsync("edited"));
+
+		Assert.Contains("no editable bot message", ex.Message, StringComparison.Ordinal);
+		Assert.Empty(bot.Requests);
+	}
+
+	[Fact]
+	public async Task EditAsync_CallbackContext_EditsTheBotMessage()
+	{
+		var bot = new RecordingTelegramBotClient();
+		var holder = new UpdateContextHolder();
+		holder.Set(CallbackUpdate("cb-id", chatId: 10));
+		var feedback = new FeedbackService(bot, holder);
+
+		await feedback.EditAsync("edited");
+
+		var edit = Assert.Single(bot.OfType<EditMessageTextRequest>());
+		Assert.Equal(10, edit.ChatId.Identifier);
+		Assert.Equal(5, edit.MessageId);
+		Assert.Equal("edited", edit.Text);
+	}
+
+	[Fact]
 	public async Task SendWithKeyboardAsync_AttachesMarkup()
 	{
 		var bot = new RecordingTelegramBotClient();
@@ -138,6 +218,66 @@ public sealed class FeedbackTests
 		Assert.Contains("resolved outside a Vexel update scope", ex.Message, StringComparison.Ordinal);
 	}
 
+	[Fact]
+	public void AddTelegramBot_ComposesWithAppRegisteredScopeInitializer()
+	{
+		var services = new ServiceCollection();
+		_ = services.AddSingleton<ITelegramBotClient>(new RecordingTelegramBotClient());
+		_ = services.AddScoped<IUpdateScopeInitializer, NoopScopeInitializer>();
+		_ = services.AddTelegramBot(static _ => "test-token");
+
+		using var provider = services.BuildServiceProvider(validateScopes: true);
+		using var scope = provider.CreateScope();
+
+		var initializers = scope.ServiceProvider.GetServices<IUpdateScopeInitializer>().ToArray();
+
+		Assert.Contains(initializers, static i => i is UpdateContextScopeInitializer);
+		Assert.Contains(initializers, static i => i is NoopScopeInitializer);
+	}
+
+	[Fact]
+	public async Task Dispatch_WhenScopeInitializerCannotResolve_AbortsUpdate()
+	{
+		var ran = new ConcurrentBag<string>();
+		var services = new ServiceCollection();
+		_ = services.AddSingleton<ITelegramBotClient>(new RecordingTelegramBotClient());
+		_ = services.AddSingleton(ran);
+		_ = services.AddLogging(static b => b.ClearProviders());
+		_ = services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+		_ = services.AddTelegramBot(static _ => "test-token");
+		_ = services.AddScoped<IUpdateScopeInitializer, ThrowingConstructorScopeInitializer>();
+		_ = services.AddRawUpdateHandler<AnyUpdateRawHandler>();
+
+		await using var provider = services.BuildServiceProvider(validateScopes: true);
+		var dispatcher = provider.GetRequiredService<IUpdateDispatcher>();
+
+		_ = await Assert.ThrowsAsync<InvalidOperationException>(
+			() => dispatcher.DispatchAsync(MessageUpdate(1, chatId: 9), CancellationToken.None));
+
+		Assert.Empty(ran);
+	}
+
+	[Fact]
+	public async Task ContainerHandlers_WrongKindContext_DoesNotSkipSiblingHandlers()
+	{
+		var ran = new ConcurrentBag<string>();
+		var services = new ServiceCollection();
+		_ = services.AddSingleton<ITelegramBotClient>(new RecordingTelegramBotClient());
+		_ = services.AddSingleton(ran);
+		_ = services.AddLogging(static b => b.ClearProviders());
+		_ = services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+		_ = services.AddTelegramBot(static _ => "test-token");
+		_ = services.AddScoped<IRawUpdateHandler, CallbackOnlyRawHandler>();
+		_ = services.AddScoped<IRawUpdateHandler, AnyUpdateRawHandler>();
+
+		await using var provider = services.BuildServiceProvider(validateScopes: true);
+		var dispatcher = provider.GetRequiredService<IUpdateDispatcher>();
+
+		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 7), CancellationToken.None);
+
+		Assert.Equal(["any"], [.. ran]);
+	}
+
 	private static Update MessageUpdate(int id, long chatId) =>
 		new()
 		{
@@ -183,6 +323,42 @@ public sealed class FeedbackTests
 				Offset = "",
 			},
 		};
+
+	private sealed class NoopScopeInitializer : IUpdateScopeInitializer
+	{
+		public void Initialize(Update update)
+		{
+		}
+	}
+
+	private sealed class ThrowingConstructorScopeInitializer : IUpdateScopeInitializer
+	{
+		public ThrowingConstructorScopeInitializer() =>
+			throw new InvalidOperationException("initializer construction boom");
+
+		public void Initialize(Update update)
+		{
+		}
+	}
+
+	private sealed class AnyUpdateRawHandler(ConcurrentBag<string> ran) : IRawUpdateHandler
+	{
+		public Task HandleAsync(Update update, CancellationToken cancellationToken)
+		{
+			ran.Add("any");
+			return Task.CompletedTask;
+		}
+	}
+
+	private sealed class CallbackOnlyRawHandler(ConcurrentBag<string> ran, CallbackContext callback)
+		: IRawUpdateHandler
+	{
+		public Task HandleAsync(Update update, CancellationToken cancellationToken)
+		{
+			ran.Add(callback.Id);
+			return Task.CompletedTask;
+		}
+	}
 
 	private sealed class StartCounter
 	{

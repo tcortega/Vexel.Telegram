@@ -76,11 +76,13 @@ public sealed class UpdateDispatcher(
 		}
 		catch (Exception ex)
 		{
+			// Same invariant as an initializer fault below: without the bound context every handler
+			// would fail on a half-bound scope, so the update must not be dispatched at all.
 			logger.LogError(
 				ex,
 				"Failed to resolve update scope initializers for update {UpdateId}",
 				update.Id);
-			return;
+			throw;
 		}
 
 		foreach (var initializer in initializers)
@@ -102,6 +104,14 @@ public sealed class UpdateDispatcher(
 		}
 	}
 
+	/// <summary>
+	/// Resolves handlers registered directly against <see cref="IRawUpdateHandler"/>. The container
+	/// materializes that set as a unit, so one handler with unresolvable dependencies (an injected
+	/// context that does not match the update kind, for example) would take every sibling with it.
+	/// When the set fails, resolution degrades to one registration at a time so only the faulty
+	/// handler is skipped. <c>AddRawUpdateHandler&lt;THandler&gt;</c> is the preferred raw path: it is
+	/// isolated by construction and keeps full container lifetime semantics.
+	/// </summary>
 	private IRawUpdateHandler[] ResolveContainerHandlers(IServiceProvider provider, Update update)
 	{
 		try
@@ -110,10 +120,58 @@ public sealed class UpdateDispatcher(
 		}
 		catch (Exception ex)
 		{
-			// The container builds this set as a unit, so one faulty handler fails all of them.
-			logger.LogError(ex, "Failed to resolve raw update handlers for update {UpdateId}", update.Id);
-			return [];
+			logger.LogError(
+				ex,
+				"Failed to resolve the raw update handler set for update {UpdateId}; "
+				+ "falling back to per-registration resolution",
+				update.Id);
+
+			return ResolveContainerHandlersPerRegistration(provider, update);
 		}
+	}
+
+	private IRawUpdateHandler[] ResolveContainerHandlersPerRegistration(
+		IServiceProvider provider,
+		Update update)
+	{
+		var handlers = new List<IRawUpdateHandler>();
+
+		foreach (var descriptor in registry.ContainerRegistrations)
+		{
+			try
+			{
+				handlers.Add(CreateContainerHandler(descriptor, provider));
+			}
+			catch (Exception ex)
+			{
+				logger.LogError(
+					ex,
+					"Failed to resolve container-registered raw update handler {HandlerType} for update {UpdateId}",
+					descriptor.ImplementationInstance?.GetType().FullName
+						?? descriptor.ImplementationType?.FullName
+						?? typeof(IRawUpdateHandler).FullName,
+					update.Id);
+			}
+		}
+
+		return [.. handlers];
+	}
+
+	private static IRawUpdateHandler CreateContainerHandler(
+		ServiceDescriptor descriptor,
+		IServiceProvider provider)
+	{
+		if (descriptor.ImplementationInstance is IRawUpdateHandler instance)
+		{
+			return instance;
+		}
+
+		if (descriptor.ImplementationFactory is { } factory)
+		{
+			return (IRawUpdateHandler)factory(provider);
+		}
+
+		return (IRawUpdateHandler)ActivatorUtilities.CreateInstance(provider, descriptor.ImplementationType!);
 	}
 
 	private async Task InvokeHandlerAsync(

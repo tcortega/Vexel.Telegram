@@ -47,8 +47,12 @@ public static class ServiceCollectionExtensions
 		ArgumentNullException.ThrowIfNull(services);
 
 		services.TryAddScoped<UpdateContextHolder>();
-		services.TryAddScoped<IUpdateScopeInitializer, UpdateContextScopeInitializer>();
 		services.TryAddScoped<Feedback>();
+
+		// The dispatcher runs every IUpdateScopeInitializer, so this must compose with app-registered
+		// initializers instead of being skipped when one is already present.
+		services.TryAddEnumerable(
+			ServiceDescriptor.Scoped<IUpdateScopeInitializer, UpdateContextScopeInitializer>());
 
 		// Concrete contexts are scoped factories over the holder so Immediate injects them as
 		// ordinary DI services. Wrong-kind resolution fails with a clear message.
