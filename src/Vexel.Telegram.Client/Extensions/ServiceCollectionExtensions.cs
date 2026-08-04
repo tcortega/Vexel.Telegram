@@ -39,6 +39,10 @@ public static class ServiceCollectionExtensions
 	/// <summary>
 	/// Adds a raw update handler that is resolved independently of every other raw handler, so a
 	/// construction or dependency failure in one handler cannot stop the others from running.
+	/// This is the preferred way to register a raw handler: registering directly against
+	/// <see cref="IRawUpdateHandler"/> makes the container materialize every such handler as one
+	/// unit, which the dispatcher can only recover from by degrading to per-registration
+	/// construction (singleton handlers are then rebuilt per update and scope disposal is lost).
 	/// </summary>
 	/// <typeparam name="THandler">The handler implementation type.</typeparam>
 	/// <param name="services">The service collection.</param>
@@ -69,6 +73,7 @@ public static class ServiceCollectionExtensions
 		}
 
 		var registry = new RawUpdateHandlerRegistry();
+		registry.AttachServices(services);
 		_ = services.AddSingleton(registry);
 
 		return registry;

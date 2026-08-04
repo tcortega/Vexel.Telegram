@@ -5,7 +5,7 @@ Not a frozen API contract.
 Items below are labeled `agreed`, `proposed`, or `open`.
 Do not treat proposed items as authorization to implement product code.
 
-Last updated: 2026-08-04 (decision log through 32; T1 skeleton and T2 client dispatch landed)
+Last updated: 2026-08-04 (decision log through 32; T1 skeleton, T2 client dispatch, and T4 contexts/Feedback/DI landed)
 Branch: `v2` (created to hold this context and future V2 work)
 Repo stays public. Private-repo idea was rejected.
 
@@ -212,13 +212,19 @@ public static partial class SearchInline
 
 Callback state remains developer payload in callback data, not Telegram opaque ids.
 
-### Contexts / feedback (proposed direction)
+### Contexts / feedback - **settled in T4**
 
-Small injectables, not a giant framework:
+Small injectables, not a giant framework. Concrete types (decision 31), no interfaces:
 
-- Message / callback / inline / chosen-result contexts
-- Shared user/chat bits as needed
-- `IFeedback` (or similar) for reply/edit/success helpers - keep v1 idea, thinner API
+- `MessageContext`, `CallbackContext`, `InlineQueryContext`, `ChosenInlineResultContext`,
+  bound per update by a write-once scoped `UpdateContextHolder` and exposed as scoped factories.
+  Resolving a context for the wrong update kind throws.
+- `Feedback` for reply/edit/answer helpers - keep the v1 idea, thinner API.
+  Answer methods are first-wins idempotent and latch only after the Bot API send succeeds.
+  `Edit` needs a bot-authored message (callback or chosen inline result).
+
+Shapes and invariants live with the code in `src/Vexel.Telegram.Handlers`; see `AGENTS.md` for the
+one-paragraph summary.
 
 Conversation state: explicit service or payload state; avoid magic interceptors unless designed cleanly later.
 
@@ -227,17 +233,16 @@ Conversation state: explicit service or payload state; avoid magic interceptors 
 Prefer Immediate behaviors for cross-cutting (auth, logging, validation host hooks).
 Do not invent a second pipeline.
 
-### Registration DX (proposed)
-
-Something in the spirit of:
+### Registration DX
 
 ```csharp
-builder.Services.AddTelegramBot(...);
-builder.Services.AddXxxHandlers();    // Immediate
-builder.Services.AddXxxTelegram();    // Vexel generated routes
+builder.Services.AddTelegramBot(_ => "<BOT_TOKEN>");    // client + host + contexts + Feedback
+builder.Services.AddXxxHandlers();                      // Immediate
+builder.Services.AddXxxTelegram();                      // Vexel generated routes
 ```
 
-Exact method names **open**.
+**Settled in T4:** `AddTelegramBot(...)` ships (with `AddVexelUpdateContexts()` as the contexts-only
+seam for manual wiring). `AddXxxTelegram()` lands with the router.
 
 ### Escape hatch
 
@@ -339,10 +344,9 @@ Mitigations for dual-attr DX:
 
 ### Proposed (not fully approved)
 
-1. Feedback and context interface shapes.
-2. Callback payload format and size/analyzer rules.
-3. Metapackage vs explicit package references guidance for production apps.
-4. Delivery cadence (skeleton -> gen -> sample -> delete dead v1 surface on branch).
+1. Callback payload format and size/analyzer rules.
+2. Metapackage vs explicit package references guidance for production apps.
+3. Delivery cadence (skeleton -> gen -> sample -> delete dead v1 surface on branch).
 
 ## 12. Test strategy - **agreed direction**
 
@@ -373,7 +377,7 @@ Not a substitute for unit tests. Not prod userbots.
 ### Open questions
 
 None tracked here.
-The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch landed).
+The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI landed).
 
 
 ---

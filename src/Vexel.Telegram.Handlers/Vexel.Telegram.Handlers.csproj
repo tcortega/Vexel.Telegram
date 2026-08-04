@@ -15,6 +15,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Vexel.Telegram.Client\Vexel.Telegram.Client.csproj"/>
+		<ProjectReference Include="..\Vexel.Telegram.Hosting\Vexel.Telegram.Hosting.csproj"/>
 		<!-- Development-time analyzer; nupkg embedding is asserted in T15 pack dry-run. -->
 		<ProjectReference Include="..\Vexel.Telegram.Generators\Vexel.Telegram.Generators.csproj"
 		                  ReferenceOutputAssembly="false"

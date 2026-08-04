@@ -17,10 +17,12 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 	private readonly CancellationTokenSource _cts = new();
 	private readonly List<(int Id, string Json)> _queue = [];
 	private readonly List<string> _requests = [];
+	private readonly List<string> _outboundCalls = [];
 	private readonly Lock _gate = new();
 	private readonly Action<string>? _trace;
 	private Task? _acceptLoop;
 	private int _getUpdatesCalls;
+	private int _nextSentMessageId = 9000;
 
 	public FakeTelegramBotApi(Action<string>? trace = null)
 	{
@@ -43,6 +45,21 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 			lock (_gate)
 			{
 				return [.. _requests];
+			}
+		}
+	}
+
+	/// <summary>
+	/// Bot-initiated calls the server received (sendMessage, editMessageText, answerCallbackQuery,
+	/// answerInlineQuery, ...), one summary line each, in arrival order.
+	/// </summary>
+	public IReadOnlyList<string> OutboundCalls
+	{
+		get
+		{
+			lock (_gate)
+			{
+				return [.. _outboundCalls];
 			}
 		}
 	}
@@ -113,6 +130,81 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 		return (id, update.ToJsonString());
 	}
 
+	/// <summary>
+	/// Builds a callback-query update JSON payload for a tap on a button under a bot message.
+	/// </summary>
+	public static (int Id, string Json) CallbackQueryUpdate(
+		int id,
+		long chatId,
+		int botMessageId,
+		string callbackQueryId,
+		string data)
+	{
+		var update = new JsonObject
+		{
+			["update_id"] = id,
+			["callback_query"] = new JsonObject
+			{
+				["id"] = callbackQueryId,
+				["from"] = new JsonObject
+				{
+					["id"] = chatId,
+					["is_bot"] = false,
+					["first_name"] = $"chat{chatId}",
+				},
+				["chat_instance"] = $"ci-{chatId}",
+				["data"] = data,
+				["message"] = new JsonObject
+				{
+					["message_id"] = botMessageId,
+					["date"] = 1_700_000_000,
+					["chat"] = new JsonObject
+					{
+						["id"] = chatId,
+						["type"] = "private",
+						["first_name"] = $"chat{chatId}",
+					},
+					["from"] = new JsonObject
+					{
+						["id"] = 424_242,
+						["is_bot"] = true,
+						["first_name"] = "VexelBot",
+					},
+					["text"] = "pick one",
+				},
+			},
+		};
+
+		return (id, update.ToJsonString());
+	}
+
+	/// <summary>Builds an inline-query update JSON payload.</summary>
+	public static (int Id, string Json) InlineQueryUpdate(
+		int id,
+		long userId,
+		string inlineQueryId,
+		string query)
+	{
+		var update = new JsonObject
+		{
+			["update_id"] = id,
+			["inline_query"] = new JsonObject
+			{
+				["id"] = inlineQueryId,
+				["from"] = new JsonObject
+				{
+					["id"] = userId,
+					["is_bot"] = false,
+					["first_name"] = $"user{userId}",
+				},
+				["query"] = query,
+				["offset"] = "",
+			},
+		};
+
+		return (id, update.ToJsonString());
+	}
+
 	private static int FreePort()
 	{
 		using var probe = new TcpListener(IPAddress.Loopback, 0);
@@ -159,7 +251,7 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 		{
 			"getUpdates" => await ServeGetUpdatesAsync(body),
 			"getMe" => /*lang=json,strict*/ """{"ok":true,"result":{"id":424242,"is_bot":true,"first_name":"VexelBot","username":"vexel_bot"}}""",
-			_ => /*lang=json,strict*/ """{"ok":true,"result":true}""",
+			_ => ServeOutboundCall(method, body),
 		};
 
 		var bytes = Encoding.UTF8.GetBytes(payload);
@@ -168,6 +260,98 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 		context.Response.ContentLength64 = bytes.Length;
 		await context.Response.OutputStream.WriteAsync(bytes);
 		context.Response.Close();
+	}
+
+	/// <summary>
+	/// Serves everything the bot sends outward. Calls are logged the way a Telegram-side observer
+	/// would see them, and replies carry a result shaped like the real API's so the strongly typed
+	/// client deserializes it.
+	/// </summary>
+	private string ServeOutboundCall(string method, string body)
+	{
+		var request = ParseObject(body);
+
+		lock (_gate)
+		{
+			_outboundCalls.Add(Describe(method, request));
+		}
+
+		_trace?.Invoke($"telegram-api  <- bot calls {Describe(method, request)}");
+
+		return method switch
+		{
+			"sendMessage" or "editMessageText" when request?["inline_message_id"] is null =>
+				$$"""{"ok":true,"result":{{MessageResult(request)}}}""",
+			_ => /*lang=json,strict*/ """{"ok":true,"result":true}""",
+		};
+	}
+
+	private static string Describe(string method, JsonObject? request)
+	{
+		if (request is null)
+		{
+			return method;
+		}
+
+		var fields = new List<string>();
+		foreach (var key in (string[])["chat_id", "message_id", "callback_query_id", "inline_query_id", "text", "show_alert"])
+		{
+			if (request[key] is { } value)
+			{
+				fields.Add($"{key}={value.ToJsonString()}");
+			}
+		}
+
+		if (request["reply_markup"] is not null)
+		{
+			fields.Add("reply_markup=<inline keyboard>");
+		}
+
+		return fields.Count == 0 ? method : $"{method} {string.Join(' ', fields)}";
+	}
+
+	private string MessageResult(JsonObject? request)
+	{
+		var chatId = request?["chat_id"]?.GetValue<long>() ?? 0;
+		var messageId = request?["message_id"]?.GetValue<int>()
+			?? Interlocked.Increment(ref _nextSentMessageId);
+
+		var message = new JsonObject
+		{
+			["message_id"] = messageId,
+			["date"] = 1_700_000_000,
+			["chat"] = new JsonObject
+			{
+				["id"] = chatId,
+				["type"] = "private",
+			},
+			["from"] = new JsonObject
+			{
+				["id"] = 424_242,
+				["is_bot"] = true,
+				["first_name"] = "VexelBot",
+			},
+			["text"] = request?["text"]?.GetValue<string>() ?? string.Empty,
+		};
+
+		return message.ToJsonString();
+	}
+
+	private static JsonObject? ParseObject(string body)
+	{
+		if (string.IsNullOrWhiteSpace(body))
+		{
+			return null;
+		}
+
+		try
+		{
+			return JsonNode.Parse(body) as JsonObject;
+		}
+		catch (JsonException)
+		{
+			return null;
+		}
 	}
 
 	private async Task<string> ServeGetUpdatesAsync(string body)
