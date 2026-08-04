@@ -7,9 +7,9 @@ namespace Vexel.Telegram.Generators;
 /// Discovers Immediate.Handlers types that also carry a Vexel route attribute and emits
 /// <c>Add{Assembly}Telegram()</c> registration plus frozen command, callback, inline-query,
 /// chosen-inline-result, and flow step binders.
-/// Flow steps include every <c>[Handler]</c> with a flow-bindable request shape (empty or single
-/// string), including handlers with no route attribute, so <c>Flow.PromptAsync&lt;TRequest&gt;</c>
-/// can resolve them by the request type's <see cref="System.Type.FullName"/>.
+/// Flow steps are the pure text steps: a <c>[Handler]</c> with a flow-bindable request shape (empty
+/// or single string) and <em>no</em> route attribute, so <c>Flow.PromptAsync&lt;TRequest&gt;</c> can
+/// resolve them by the request type's <see cref="System.Type.FullName"/>.
 /// </summary>
 [Generator]
 public sealed class RouteGenerator : IIncrementalGenerator
@@ -319,9 +319,11 @@ public sealed class RouteGenerator : IIncrementalGenerator
 	{
 		token.ThrowIfCancellationRequested();
 
-		// Flow steps: every [Handler] with a flow-bindable request (rule 5), including pure text steps
-		// that carry no [Command]/[Callback].
-		if (!TryGetBindableFlowRequest(type, out var requestType, out var hasStringParameter, out _))
+		// Flow steps are pure text steps only: a [Handler] with a flow-bindable request (rule 5) and no
+		// route attribute. A [Command]/[Callback] handler is reached through its own route, so keying it
+		// by request type would make two commands sharing one request record collide for no benefit.
+		if (type.HasVexelRouteAttribute()
+			|| !TryGetBindableFlowRequest(type, out var requestType, out var hasStringParameter, out _))
 		{
 			return null;
 		}

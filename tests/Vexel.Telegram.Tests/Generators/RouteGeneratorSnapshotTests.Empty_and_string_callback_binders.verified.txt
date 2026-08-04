@@ -54,18 +54,6 @@ public static partial class TelegramServiceCollectionExtensions
 		var flowSteps = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
 			global::System.StringComparer.Ordinal)
 		{
-			[typeof(global::Demo.Confirm.Command).FullName!] = static async (scope, payload, cancellationToken) =>
-			{
-				var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::Demo.Confirm.Handler>(scope);
-				_ = await handler.HandleAsync(new global::Demo.Confirm.Command(), cancellationToken).ConfigureAwait(false);
-				return true;
-			},
-			[typeof(global::Demo.Item.Command).FullName!] = static async (scope, payload, cancellationToken) =>
-			{
-				var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::Demo.Item.Handler>(scope);
-				_ = await handler.HandleAsync(new global::Demo.Item.Command(payload), cancellationToken).ConfigureAwait(false);
-				return true;
-			},
 		};
 
 		_ = global::Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton(

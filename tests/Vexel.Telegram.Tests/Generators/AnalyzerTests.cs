@@ -283,6 +283,41 @@ public sealed class AnalyzerTests
 	}
 
 	[Fact]
+	public async Task VEX0005_does_not_fire_when_two_commands_share_a_request_record()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			public sealed record Empty;
+
+			[Handler]
+			[Command("ping")]
+			public static class Ping
+			{
+				private static ValueTask HandleAsync(Empty request, CancellationToken token) => default;
+			}
+
+			[Handler]
+			[Command("pong")]
+			public static class Pong
+			{
+				private static ValueTask HandleAsync(Empty request, CancellationToken token) => default;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new DuplicateRouteKeyAnalyzer());
+
+		Assert.DoesNotContain(diagnostics, static d => d.Id == "VEX0005");
+	}
+
+	[Fact]
 	public async Task VEX0005_does_not_fire_on_distinct_flow_requests()
 	{
 		const string source = """
@@ -639,6 +674,41 @@ public sealed class AnalyzerTests
 			{
 				public static ValueTask Go(Flow flow, CancellationToken token) =>
 					flow.PromptAsync<Collect.Command>(cancellationToken: token);
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new InvalidPromptTargetAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0007");
+	}
+
+	[Fact]
+	public async Task VEX0007_fires_when_PromptAsync_target_is_a_routed_handlers_request()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[Command("ping")]
+			public static class Ping
+			{
+				public sealed record Command(string Text);
+
+				private static ValueTask HandleAsync(Command request, CancellationToken token) => default;
+			}
+
+			public static class Use
+			{
+				public static ValueTask Go(Flow flow, CancellationToken token) =>
+					flow.PromptAsync<Ping.Command>(cancellationToken: token);
 			}
 			""";
 

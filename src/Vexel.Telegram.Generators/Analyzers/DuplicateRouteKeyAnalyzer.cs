@@ -165,9 +165,11 @@ public sealed class DuplicateRouteKeyAnalyzer : DiagnosticAnalyzer
 		SymbolAnalysisContext context,
 		ConcurrentDictionary<string, INamedTypeSymbol> flowSteps)
 	{
-		// Mirrors RouteGenerator.TransformHandler: only top-level [Handler] types become flow steps.
+		// Mirrors RouteGenerator.TransformFlowStep: only top-level [Handler] types with no route
+		// attribute become flow steps, so commands sharing one request record are not a collision.
 		if (context.Symbol is not INamedTypeSymbol { ContainingType: null } type
-			|| !type.HasHandlerAttribute())
+			|| !type.HasHandlerAttribute()
+			|| type.HasVexelRouteAttribute())
 		{
 			return;
 		}

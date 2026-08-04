@@ -77,6 +77,7 @@ internal static class DiagnosticDescriptors
 		defaultSeverity: DiagnosticSeverity.Error,
 		isEnabledByDefault: true,
 		description:
-			"Flow.PromptAsync<TRequest> requires TRequest to be the request type of a [Handler] with a "
-			+ "flow-bindable request shape (empty record or single string; binding convention rules 5-6).");
+			"Flow.PromptAsync<TRequest> requires TRequest to be the request type of a [Handler] with no "
+			+ "route attribute and a flow-bindable request shape (empty record or single string; binding "
+			+ "convention rules 5-6).");
 }

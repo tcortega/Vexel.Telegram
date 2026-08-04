@@ -60,24 +60,6 @@ public static partial class TelegramServiceCollectionExtensions
 		var flowSteps = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
 			global::System.StringComparer.Ordinal)
 		{
-			[typeof(global::Demo.DefaultInline).FullName!] = static async (scope, payload, cancellationToken) =>
-			{
-				var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::Demo.DefaultInline.Handler>(scope);
-				_ = await handler.HandleAsync(new global::Demo.DefaultInline.Query(payload), cancellationToken).ConfigureAwait(false);
-				return true;
-			},
-			[typeof(global::Demo.ItemChosen).FullName!] = static async (scope, payload, cancellationToken) =>
-			{
-				var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::Demo.ItemChosen.Handler>(scope);
-				_ = await handler.HandleAsync(new global::Demo.ItemChosen.Command(payload), cancellationToken).ConfigureAwait(false);
-				return true;
-			},
-			[typeof(global::Demo.SearchInline).FullName!] = static async (scope, payload, cancellationToken) =>
-			{
-				var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::Demo.SearchInline.Handler>(scope);
-				_ = await handler.HandleAsync(new global::Demo.SearchInline.Query(payload), cancellationToken).ConfigureAwait(false);
-				return true;
-			},
 		};
 
 		_ = global::Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton(

@@ -68,8 +68,10 @@ public sealed class Flow
 	/// <see langword="static"/> and C# rejects static types as type arguments, so the request record
 	/// nested in the handler is what identifies the step.
 	/// The step key is <c>typeof(TRequest).FullName</c>; <typeparamref name="TRequest"/> must be the
-	/// request of a <c>[Handler]</c> and be flow-bindable (empty record or single <see cref="string"/>)
-	/// so the generator registered it in the flow step map (VEX0007 enforces this at compile time).
+	/// request of a <c>[Handler]</c> that carries no route attribute - a pure text step, not a
+	/// <c>[Command]</c>/<c>[Callback]</c> handler - and be flow-bindable (empty record or single
+	/// <see cref="string"/>) so the generator registered it in the flow step map (VEX0007 enforces
+	/// this at compile time).
 	/// </summary>
 	/// <typeparam name="TRequest">Request type of the handler that receives the next text message.</typeparam>
 	/// <param name="ttl">Optional override of <see cref="FlowOptions.DefaultTtl"/>.</param>
@@ -83,8 +85,8 @@ public sealed class Flow
 		{
 			throw new InvalidOperationException(
 				$"Type '{typeof(TRequest).FullName}' is not a registered flow step. "
-				+ "Pass the request type of a [Handler] (for example CollectName.Command) whose request "
-				+ "is flow-bindable (empty record or single string).");
+				+ "Pass the request type of a [Handler] with no route attribute (for example "
+				+ "CollectName.Command) whose request is flow-bindable (empty record or single string).");
 		}
 
 		var (chatId, userId) = RequireChatUser();

@@ -98,7 +98,7 @@ public sealed class InvalidPromptTargetAnalyzer : DiagnosticAnalyzer
 			typeArgSyntax,
 			error
 			?? $"Type '{targetType.ToDisplayString()}' is not a registered flow step request; it must be the request of a "
-			+ "[Handler] and be empty or take a single string (binding convention rule 5).");
+			+ "[Handler] with no route attribute and be empty or take a single string (binding convention rule 5).");
 	}
 
 	private static bool IsFlowInvocation(SyntaxNodeAnalysisContext context, InvocationExpressionSyntax invocation)
@@ -192,6 +192,15 @@ public sealed class InvalidPromptTargetAnalyzer : DiagnosticAnalyzer
 
 			if (requestType.ContainingType is { } handler && handler.HasHandlerAttribute())
 			{
+				if (handler.HasVexelRouteAttribute())
+				{
+					error =
+						$"Type '{requestType.ToDisplayString()}' is the request of a routed handler "
+						+ $"('{handler.ToDisplayString()}' carries [Command]/[Callback]) and is not a flow step. "
+						+ "Flow.PromptAsync targets a [Handler] with no route attribute (a pure text step).";
+					return false;
+				}
+
 				if (RouteGenerator.TryGetBindableFlowRequest(handler, out var request, out _, out var handlerError)
 					&& handlerError is null)
 				{
@@ -215,7 +224,7 @@ public sealed class InvalidPromptTargetAnalyzer : DiagnosticAnalyzer
 			var requests = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 			foreach (var type in EnumerateTypes(compilation.Assembly.GlobalNamespace))
 			{
-				if (!type.HasHandlerAttribute())
+				if (!type.HasHandlerAttribute() || type.HasVexelRouteAttribute())
 				{
 					continue;
 				}
