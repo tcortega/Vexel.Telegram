@@ -316,6 +316,7 @@ Mitigations for dual-attr DX:
 15. Common-workflow-first DX: commands, callback menus, inline mode, multi-step text prompts/FSM - not only fire-and-forget commands.
 16. UX model: button-first (`[Callback]`), commands as entry/deep link/cancel, typed `IFlow.PromptAsync<TNext>` for text steps, per-scope draft/store for multi-question state. No reflection. No Immediate.Cache required for flow (that package is response caching, not FSM). Pluggable `IFlowStore` (memory sample, redis/etc prod).
 17. `IFeedback` thin high-DX helper (not optional framework sludge): Reply/Edit/AnswerCallback/AnswerInline + send-with-keyboard. Defaults from context (chat, message id, parse mode opt). Power: inject `ITelegramBotClient` anytime. No fat localization/template engine in core.
+18. Concurrency: configurable; **default ordered per chat**, cross-chat parallel. Power can loosen.
 
 
 
