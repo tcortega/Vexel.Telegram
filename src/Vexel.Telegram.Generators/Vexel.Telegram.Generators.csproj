@@ -11,8 +11,6 @@
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<ProduceReferenceAssembly>false</ProduceReferenceAssembly>
 		<RootNamespace>Vexel.Telegram.Generators</RootNamespace>
-		<!-- Analyzers should not pull app-global analyzers into the generator compilation surface. -->
-		<IncludePackageReferencesDuringMarkupCompilation>false</IncludePackageReferencesDuringMarkupCompilation>
 	</PropertyGroup>
 
 	<ItemGroup>
