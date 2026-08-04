@@ -8,12 +8,6 @@
 [![GitHub Actions](https://github.com/tcortega/Vexel.Telegram/actions/workflows/build.yml/badge.svg)](https://github.com/tcortega/Vexel.Telegram/actions)
 ---
 
-> **Status:** this README documents the released v1 line on `master`.
-> The `v2` branch is an in-progress rewrite on top of
-> [Immediate.Handlers](https://github.com/ImmediatePlatform/Immediate.Handlers), and its API is not published yet.
-> The v1 commands, interactivity, and responder projects documented below are not part of the v2 build.
-> Design notes and decision log live in [docs/v2-context.md](./docs/v2-context.md).
-
 Vexel.Telegram is a C# library for building Telegram bots using
 the [Telegram.Bot](https://github.com/TelegramBots/Telegram.Bot) library.
 It is built to fulfill a need for robust, feature-complete, highly available and concurrent bots.

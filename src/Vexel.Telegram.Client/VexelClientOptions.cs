@@ -1,13 +1,17 @@
+using Telegram.Bot.Polling;
+
 namespace Vexel.Telegram.Client;
 
 /// <summary>
-/// Configuration options for <see cref="VexelClient"/>.
+/// Holds configuration options for the <see cref="VexelClient"/>.
 /// </summary>
-public sealed class VexelClientOptions
+public record VexelClientOptions
 {
 	/// <summary>
-	/// When <see langword="true"/>, pending updates are dropped on start.
-	/// Defaults to <see langword="true"/>.
+	/// Gets or sets the options for the update receiver.
 	/// </summary>
-	public bool DropPendingUpdates { get; set; } = true;
+	/// <remarks>
+	/// Defaults to <see cref="ReceiverOptions"/> with <c>DropPendingUpdates</c> set to <c>true</c>.
+	/// </remarks>
+	public ReceiverOptions ReceiverOptions { get; set; } = new() { DropPendingUpdates = true, };
 }
