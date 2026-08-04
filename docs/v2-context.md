@@ -328,6 +328,7 @@ Mitigations for dual-attr DX:
 27. v1→v2: **breaking major**; sample + short differences doc. No compat shims.
 28. On-update fan-out **kept** (v1 responder usefulness): `[OnMessage]`/`[OnCallback]`/… as Immediate `[Handler]`s; **Vexel gen** emits static multi-cast dispatch. No reflection responder bus. No Immediate.Notifications (N/A). Behaviors apply per handler. Default **await** on per-chat pipeline; fire-and-forget opt-in only.
 29. Dispatch order (per chat): **routed handler first** (command/callback/flow text); **then** `[On*]` fan-out always (observe/side-effect). On* must not replace routing.
+30. On-update attrs: `[OnMessage]`, `[OnCallbackQuery]`, `[OnInlineQuery]`, `[OnChosenInlineResult]`, … (On* prefix).
 
 
 
@@ -371,7 +372,6 @@ Not a substitute for unit tests. Not prod userbots.
 
 ### Open questions
 
-1. Exact on-update attr names (`[OnMessage]` vs `[Message]`).
 3. Context interface names (`IMessageContext` etc.) - bikeshed only.
 4. E2E harness layout in repo (project name, secret injection).
 5. Ready to freeze charter and run PlanScout?
