@@ -17,11 +17,58 @@
 	<ItemGroup>
 		<ProjectReference Include="..\Vexel.Telegram.Client\Vexel.Telegram.Client.csproj"/>
 		<ProjectReference Include="..\Vexel.Telegram.Hosting\Vexel.Telegram.Hosting.csproj"/>
-		<!-- Development-time analyzer; nupkg embedding is asserted in T15 pack dry-run. -->
+		<!--
+			Dev-time analyzer for monorepo project references.
+			NuGet consumers get the same DLL from analyzers/dotnet/cs (see _PackEmbeddedGenerators).
+			PrivateAssets keeps Generators out of the dependency group (it is not a published package).
+		-->
 		<ProjectReference Include="..\Vexel.Telegram.Generators\Vexel.Telegram.Generators.csproj"
 		                  ReferenceOutputAssembly="false"
-		                  OutputItemType="Analyzer"/>
+		                  OutputItemType="Analyzer"
+		                  PrivateAssets="all"/>
 	</ItemGroup>
+
+	<!--
+		Embed generator + VEX analyzers in the Handlers nupkg.
+		Package consumers reference Handlers only; monorepo ProjectReferences still need an explicit
+		Generators analyzer reference (analyzer project refs do not flow transitively).
+	-->
+	<PropertyGroup>
+		<TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_PackEmbeddedGenerators</TargetsForTfmSpecificContentInPackage>
+	</PropertyGroup>
+
+	<Target Name="_PackEmbeddedGenerators">
+		<!--
+			The analyzer is TFM-agnostic, so exactly one inner build packs it (a second entry for the
+			same package path is a duplicate). The owner is the first entry of $(TargetFrameworks),
+			so changing or dropping a TFM cannot silently turn this target into a no-op.
+		-->
+		<PropertyGroup>
+			<_PackGeneratorsTfm>$(TargetFrameworks)</_PackGeneratorsTfm>
+			<_PackGeneratorsTfm Condition="$(_PackGeneratorsTfm.Contains(';'))">$(_PackGeneratorsTfm.Substring(0, $(_PackGeneratorsTfm.IndexOf(';'))))</_PackGeneratorsTfm>
+			<_PackGeneratorsTfm Condition="'$(_PackGeneratorsTfm)' == ''">$(TargetFramework)</_PackGeneratorsTfm>
+			<_PackGenerators>false</_PackGenerators>
+			<_PackGenerators Condition="'$(TargetFramework)' != '' AND '$(TargetFramework)' == '$(_PackGeneratorsTfm)'">true</_PackGenerators>
+		</PropertyGroup>
+
+		<!-- Ask the analyzer ProjectReference itself where its assembly is; no hardcoded output path. -->
+		<MSBuild Projects="@(ProjectReference->WithMetadataValue('OutputItemType', 'Analyzer'))"
+		         Targets="GetTargetPath"
+		         Properties="Configuration=$(Configuration)"
+		         RemoveProperties="TargetFramework"
+		         Condition="'$(_PackGenerators)' == 'true'">
+			<Output TaskParameter="TargetOutputs" ItemName="_EmbeddedGeneratorAssembly"/>
+		</MSBuild>
+
+		<Error Text="No analyzer ProjectReference resolved for Vexel.Telegram.Handlers; the nupkg would ship without the generator."
+		       Condition="'$(_PackGenerators)' == 'true' AND '@(_EmbeddedGeneratorAssembly)' == ''"/>
+		<Error Text="Analyzer assembly '%(_EmbeddedGeneratorAssembly.FullPath)' not found. Build the solution before packing Handlers."
+		       Condition="'$(_PackGenerators)' == 'true' AND !Exists('%(_EmbeddedGeneratorAssembly.FullPath)')"/>
+
+		<ItemGroup Condition="'$(_PackGenerators)' == 'true'">
+			<TfmSpecificPackageFile Include="@(_EmbeddedGeneratorAssembly)" PackagePath="analyzers/dotnet/cs"/>
+		</ItemGroup>
+	</Target>
 
 	<PropertyGroup Label="MinVer">
 		<MinVerAutoIncrement>minor</MinVerAutoIncrement>

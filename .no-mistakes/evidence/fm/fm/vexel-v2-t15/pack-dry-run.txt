@@ -1,0 +1,20 @@
+$ bash ./build/pack.sh nupkgs
+  The package Vexel.Telegram.Client.0.0.0-preview.0.44 is missing a readme. Go to https://aka.ms/nuget/authoring-best-practices/readme to learn why package readmes are important.
+  Successfully created package '/Users/shiki/.no-mistakes/worktrees/b6147a1cfc26/01KZ7ESQRTKEDWE45325ZQD0JH/nupkgs/Vexel.Telegram.Client.0.0.0-preview.0.44.nupkg'.
+  The package Vexel.Telegram.Handlers.0.0.0-preview.0.44 is missing a readme. Go to https://aka.ms/nuget/authoring-best-practices/readme to learn why package readmes are important.
+  Successfully created package '/Users/shiki/.no-mistakes/worktrees/b6147a1cfc26/01KZ7ESQRTKEDWE45325ZQD0JH/nupkgs/Vexel.Telegram.Handlers.0.0.0-preview.0.44.nupkg'.
+  The package Vexel.Telegram.Hosting.0.0.0-preview.0.44 is missing a readme. Go to https://aka.ms/nuget/authoring-best-practices/readme to learn why package readmes are important.
+  Successfully created package '/Users/shiki/.no-mistakes/worktrees/b6147a1cfc26/01KZ7ESQRTKEDWE45325ZQD0JH/nupkgs/Vexel.Telegram.Hosting.0.0.0-preview.0.44.nupkg'.
+  The package Vexel.Telegram.AspNetCore.0.0.0-preview.0.44 is missing a readme. Go to https://aka.ms/nuget/authoring-best-practices/readme to learn why package readmes are important.
+  Successfully created package '/Users/shiki/.no-mistakes/worktrees/b6147a1cfc26/01KZ7ESQRTKEDWE45325ZQD0JH/nupkgs/Vexel.Telegram.AspNetCore.0.0.0-preview.0.44.nupkg'.
+
+$ bash ./build/assert-pack-layout.sh nupkgs
+ok: found Vexel.Telegram.Client.0.0.0-preview.0.44.nupkg
+ok: found Vexel.Telegram.Handlers.0.0.0-preview.0.44.nupkg
+ok: found Vexel.Telegram.Hosting.0.0.0-preview.0.44.nupkg
+ok: found Vexel.Telegram.AspNetCore.0.0.0-preview.0.44.nupkg
+ok: Handlers embeds analyzers/dotnet/cs/Vexel.Telegram.Generators.dll
+ok: Generators.dll is analyzer-only (not under lib/)
+ok: Handlers depends on Immediate.Handlers
+ok: Handlers does not depend on a Generators package id
+pack layout assertions passed

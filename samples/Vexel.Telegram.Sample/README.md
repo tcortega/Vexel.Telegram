@@ -76,4 +76,4 @@ When that lands, this bot is the fixture the suite drives.
 ## Project references
 
 The sample references the `Vexel.Telegram` metapackage project plus the generators analyzer project directly.
-Package consumers will get the generator from the Handlers nupkg once packing lands (T15); project-reference analyzer refs do not flow transitively in the monorepo, so the sample wires the analyzer explicitly.
+NuGet consumers get the generator from the Handlers nupkg (`analyzers/dotnet/cs`). Project-reference analyzer refs do not flow transitively in the monorepo, so the sample wires the analyzer explicitly.

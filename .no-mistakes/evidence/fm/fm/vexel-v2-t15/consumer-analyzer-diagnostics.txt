@@ -1,0 +1,9 @@
+=== VEX analyzers ship in the Handlers nupkg too (same consumer app, SDK 11) ===
+Added BadHandler.cs with a duplicate /ping route and an illegal Telegram command name.
+
+--- dotnet build -c Release ---
+    3 Error(s)
+BadHandler.cs(10,29): error VEX0005: Duplicate command route key 'ping' on 'ConsumerBot.Ping' and 'ConsumerBot.PingAgain' [ConsumerBot.csproj]
+BadHandler.cs(19,2): error VEX0003: Command name 'Not Valid!' is invalid; Telegram requires 1-32 characters of lowercase a-z, digits, and underscores [ConsumerBot.csproj]
+Build FAILED.
+Program.cs(11,2): error VEX0005: Duplicate command route key 'ping' on 'ConsumerBot.PingAgain' and 'ConsumerBot.Ping' [ConsumerBot.csproj]

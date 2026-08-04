@@ -15,11 +15,13 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # MinVer needs tags + history for pack dry-run versioning.
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -40,5 +42,40 @@ jobs:
       - name: Build
         run: dotnet build -c Release --no-restore
 
-      - name: Test
-        run: dotnet test -c Release --no-build --verbosity normal
+      - name: Pack (dry-run)
+        run: bash ./build/pack.sh nupkgs
+
+      - name: Assert pack layout
+        run: bash ./build/assert-pack-layout.sh nupkgs
+
+  # Self-contained on purpose: no `needs: build`, so the matrix runs in parallel with the
+  # build/format/pack job instead of rebuilding the solution behind it. Either job failing fails the run.
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Test project TFMs (see tests/Vexel.Telegram.Tests.csproj). Library TFMs are still built above.
+        tfm: [ net10.0, net11.0 ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+            11.0.x
+          dotnet-quality: preview
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Test (${{ matrix.tfm }})
+        run: dotnet test -c Release --no-build --framework ${{ matrix.tfm }} --verbosity normal

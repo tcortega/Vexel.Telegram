@@ -1,0 +1,10 @@
+=== Negative check: does assert-pack-layout.sh actually catch a package that lost the analyzer? ===
+Copied the nupkgs, deleted analyzers/dotnet/cs/Vexel.Telegram.Generators.dll from the Handlers package, re-ran the assertion.
+
+$ bash ./build/assert-pack-layout.sh <tampered-dir>; echo $?
+ok: found Vexel.Telegram.Client.0.0.0-preview.0.44.nupkg
+ok: found Vexel.Telegram.Handlers.0.0.0-preview.0.44.nupkg
+ok: found Vexel.Telegram.Hosting.0.0.0-preview.0.44.nupkg
+ok: found Vexel.Telegram.AspNetCore.0.0.0-preview.0.44.nupkg
+error: Handlers nupkg missing analyzers/dotnet/cs/Vexel.Telegram.Generators.dll
+1
