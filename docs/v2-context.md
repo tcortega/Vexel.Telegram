@@ -157,7 +157,7 @@ Current build-level details live in `AGENTS.md`; the solution and csproj files a
 
 App references: `Vexel.Telegram` + `Immediate.Handlers` as an **explicit peer** (same honesty as Apis).
 
-### Runtime flow - **command, callback, and inline legs settled in T3/T5/T7, flow step leg in T6**
+### Runtime flow - **command, callback, and inline legs settled in T3/T5/T7, flow step leg in T6, `[On*]` fan-out in T8**
 
 ```
 Update
@@ -167,6 +167,8 @@ Update
          bind to TRequest
          resolve generated Immediate handler
          await HandleAsync
+         then [On*] fan-out for that update kind (always, hit or miss;
+               awaited sequentially on the same lane, FQ-name order, fault-isolated)
     -> raw IRawUpdateHandler escape hatches (always last; cannot suppress routing)
     -> IUpdateCompletionHook (B4: default answerCallbackQuery / empty answerInlineQuery
                               if Feedback did not answer)
@@ -174,13 +176,14 @@ Update
 
 Hot path: compile-time map, no reflection invoke.
 
-`[Command]`, `[Callback]`, `[InlineQuery]`, `[ChosenInlineResult]`, and text flow step legs exist
-today: `IUpdateRouter` is the dispatcher seam, `TelegramRouter` the runtime implementation.
+`[Command]`, `[Callback]`, `[InlineQuery]`, `[ChosenInlineResult]`, text flow step, and `[On*]` legs
+exist today: `IUpdateRouter` is the dispatcher seam, `TelegramRouter` the runtime implementation.
 Binding conventions live in the code that implements them -
 `CommandKeyExtractor`, `CommandArgumentBinder`, `CallbackKeyExtractor`, `InlineQueryKeyExtractor` in
 `src/Vexel.Telegram.Handlers/Routing` - not restated here.
 Message text precedence (commands beat an armed step, built-in `/cancel`, B3 step lifecycle) lives with
-`TelegramRouter` and `Flow` in the same package.
+`TelegramRouter` and `Flow` in the same package, as does the `[On*]` fan-out order and its per-observer
+fault isolation.
 Keyboard builders emit short `key` / `key|suffix` callback data (`Keyboards/`).
 
 ### Example DX (illustrative, not approved API names)
@@ -256,9 +259,10 @@ builder.Services.AddXxxTelegram();                      // Vexel generated route
 
 **Settled in T4:** `AddTelegramBot(...)` ships (with `AddVexelUpdateContexts()` as the contexts-only
 seam for manual wiring).
-**Settled in T3/T5/T6/T7:** the generator emits `Add{Assembly}Telegram()`, which registers that assembly's
-`TelegramRouteContribution`; `TelegramRouter` composes all contributions and fails fast on duplicate
-route keys (command, callback, inline query, chosen inline result, or flow step) across assemblies.
+**Settled in T3/T5/T6/T7/T8:** the generator emits `Add{Assembly}Telegram()`, which registers that assembly's
+`TelegramRouteContribution` (route maps plus the four `[On*]` dispatch arrays); `TelegramRouter` composes all
+contributions and fails fast on duplicate route keys (command, callback, inline query, chosen inline result,
+or flow step) across assemblies, and on the same assembly contributing one `[On*]` observer twice.
 **Settled in T6:** `AddTelegramFlow(...)` wires `Flow`, `IFlowStore` (`MemoryFlowStore` default), and
 `FlowOptions`; `AddTelegramBot(...)` calls it, and takes an optional `configureFlowOptions` callback.
 
@@ -277,7 +281,7 @@ Raw update handlers without Immediate for power users and non-command traffic.
 V2 ships **Immediate.Apis parity**: every routed Telegram handler type **must** carry:
 
 1. `[Handler]` (Immediate.Handlers) - required for handler/pipeline/DI generation
-2. A Vexel Telegram attribute (`[Command]`, `[Callback]`, `[InlineQuery]`, …) - required for route-table generation
+2. A Vexel Telegram attribute (`[Command]`, `[Callback]`, `[InlineQuery]`, `[On*]`, …) - required for route-table generation
 
 Users are forced to use `[Handler]`. That is an accepted product cost, not a temporary oversight.
 
@@ -344,7 +348,7 @@ Mitigations for dual-attr DX:
 15. Common-workflow-first DX: commands, callback menus, inline mode, multi-step text prompts/FSM - not only fire-and-forget commands.
 16. UX model: button-first (`[Callback]`), commands as entry/deep link/cancel, typed `Flow.PromptAsync<TRequest>` for text steps, per-scope draft/store for multi-question state. No reflection. No Immediate.Cache required for flow (that package is response caching, not FSM). Pluggable `IFlowStore` (memory sample, redis/etc prod).
     - Concrete `Flow`, not `IFlow` (see 31). `PromptAsync` takes the **request** record, not the handler class: Immediate handler types are `static` and C# rejects static types as type arguments, so `flow.PromptAsync<CollectName.Command>()` is the shape. Durable step key = request `Type.FullName` (nested requests render `Ns.Handler+Command`).
-    - A flow step is a `[Handler]` with a flow-bindable request and **no** route attribute (a pure text step). `[Command]`/`[Callback]` handlers are reached through their own route and never enter the step map, so they may share request records freely.
+    - A flow step is a `[Handler]` with a flow-bindable request and **no** route or `[On*]` attribute (a pure text step). `[Command]`/`[Callback]`/`[On*]` handlers are reached through their own route or fan-out and never enter the step map, so they may share request records freely.
 17. `IFeedback` thin high-DX helper (not optional framework sludge): Reply/Edit/AnswerCallback/AnswerInline + send-with-keyboard. Defaults from context (chat, message id, parse mode opt). Power: inject `ITelegramBotClient` anytime. No fat localization/template engine in core.
 18. Concurrency: configurable; **default ordered per chat**, cross-chat parallel. Power can loosen.
 19. Hosting: **polling default**, webhook supported.
@@ -356,9 +360,12 @@ Mitigations for dual-attr DX:
 25. No v1 master inline hotfix parallel track; effort on `v2` only.
 26. Drop Remora.Commands (and Remora.Results) on `v2` entirely.
 27. v1→v2: **breaking major**; sample + short differences doc. No compat shims.
-28. On-update fan-out **kept** (v1 responder usefulness): `[OnMessage]`/`[OnCallback]`/… as Immediate `[Handler]`s; **Vexel gen** emits static multi-cast dispatch. No reflection responder bus. No Immediate.Notifications (N/A). Behaviors apply per handler. Default **await** on per-chat pipeline; fire-and-forget opt-in only.
+28. On-update fan-out **kept** (v1 responder usefulness): `[OnMessage]`/`[OnCallback]`/… as Immediate `[Handler]`s; **Vexel gen** emits static multi-cast dispatch. No reflection responder bus. No Immediate.Notifications (N/A). Behaviors apply per handler. **Await** on the per-chat pipeline.
+    - **Settled in T8:** 2.0 ships await-only - there is no fire-and-forget opt-in. The attributes carry no options, so a later opt-in stays additive and shape-compatible.
 29. Dispatch order (per chat): **routed handler first** (command/callback/flow text); **then** `[On*]` fan-out always (observe/side-effect). On* must not replace routing.
-30. On-update attrs: `[OnMessage]`, `[OnCallbackQuery]`, `[OnInlineQuery]`, `[OnChosenInlineResult]`, … (On* prefix).
+    - **Settled in T8:** observers run whether the routed leg hit, missed, or faulted (routed faults are logged and isolated), sequentially in fully-qualified handler metadata name order (ordinal), each fault-isolated; cancellation still stops the fan-out.
+30. On-update attrs: `[OnMessage]`, `[OnCallbackQuery]`, `[OnInlineQuery]`, `[OnChosenInlineResult]` (On* prefix).
+    - **Settled in T8:** exactly these four routed kinds in 2.0; no other update kinds get an On* attribute. Requests must be empty records - payload comes from the injected context.
 31. Prefer **concrete** contexts/`Feedback`/`Flow` (no interface-for-mocking). Keep **`IFlowStore`** (and Telegram.Bot’s `ITelegramBotClient`) where swap is real. No unit-test-driven interface soup.
 32. E2E: `tests/Vexel.Telegram.E2E` (test DC user+bot); light `tests/Vexel.Telegram.Tests`. Secrets: **GitHub Actions secrets** + local **dotnet user-secrets**. Never commit sessions/tokens.
 
@@ -403,7 +410,7 @@ Not a substitute for unit tests. Not prod userbots.
 ### Open questions
 
 None tracked here.
-The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, T6 `Flow` + flow step routing, T7 `[InlineQuery]` / `[ChosenInlineResult]` routing landed).
+The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, T6 `Flow` + flow step routing, T7 `[InlineQuery]` / `[ChosenInlineResult]` routing, T8 `[On*]` fan-out landed).
 
 
 ---
