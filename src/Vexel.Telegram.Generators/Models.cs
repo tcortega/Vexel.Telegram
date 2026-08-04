@@ -15,6 +15,23 @@ internal sealed record CallbackRouteModel(
 	string AssemblyDisplayName,
 	bool HasStringParameter);
 
+/// <summary>
+/// Inline-query route. <see cref="Trigger"/> is empty for the default handler.
+/// </summary>
+internal sealed record InlineQueryRouteModel(
+	string Trigger,
+	string HandlerFullyQualifiedName,
+	string RequestFullyQualifiedName,
+	string AssemblyDisplayName,
+	bool HasStringParameter);
+
+internal sealed record ChosenInlineResultRouteModel(
+	string RouteKey,
+	string HandlerFullyQualifiedName,
+	string RequestFullyQualifiedName,
+	string AssemblyDisplayName,
+	bool HasStringParameter);
+
 internal sealed record RequestParameterModel(
 	string FullyQualifiedTypeName,
 	string ParameterName,
@@ -35,4 +52,6 @@ internal sealed record AssemblyRoutesModel(
 	string AssemblyIdentifier,
 	string RootNamespace,
 	EquatableReadOnlyList<CommandRouteModel> Commands,
-	EquatableReadOnlyList<CallbackRouteModel> Callbacks);
+	EquatableReadOnlyList<CallbackRouteModel> Callbacks,
+	EquatableReadOnlyList<InlineQueryRouteModel> InlineQueries,
+	EquatableReadOnlyList<ChosenInlineResultRouteModel> ChosenInlineResults);

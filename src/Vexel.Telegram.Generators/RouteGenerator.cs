@@ -5,7 +5,8 @@ namespace Vexel.Telegram.Generators;
 
 /// <summary>
 /// Discovers Immediate.Handlers types that also carry a Vexel route attribute and emits
-/// <c>Add{Assembly}Telegram()</c> registration plus frozen command and callback binders.
+/// <c>Add{Assembly}Telegram()</c> registration plus frozen command, callback, inline-query, and
+/// chosen-inline-result binders.
 /// </summary>
 [Generator]
 public sealed class RouteGenerator : IIncrementalGenerator
@@ -18,7 +19,11 @@ public sealed class RouteGenerator : IIncrementalGenerator
 				SymbolExtensions.HandlerAttributeMetadataName,
 				predicate: static (node, _) => node is TypeDeclarationSyntax,
 				transform: static (ctx, token) => TransformHandler(ctx, token))
-			.Where(static pair => pair.Command is not null || pair.Callback is not null)
+			.Where(static pair =>
+				pair.Command is not null
+				|| pair.Callback is not null
+				|| pair.InlineQuery is not null
+				|| pair.ChosenInlineResult is not null)
 			.WithTrackingName("VexelRoutes");
 
 		var assemblyIdentifier = context.CompilationProvider
@@ -57,11 +62,29 @@ public sealed class RouteGenerator : IIncrementalGenerator
 					.ThenBy(static r => r.HandlerFullyQualifiedName, StringComparer.Ordinal)
 					.ToArray();
 
+				var inlineQueries = routes
+					.Select(static r => r.InlineQuery)
+					.Where(static c => c is not null)
+					.Select(static c => c!)
+					.OrderBy(static r => r.Trigger, StringComparer.Ordinal)
+					.ThenBy(static r => r.HandlerFullyQualifiedName, StringComparer.Ordinal)
+					.ToArray();
+
+				var chosenInlineResults = routes
+					.Select(static r => r.ChosenInlineResult)
+					.Where(static c => c is not null)
+					.Select(static c => c!)
+					.OrderBy(static r => r.RouteKey, StringComparer.Ordinal)
+					.ThenBy(static r => r.HandlerFullyQualifiedName, StringComparer.Ordinal)
+					.ToArray();
+
 				return new AssemblyRoutesModel(
 					assemblyIdentifier,
 					rootNamespace,
 					new EquatableReadOnlyList<CommandRouteModel>(commands),
-					new EquatableReadOnlyList<CallbackRouteModel>(callbacks));
+					new EquatableReadOnlyList<CallbackRouteModel>(callbacks),
+					new EquatableReadOnlyList<InlineQueryRouteModel>(inlineQueries),
+					new EquatableReadOnlyList<ChosenInlineResultRouteModel>(chosenInlineResults));
 			})
 			.WithTrackingName("VexelRouteModel");
 
@@ -81,7 +104,9 @@ public sealed class RouteGenerator : IIncrementalGenerator
 
 		return new HandlerRoutes(
 			TransformCommand(type, token),
-			TransformCallback(type, token));
+			TransformCallback(type, token),
+			TransformInlineQuery(type, token),
+			TransformChosenInlineResult(type, token));
 	}
 
 	private static CommandRouteModel? TransformCommand(INamedTypeSymbol type, CancellationToken token)
@@ -160,7 +185,7 @@ public sealed class RouteGenerator : IIncrementalGenerator
 
 		token.ThrowIfCancellationRequested();
 
-		if (!TryGetBindableCallbackRequest(type, out var requestType, out var hasStringParameter, out _))
+		if (!TryGetBindableStringOrEmptyRequest(type, "Callback", out var requestType, out var hasStringParameter, out _))
 		{
 			// VEX0004 reports; skip emission.
 			return null;
@@ -169,6 +194,106 @@ public sealed class RouteGenerator : IIncrementalGenerator
 		token.ThrowIfCancellationRequested();
 
 		return new CallbackRouteModel(
+			RouteKey: routeKey,
+			HandlerFullyQualifiedName: type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+			RequestFullyQualifiedName: requestType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+			AssemblyDisplayName: type.ContainingAssembly.Name,
+			HasStringParameter: hasStringParameter);
+	}
+
+	private static InlineQueryRouteModel? TransformInlineQuery(INamedTypeSymbol type, CancellationToken token)
+	{
+		token.ThrowIfCancellationRequested();
+
+		var attribute = type.GetInlineQueryAttribute();
+		if (attribute is null)
+		{
+			return null;
+		}
+
+		token.ThrowIfCancellationRequested();
+
+		// Optional ctor arg defaults to "" when omitted ([InlineQuery] with no args).
+		string trigger;
+		if (attribute.ConstructorArguments.Length == 0)
+		{
+			trigger = string.Empty;
+		}
+		else if (attribute.ConstructorArguments is [{ Value: string t }])
+		{
+			trigger = t;
+		}
+		else
+		{
+			return null;
+		}
+
+		if (!InlineQueryTriggerValidation.IsValid(trigger))
+		{
+			// VEX0006 reports; skip emission.
+			return null;
+		}
+
+		token.ThrowIfCancellationRequested();
+
+		if (!TryGetBindableStringOrEmptyRequest(type, "Inline query", out var requestType, out var hasStringParameter, out _))
+		{
+			// VEX0004 reports; skip emission.
+			return null;
+		}
+
+		token.ThrowIfCancellationRequested();
+
+		return new InlineQueryRouteModel(
+			Trigger: trigger,
+			HandlerFullyQualifiedName: type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+			RequestFullyQualifiedName: requestType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+			AssemblyDisplayName: type.ContainingAssembly.Name,
+			HasStringParameter: hasStringParameter);
+	}
+
+	private static ChosenInlineResultRouteModel? TransformChosenInlineResult(
+		INamedTypeSymbol type,
+		CancellationToken token)
+	{
+		token.ThrowIfCancellationRequested();
+
+		var attribute = type.GetChosenInlineResultAttribute();
+		if (attribute is null)
+		{
+			return null;
+		}
+
+		token.ThrowIfCancellationRequested();
+
+		if (attribute.ConstructorArguments is not [{ Value: string routeKey }])
+		{
+			return null;
+		}
+
+		// Same key rules as callback (non-blank, no '|', <= 64 UTF-8 bytes of ResultId budget).
+		if (!CallbackKeyValidation.IsValid(routeKey))
+		{
+			// VEX0002 reports; skip emission.
+			return null;
+		}
+
+		token.ThrowIfCancellationRequested();
+
+		if (!TryGetBindableStringOrEmptyRequest(
+				type,
+				"Chosen inline result",
+				out var requestType,
+				out var hasStringParameter,
+				out _))
+		{
+			// VEX0004 reports; skip emission.
+			return null;
+		}
+
+		token.ThrowIfCancellationRequested();
+
+		return new ChosenInlineResultRouteModel(
 			RouteKey: routeKey,
 			HandlerFullyQualifiedName: type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
 			RequestFullyQualifiedName: requestType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
@@ -274,8 +399,12 @@ public sealed class RouteGenerator : IIncrementalGenerator
 		return true;
 	}
 
-	internal static bool TryGetBindableCallbackRequest(
+	/// <summary>
+	/// Empty record or single string parameter - shared by callback, inline query, and chosen inline result.
+	/// </summary>
+	internal static bool TryGetBindableStringOrEmptyRequest(
 		INamedTypeSymbol handlerType,
+		string kindLabel,
 		[System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ITypeSymbol? requestType,
 		out bool hasStringParameter,
 		out string? errorMessage)
@@ -336,7 +465,7 @@ public sealed class RouteGenerator : IIncrementalGenerator
 		}
 
 		errorMessage =
-			$"Callback request '{namedRequest.ToDisplayString()}' on '{handlerType.Name}' must be an empty record or a single string parameter receiving the data suffix (binding convention rule 3).";
+			$"{kindLabel} request '{namedRequest.ToDisplayString()}' on '{handlerType.Name}' must be an empty record or a single string parameter (binding convention rule 3/4/6).";
 		return false;
 	}
 
@@ -347,5 +476,9 @@ public sealed class RouteGenerator : IIncrementalGenerator
 		context.AddSource("Vexel.Telegram.Routes.g.cs", source);
 	}
 
-	private readonly record struct HandlerRoutes(CommandRouteModel? Command, CallbackRouteModel? Callback);
+	private readonly record struct HandlerRoutes(
+		CommandRouteModel? Command,
+		CallbackRouteModel? Callback,
+		InlineQueryRouteModel? InlineQuery,
+		ChosenInlineResultRouteModel? ChosenInlineResult);
 }

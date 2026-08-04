@@ -8,6 +8,9 @@ internal static class SymbolExtensions
 	public const string HandlerAttributeMetadataName = "Immediate.Handlers.Shared.HandlerAttribute";
 	public const string CommandAttributeMetadataName = "Vexel.Telegram.Handlers.Attributes.CommandAttribute";
 	public const string CallbackAttributeMetadataName = "Vexel.Telegram.Handlers.Attributes.CallbackAttribute";
+	public const string InlineQueryAttributeMetadataName = "Vexel.Telegram.Handlers.Attributes.InlineQueryAttribute";
+	public const string ChosenInlineResultAttributeMetadataName =
+		"Vexel.Telegram.Handlers.Attributes.ChosenInlineResultAttribute";
 	public const string ImmediateAssemblyIdentifierMetadataName =
 		"Immediate.Handlers.Shared.ImmediateAssemblyIdentifierAttribute";
 
@@ -76,6 +79,52 @@ internal static class SymbolExtensions
 			},
 		};
 
+	public static bool IsInlineQueryAttribute([NotNullWhen(true)] this ITypeSymbol? type) =>
+		type is
+		{
+			Name: "InlineQueryAttribute",
+			ContainingNamespace:
+			{
+				Name: "Attributes",
+				ContainingNamespace:
+				{
+					Name: "Handlers",
+					ContainingNamespace:
+					{
+						Name: "Telegram",
+						ContainingNamespace:
+						{
+							Name: "Vexel",
+							ContainingNamespace.IsGlobalNamespace: true,
+						},
+					},
+				},
+			},
+		};
+
+	public static bool IsChosenInlineResultAttribute([NotNullWhen(true)] this ITypeSymbol? type) =>
+		type is
+		{
+			Name: "ChosenInlineResultAttribute",
+			ContainingNamespace:
+			{
+				Name: "Attributes",
+				ContainingNamespace:
+				{
+					Name: "Handlers",
+					ContainingNamespace:
+					{
+						Name: "Telegram",
+						ContainingNamespace:
+						{
+							Name: "Vexel",
+							ContainingNamespace.IsGlobalNamespace: true,
+						},
+					},
+				},
+			},
+		};
+
 	public static bool HasHandlerAttribute(this INamedTypeSymbol type)
 	{
 		foreach (var attribute in type.GetAttributes())
@@ -115,9 +164,38 @@ internal static class SymbolExtensions
 		return null;
 	}
 
+	public static AttributeData? GetInlineQueryAttribute(this INamedTypeSymbol type)
+	{
+		foreach (var attribute in type.GetAttributes())
+		{
+			if (attribute.AttributeClass.IsInlineQueryAttribute())
+			{
+				return attribute;
+			}
+		}
+
+		return null;
+	}
+
+	public static AttributeData? GetChosenInlineResultAttribute(this INamedTypeSymbol type)
+	{
+		foreach (var attribute in type.GetAttributes())
+		{
+			if (attribute.AttributeClass.IsChosenInlineResultAttribute())
+			{
+				return attribute;
+			}
+		}
+
+		return null;
+	}
+
 	public static bool IsVexelRouteAttribute([NotNullWhen(true)] this ITypeSymbol? type) =>
-		type.IsCommandAttribute() || type.IsCallbackAttribute();
-	// Inline/On* land in later tasks and extend this check.
+		type.IsCommandAttribute()
+		|| type.IsCallbackAttribute()
+		|| type.IsInlineQueryAttribute()
+		|| type.IsChosenInlineResultAttribute();
+	// On* land in T8 and extend this check.
 
 	public static bool HasVexelRouteAttribute(this INamedTypeSymbol type)
 	{

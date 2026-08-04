@@ -133,4 +133,62 @@ public sealed class RouteGeneratorSnapshotTests
 		var generated = GeneratorTestHelper.GetVexelGeneratedSource(GeneratorTestHelper.RunGenerators(source));
 		await Verify(generated);
 	}
+
+	[Fact]
+	public async Task Inline_query_and_chosen_inline_result_binders()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[InlineQuery("search")]
+			public static partial class SearchInline
+			{
+				public sealed record Query(string Text);
+
+				private static ValueTask HandleAsync(Query query, CancellationToken token)
+				{
+					_ = query;
+					_ = token;
+					return default;
+				}
+			}
+
+			[Handler]
+			[InlineQuery]
+			public static partial class DefaultInline
+			{
+				public sealed record Query(string Text);
+
+				private static ValueTask HandleAsync(Query query, CancellationToken token)
+				{
+					_ = query;
+					_ = token;
+					return default;
+				}
+			}
+
+			[Handler]
+			[ChosenInlineResult("item")]
+			public static partial class ItemChosen
+			{
+				public sealed record Command(string Id);
+
+				private static ValueTask HandleAsync(Command command, CancellationToken token)
+				{
+					_ = command;
+					_ = token;
+					return default;
+				}
+			}
+			""";
+
+		var generated = GeneratorTestHelper.GetVexelGeneratedSource(GeneratorTestHelper.RunGenerators(source));
+		await Verify(generated);
+	}
 }

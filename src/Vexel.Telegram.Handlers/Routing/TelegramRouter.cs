@@ -11,9 +11,10 @@ namespace Vexel.Telegram.Handlers.Routing;
 /// bind arguments, and await the generated Immediate handler.
 /// </summary>
 /// <remarks>
-/// Callback answer obligation (B4) is discharged by <see cref="CallbackAnswerObligation"/> after
-/// the full dispatch pipeline so routed handlers, exceptions, unrouted callbacks, and raw handlers
-/// all share one fail-closed empty <c>answerCallbackQuery</c> when Feedback did not answer.
+/// Callback and inline answer obligations (B4) are discharged by
+/// <see cref="CallbackAnswerObligation"/> and <see cref="InlineAnswerObligation"/> after the full
+/// dispatch pipeline so routed handlers, exceptions, unrouted updates, and raw handlers all share
+/// one fail-closed default answer when Feedback did not answer.
 /// </remarks>
 public sealed class TelegramRouter : IUpdateRouter
 {
@@ -21,13 +22,15 @@ public sealed class TelegramRouter : IUpdateRouter
 	private readonly ILogger<TelegramRouter> _logger;
 	private readonly FrozenDictionary<string, RouteEntry> _commands;
 	private readonly FrozenDictionary<string, RouteEntry> _callbacks;
+	private readonly FrozenDictionary<string, RouteEntry> _inlineQueries;
+	private readonly FrozenDictionary<string, RouteEntry> _chosenInlineResults;
 	private string? _botUsername;
 	private int _botUsernameResolved; // 0 = unset, 1 = resolved
 	private long _botUsernameRetryAfterTicks;
 
 	/// <summary>
 	/// Initializes a new router from all registered <see cref="TelegramRouteContribution"/>s.
-	/// Fails fast when two assemblies contribute the same command or callback key.
+	/// Fails fast when two assemblies contribute the same command, callback, inline, or chosen key.
 	/// </summary>
 	/// <param name="contributions">Per-assembly route contributions.</param>
 	/// <param name="botClient">Bot client used to resolve this bot's username when needed.</param>
@@ -47,6 +50,8 @@ public sealed class TelegramRouter : IUpdateRouter
 		var contributionList = contributions as IList<TelegramRouteContribution> ?? [.. contributions];
 		_commands = ComposeCommands(contributionList);
 		_callbacks = ComposeCallbacks(contributionList);
+		_inlineQueries = ComposeInlineQueries(contributionList);
+		_chosenInlineResults = ComposeChosenInlineResults(contributionList);
 	}
 
 	/// <summary>
@@ -82,6 +87,19 @@ public sealed class TelegramRouter : IUpdateRouter
 		if (update.CallbackQuery is { } callbackQuery)
 		{
 			await RouteCallbackAsync(callbackQuery, update, scope, cancellationToken).ConfigureAwait(false);
+			return;
+		}
+
+		if (update.InlineQuery is { } inlineQuery)
+		{
+			await RouteInlineQueryAsync(inlineQuery, update, scope, cancellationToken).ConfigureAwait(false);
+			return;
+		}
+
+		if (update.ChosenInlineResult is { } chosenInlineResult)
+		{
+			await RouteChosenInlineResultAsync(chosenInlineResult, update, scope, cancellationToken)
+				.ConfigureAwait(false);
 			return;
 		}
 
@@ -174,10 +192,115 @@ public sealed class TelegramRouter : IUpdateRouter
 			return;
 		}
 
+		await InvokeRouteAsync(
+			entry,
+			suffix,
+			update,
+			scope,
+			RouteKindLabel.Callback,
+			cancellationToken).ConfigureAwait(false);
+	}
+
+	private async Task RouteInlineQueryAsync(
+		InlineQuery inlineQuery,
+		Update update,
+		IServiceProvider scope,
+		CancellationToken cancellationToken)
+	{
+		// Routing keys off query text only - never InlineQuery.Id (opaque Telegram server id).
+		// Answer obligation (B4) is discharged by InlineAnswerObligation after the full pipeline.
+		if (_inlineQueries.Count == 0)
+		{
+			return;
+		}
+
+		var (trigger, remainder) = InlineQueryKeyExtractor.Extract(inlineQuery.Query);
+
+		// Non-empty first token that matches a registered trigger wins (D8 exact match).
+		// The empty-string default is never selected via the trigger path.
+		if (trigger.Length > 0
+			&& _inlineQueries.TryGetValue(trigger, out var triggerEntry))
+		{
+			await InvokeRouteAsync(
+				triggerEntry,
+				remainder,
+				update,
+				scope,
+				RouteKindLabel.InlineQuery,
+				cancellationToken).ConfigureAwait(false);
+			return;
+		}
+
+		// Empty or unmatched queries route to the default handler with the full query text.
+		if (_inlineQueries.TryGetValue(string.Empty, out var defaultEntry))
+		{
+			await InvokeRouteAsync(
+				defaultEntry,
+				inlineQuery.Query ?? string.Empty,
+				update,
+				scope,
+				RouteKindLabel.InlineQuery,
+				cancellationToken).ConfigureAwait(false);
+			return;
+		}
+
+		_logger.LogDebug(
+			"Unrouted inline query {InlineQueryId} for update {UpdateId}: no default handler and no trigger '{Trigger}'",
+			inlineQuery.Id,
+			update.Id,
+			trigger);
+	}
+
+	private async Task RouteChosenInlineResultAsync(
+		ChosenInlineResult chosenInlineResult,
+		Update update,
+		IServiceProvider scope,
+		CancellationToken cancellationToken)
+	{
+		if (_chosenInlineResults.Count == 0)
+		{
+			return;
+		}
+
+		// Same key|suffix convention as callbacks against the developer-set ResultId.
+		if (!CallbackKeyExtractor.TryExtract(chosenInlineResult.ResultId, out var key, out var suffix))
+		{
+			_logger.LogDebug(
+				"Unrouted chosen inline result for update {UpdateId}: empty ResultId",
+				update.Id);
+			return;
+		}
+
+		if (!_chosenInlineResults.TryGetValue(key, out var entry))
+		{
+			_logger.LogDebug(
+				"Unrouted chosen inline result for update {UpdateId}: no route for key '{ResultKey}'",
+				update.Id,
+				key);
+			return;
+		}
+
+		await InvokeRouteAsync(
+			entry,
+			suffix,
+			update,
+			scope,
+			RouteKindLabel.ChosenInlineResult,
+			cancellationToken).ConfigureAwait(false);
+	}
+
+	private async Task InvokeRouteAsync(
+		RouteEntry entry,
+		string payload,
+		Update update,
+		IServiceProvider scope,
+		RouteKindLabel kind,
+		CancellationToken cancellationToken)
+	{
 		bool invoked;
 		try
 		{
-			invoked = await entry.Binder(scope, suffix, cancellationToken).ConfigureAwait(false);
+			invoked = await entry.Binder(scope, payload, cancellationToken).ConfigureAwait(false);
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 		{
@@ -185,11 +308,12 @@ public sealed class TelegramRouter : IUpdateRouter
 		}
 		catch (Exception ex)
 		{
-			// Fault isolation: handler exceptions never kill the lane (P2). Answer obligation
-			// still discharges post-pipeline. No auto error text.
+			// Fault isolation: handler exceptions never kill the lane (P2). Answer obligations
+			// still discharge post-pipeline. No auto error text.
 			_logger.LogError(
 				ex,
-				"Callback handler for '{CallbackKey}' failed for update {UpdateId}",
+				"{Kind} handler for '{RouteKey}' failed for update {UpdateId}",
+				kind.Title,
 				entry.RouteKey,
 				update.Id);
 			return;
@@ -198,7 +322,8 @@ public sealed class TelegramRouter : IUpdateRouter
 		if (!invoked)
 		{
 			_logger.LogWarning(
-				"Failed to bind arguments for callback '{CallbackKey}' (update {UpdateId}); handler not invoked",
+				"Failed to bind arguments for {Kind} '{RouteKey}' (update {UpdateId}); handler not invoked",
+				kind.Lowercase,
 				entry.RouteKey,
 				update.Id);
 		}
@@ -275,23 +400,38 @@ public sealed class TelegramRouter : IUpdateRouter
 	}
 
 	private static FrozenDictionary<string, RouteEntry> ComposeCallbacks(
-		IEnumerable<TelegramRouteContribution> contributions)
+		IEnumerable<TelegramRouteContribution> contributions) =>
+		ComposeOrdinalMap(contributions, static c => c.Callbacks, "callback");
+
+	private static FrozenDictionary<string, RouteEntry> ComposeInlineQueries(
+		IEnumerable<TelegramRouteContribution> contributions) =>
+		ComposeOrdinalMap(contributions, static c => c.InlineQueries, "inline query");
+
+	private static FrozenDictionary<string, RouteEntry> ComposeChosenInlineResults(
+		IEnumerable<TelegramRouteContribution> contributions) =>
+		ComposeOrdinalMap(contributions, static c => c.ChosenInlineResults, "chosen inline result");
+
+	private static FrozenDictionary<string, RouteEntry> ComposeOrdinalMap(
+		IEnumerable<TelegramRouteContribution> contributions,
+		Func<TelegramRouteContribution, IReadOnlyDictionary<string, RouteBinder>> selector,
+		string kind)
 	{
 		var map = new Dictionary<string, RouteEntry>(StringComparer.Ordinal);
 		var owners = new Dictionary<string, string>(StringComparer.Ordinal);
 
 		foreach (var contribution in contributions)
 		{
-			foreach (var pair in contribution.Callbacks)
+			foreach (var pair in selector(contribution))
 			{
 				if (owners.TryGetValue(pair.Key, out var otherAssembly))
 				{
+					var displayKey = pair.Key.Length == 0 ? "<default>" : pair.Key;
 					throw new InvalidOperationException(
 						string.Equals(otherAssembly, contribution.AssemblyName, StringComparison.Ordinal)
-							? $"Assembly '{contribution.AssemblyName}' contributed callback route "
-								+ $"'{pair.Key}' more than once. Call Add{contribution.AssemblyName}Telegram() "
+							? $"Assembly '{contribution.AssemblyName}' contributed {kind} route "
+								+ $"'{displayKey}' more than once. Call Add{contribution.AssemblyName}Telegram() "
 								+ "exactly once (a library that already calls it must not be re-registered by the app)."
-							: $"Duplicate callback route '{pair.Key}' registered by assemblies "
+							: $"Duplicate {kind} route '{displayKey}' registered by assemblies "
 								+ $"'{otherAssembly}' and '{contribution.AssemblyName}'.");
 				}
 
@@ -304,4 +444,15 @@ public sealed class TelegramRouter : IUpdateRouter
 	}
 
 	private readonly record struct RouteEntry(string RouteKey, RouteBinder Binder);
+
+	/// <summary>Sentence-initial and mid-sentence spellings of a route kind for log templates.</summary>
+	private readonly record struct RouteKindLabel(string Title, string Lowercase)
+	{
+		public static RouteKindLabel Callback { get; } = new("Callback", "callback");
+
+		public static RouteKindLabel InlineQuery { get; } = new("Inline query", "inline query");
+
+		public static RouteKindLabel ChosenInlineResult { get; } =
+			new("Chosen inline result", "chosen inline result");
+	}
 }

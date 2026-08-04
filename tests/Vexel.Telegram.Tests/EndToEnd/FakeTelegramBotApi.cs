@@ -228,6 +228,37 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 		return (id, update.ToJsonString());
 	}
 
+	/// <summary>
+	/// Builds a chosen-inline-result update JSON payload for the result the user picked out of an
+	/// inline answer, including the <c>inline_message_id</c> of the message it posted.
+	/// </summary>
+	public static (int Id, string Json) ChosenInlineResultUpdate(
+		int id,
+		long userId,
+		string resultId,
+		string query,
+		string inlineMessageId)
+	{
+		var update = new JsonObject
+		{
+			["update_id"] = id,
+			["chosen_inline_result"] = new JsonObject
+			{
+				["result_id"] = resultId,
+				["from"] = new JsonObject
+				{
+					["id"] = userId,
+					["is_bot"] = false,
+					["first_name"] = $"user{userId}",
+				},
+				["query"] = query,
+				["inline_message_id"] = inlineMessageId,
+			},
+		};
+
+		return (id, update.ToJsonString());
+	}
+
 	private static int FreePort()
 	{
 		using var probe = new TcpListener(IPAddress.Loopback, 0);
@@ -317,7 +348,7 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 		}
 
 		var fields = new List<string>();
-		foreach (var key in (string[])["chat_id", "message_id", "callback_query_id", "inline_query_id", "text", "show_alert"])
+		foreach (var key in (string[])["chat_id", "message_id", "inline_message_id", "callback_query_id", "inline_query_id", "text", "show_alert", "cache_time"])
 		{
 			if (request[key] is { } value)
 			{
@@ -327,6 +358,13 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 					? $"{key}=\"{value.GetValue<string>()}\""
 					: $"{key}={value.ToJsonString()}");
 			}
+		}
+
+		// Inline answers are only meaningful with their result set, including the empty one the
+		// fail-closed obligation sends.
+		if (request["results"] is JsonArray results)
+		{
+			fields.Add(DescribeResults(results));
 		}
 
 		if (request["reply_markup"] is not null)
@@ -342,6 +380,26 @@ public sealed class FakeTelegramBotApi : IAsyncDisposable
 		}
 
 		return fields.Count == 0 ? method : $"{method} {string.Join(' ', fields)}";
+	}
+
+	/// <summary>
+	/// Summarises an <c>answerInlineQuery</c> result set as <c>id -> title</c> pairs, the way the
+	/// Telegram client would list them under the user's input field.
+	/// </summary>
+	private static string DescribeResults(JsonArray results)
+	{
+		var described = results
+			.OfType<JsonObject>()
+			.Select(static result =>
+			{
+				var id = result["id"]?.GetValue<string>() ?? string.Empty;
+				var title = result["title"]?.GetValue<string>() ?? string.Empty;
+
+				return $"{id} -> \"{title}\"";
+			})
+			.ToArray();
+
+		return $"results=[{string.Join("; ", described)}]";
 	}
 
 	/// <summary>
