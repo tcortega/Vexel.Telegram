@@ -9,7 +9,7 @@ namespace Vexel.Telegram.Generators;
 /// chosen-inline-result, and flow step binders.
 /// Flow steps are the pure text steps: a <c>[Handler]</c> with a flow-bindable request shape (empty
 /// or single string) and <em>no</em> route attribute, so <c>Flow.PromptAsync&lt;TRequest&gt;</c> can
-/// resolve them by the request type's <see cref="System.Type.FullName"/>.
+/// resolve them by the request type's <see cref="Type.FullName"/>.
 /// </summary>
 [Generator]
 public sealed class RouteGenerator : IIncrementalGenerator

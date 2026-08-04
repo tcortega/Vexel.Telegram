@@ -97,8 +97,8 @@ public sealed class InvalidPromptTargetAnalyzer : DiagnosticAnalyzer
 			context,
 			typeArgSyntax,
 			error
-			?? $"Type '{targetType.ToDisplayString()}' is not a registered flow step request; it must be the request of a "
-			+ "[Handler] with no route attribute and be empty or take a single string (binding convention rule 5).");
+			?? ($"Type '{targetType.ToDisplayString()}' is not a registered flow step request; it must be the request of a "
+				+ "[Handler] with no route attribute and be empty or take a single string (binding convention rule 5)."));
 	}
 
 	private static bool IsFlowInvocation(SyntaxNodeAnalysisContext context, InvocationExpressionSyntax invocation)
