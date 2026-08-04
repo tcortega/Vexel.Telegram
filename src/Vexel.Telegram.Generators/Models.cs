@@ -39,6 +39,15 @@ internal sealed record FlowStepModel(
 	string AssemblyDisplayName,
 	bool HasStringParameter);
 
+/// <summary>
+/// On* observer. Request is always an empty record; payload access is via injected context.
+/// Sorted by <see cref="HandlerFullyQualifiedName"/> for deterministic dispatch.
+/// </summary>
+internal sealed record OnHandlerModel(
+	string HandlerFullyQualifiedName,
+	string RequestFullyQualifiedName,
+	string AssemblyDisplayName);
+
 internal sealed record RequestParameterModel(
 	string FullyQualifiedTypeName,
 	string ParameterName,
@@ -62,4 +71,8 @@ internal sealed record AssemblyRoutesModel(
 	EquatableReadOnlyList<CallbackRouteModel> Callbacks,
 	EquatableReadOnlyList<InlineQueryRouteModel> InlineQueries,
 	EquatableReadOnlyList<ChosenInlineResultRouteModel> ChosenInlineResults,
-	EquatableReadOnlyList<FlowStepModel> FlowSteps);
+	EquatableReadOnlyList<FlowStepModel> FlowSteps,
+	EquatableReadOnlyList<OnHandlerModel> OnMessages,
+	EquatableReadOnlyList<OnHandlerModel> OnCallbackQueries,
+	EquatableReadOnlyList<OnHandlerModel> OnInlineQueries,
+	EquatableReadOnlyList<OnHandlerModel> OnChosenInlineResults);

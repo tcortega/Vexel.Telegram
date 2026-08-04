@@ -50,6 +50,61 @@ public sealed class AnalyzerTests
 	}
 
 	[Fact]
+	public async Task VEX0001_fires_when_OnMessage_missing_Handler()
+	{
+		const string source = """
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[OnMessage]
+			public static class Observer
+			{
+				public sealed record Command;
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new MissingHandlerAttributeAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0001");
+	}
+
+	[Fact]
+	public async Task VEX0004_fires_when_OnMessage_request_is_not_empty()
+	{
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[OnMessage]
+			public static partial class Observer
+			{
+				public sealed record Command(string Text);
+
+				private static ValueTask HandleAsync(Command command, CancellationToken token)
+				{
+					_ = command;
+					_ = token;
+					return default;
+				}
+			}
+			""";
+
+		var diagnostics = await GeneratorTestHelper.RunAnalyzersAsync(
+			source,
+			new UnbindableRequestAnalyzer());
+
+		Assert.Contains(diagnostics, static d => d.Id == "VEX0004");
+	}
+
+	[Fact]
 	public async Task VEX0002_fires_when_callback_key_exceeds_64_utf8_bytes()
 	{
 		// 65 ASCII bytes.

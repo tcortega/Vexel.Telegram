@@ -5,7 +5,7 @@ Not a frozen API contract.
 Items below are labeled `agreed`, `proposed`, or `open`.
 Do not treat proposed items as authorization to implement product code.
 
-Last updated: 2026-08-05 (decision log through 32; T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, T6 `Flow` + flow step routing, and T7 `[InlineQuery]` / `[ChosenInlineResult]` routing landed)
+Last updated: 2026-08-05 (decision log through 32; T1 skeleton, T2 client dispatch, T4 contexts/Feedback/DI, T3 `[Command]` routing, T5 `[Callback]` + keyboard helpers, T6 `Flow` + flow step routing, T7 `[InlineQuery]` / `[ChosenInlineResult]` routing, and T8 `[On*]` fan-out generation landed)
 Branch: `v2` (created to hold this context and future V2 work)
 Repo stays public. Private-repo idea was rejected.
 

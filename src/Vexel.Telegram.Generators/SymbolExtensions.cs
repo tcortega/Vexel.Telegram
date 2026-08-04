@@ -11,6 +11,14 @@ internal static class SymbolExtensions
 	public const string InlineQueryAttributeMetadataName = "Vexel.Telegram.Handlers.Attributes.InlineQueryAttribute";
 	public const string ChosenInlineResultAttributeMetadataName =
 		"Vexel.Telegram.Handlers.Attributes.ChosenInlineResultAttribute";
+	public const string OnMessageAttributeMetadataName =
+		"Vexel.Telegram.Handlers.Attributes.OnMessageAttribute";
+	public const string OnCallbackQueryAttributeMetadataName =
+		"Vexel.Telegram.Handlers.Attributes.OnCallbackQueryAttribute";
+	public const string OnInlineQueryAttributeMetadataName =
+		"Vexel.Telegram.Handlers.Attributes.OnInlineQueryAttribute";
+	public const string OnChosenInlineResultAttributeMetadataName =
+		"Vexel.Telegram.Handlers.Attributes.OnChosenInlineResultAttribute";
 	public const string ImmediateAssemblyIdentifierMetadataName =
 		"Immediate.Handlers.Shared.ImmediateAssemblyIdentifierAttribute";
 
@@ -125,6 +133,47 @@ internal static class SymbolExtensions
 			},
 		};
 
+	public static bool IsOnMessageAttribute([NotNullWhen(true)] this ITypeSymbol? type) =>
+		IsVexelAttributeNamed(type, "OnMessageAttribute");
+
+	public static bool IsOnCallbackQueryAttribute([NotNullWhen(true)] this ITypeSymbol? type) =>
+		IsVexelAttributeNamed(type, "OnCallbackQueryAttribute");
+
+	public static bool IsOnInlineQueryAttribute([NotNullWhen(true)] this ITypeSymbol? type) =>
+		IsVexelAttributeNamed(type, "OnInlineQueryAttribute");
+
+	public static bool IsOnChosenInlineResultAttribute([NotNullWhen(true)] this ITypeSymbol? type) =>
+		IsVexelAttributeNamed(type, "OnChosenInlineResultAttribute");
+
+	public static bool IsOnAttribute([NotNullWhen(true)] this ITypeSymbol? type) =>
+		type.IsOnMessageAttribute()
+		|| type.IsOnCallbackQueryAttribute()
+		|| type.IsOnInlineQueryAttribute()
+		|| type.IsOnChosenInlineResultAttribute();
+
+	private static bool IsVexelAttributeNamed([NotNullWhen(true)] ITypeSymbol? type, string name) =>
+		type is
+		{
+			ContainingNamespace:
+			{
+				Name: "Attributes",
+				ContainingNamespace:
+				{
+					Name: "Handlers",
+					ContainingNamespace:
+					{
+						Name: "Telegram",
+						ContainingNamespace:
+						{
+							Name: "Vexel",
+							ContainingNamespace.IsGlobalNamespace: true,
+						},
+					},
+				},
+			},
+		}
+		&& string.Equals(type.Name, name, StringComparison.Ordinal);
+
 	public static bool HasHandlerAttribute(this INamedTypeSymbol type)
 	{
 		foreach (var attribute in type.GetAttributes())
@@ -203,12 +252,37 @@ internal static class SymbolExtensions
 		return null;
 	}
 
+	public static AttributeData? GetOnMessageAttribute(this INamedTypeSymbol type) =>
+		GetAttribute(type, static t => t.IsOnMessageAttribute());
+
+	public static AttributeData? GetOnCallbackQueryAttribute(this INamedTypeSymbol type) =>
+		GetAttribute(type, static t => t.IsOnCallbackQueryAttribute());
+
+	public static AttributeData? GetOnInlineQueryAttribute(this INamedTypeSymbol type) =>
+		GetAttribute(type, static t => t.IsOnInlineQueryAttribute());
+
+	public static AttributeData? GetOnChosenInlineResultAttribute(this INamedTypeSymbol type) =>
+		GetAttribute(type, static t => t.IsOnChosenInlineResultAttribute());
+
+	private static AttributeData? GetAttribute(INamedTypeSymbol type, Func<ITypeSymbol?, bool> match)
+	{
+		foreach (var attribute in type.GetAttributes())
+		{
+			if (match(attribute.AttributeClass))
+			{
+				return attribute;
+			}
+		}
+
+		return null;
+	}
+
 	public static bool IsVexelRouteAttribute([NotNullWhen(true)] this ITypeSymbol? type) =>
 		type.IsCommandAttribute()
 		|| type.IsCallbackAttribute()
 		|| type.IsInlineQueryAttribute()
-		|| type.IsChosenInlineResultAttribute();
-	// On* land in T8 and extend this check.
+		|| type.IsChosenInlineResultAttribute()
+		|| type.IsOnAttribute();
 
 	public static bool HasVexelRouteAttribute(this INamedTypeSymbol type)
 	{

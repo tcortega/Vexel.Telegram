@@ -64,6 +64,15 @@ public sealed class UnbindableRequestAnalyzer : DiagnosticAnalyzer
 				out error);
 		}
 
+		if (error is null
+			&& (type.GetOnMessageAttribute() is not null
+				|| type.GetOnCallbackQueryAttribute() is not null
+				|| type.GetOnInlineQueryAttribute() is not null
+				|| type.GetOnChosenInlineResultAttribute() is not null))
+		{
+			_ = RouteGenerator.TryGetBindableOnRequest(type, out _, out error);
+		}
+
 		if (error is null)
 		{
 			return;

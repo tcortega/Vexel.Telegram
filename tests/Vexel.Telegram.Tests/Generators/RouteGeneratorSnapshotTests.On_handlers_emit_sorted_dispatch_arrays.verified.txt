@@ -18,10 +18,17 @@ public static partial class TelegramServiceCollectionExtensions
 		var commands = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
 			global::System.StringComparer.OrdinalIgnoreCase)
 		{
+			["ping"] = static async (scope, payload, cancellationToken) =>
+			{
+				var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::Demo.Ping.Handler>(scope);
+				_ = await handler.HandleAsync(new global::Demo.Ping.Command(), cancellationToken).ConfigureAwait(false);
+				return true;
+			},
 		};
 
 		var metadata = new global::Vexel.Telegram.Handlers.Routing.CommandRouteMetadata[]
 		{
+			new global::Vexel.Telegram.Handlers.Routing.CommandRouteMetadata("ping", ""),
 		};
 
 		var callbacks = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
@@ -42,20 +49,38 @@ public static partial class TelegramServiceCollectionExtensions
 		var flowSteps = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(
 			global::System.StringComparer.Ordinal)
 		{
-			[typeof(global::Demo.CollectName.Command).FullName!] = static async (scope, payload, cancellationToken) =>
-			{
-				var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::Demo.CollectName.Handler>(scope);
-				_ = await handler.HandleAsync(new global::Demo.CollectName.Command(payload), cancellationToken).ConfigureAwait(false);
-				return true;
-			},
 		};
 
 		var onMessages = new global::Vexel.Telegram.Handlers.Routing.OnHandlerEntry[]
 		{
+			new global::Vexel.Telegram.Handlers.Routing.OnHandlerEntry(
+				"global::Demo.AlphaObserver",
+				static async (scope, payload, cancellationToken) =>
+				{
+					var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::Demo.AlphaObserver.Handler>(scope);
+					_ = await handler.HandleAsync(new global::Demo.AlphaObserver.Command(), cancellationToken).ConfigureAwait(false);
+					return true;
+				}),
+			new global::Vexel.Telegram.Handlers.Routing.OnHandlerEntry(
+				"global::Demo.ZedObserver",
+				static async (scope, payload, cancellationToken) =>
+				{
+					var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::Demo.ZedObserver.Handler>(scope);
+					_ = await handler.HandleAsync(new global::Demo.ZedObserver.Command(), cancellationToken).ConfigureAwait(false);
+					return true;
+				}),
 		};
 
 		var onCallbackQueries = new global::Vexel.Telegram.Handlers.Routing.OnHandlerEntry[]
 		{
+			new global::Vexel.Telegram.Handlers.Routing.OnHandlerEntry(
+				"global::Demo.CallbackObserver",
+				static async (scope, payload, cancellationToken) =>
+				{
+					var handler = global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::Demo.CallbackObserver.Handler>(scope);
+					_ = await handler.HandleAsync(new global::Demo.CallbackObserver.Command(), cancellationToken).ConfigureAwait(false);
+					return true;
+				}),
 		};
 
 		var onInlineQueries = new global::Vexel.Telegram.Handlers.Routing.OnHandlerEntry[]

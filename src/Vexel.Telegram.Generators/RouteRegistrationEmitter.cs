@@ -85,6 +85,14 @@ internal static class RouteRegistrationEmitter
 
 		_ = sb.AppendLine("\t\t};");
 		_ = sb.AppendLine();
+		EmitOnHandlerArray(sb, "onMessages", model.OnMessages);
+		_ = sb.AppendLine();
+		EmitOnHandlerArray(sb, "onCallbackQueries", model.OnCallbackQueries);
+		_ = sb.AppendLine();
+		EmitOnHandlerArray(sb, "onInlineQueries", model.OnInlineQueries);
+		_ = sb.AppendLine();
+		EmitOnHandlerArray(sb, "onChosenInlineResults", model.OnChosenInlineResults);
+		_ = sb.AppendLine();
 		_ = sb.AppendLine("\t\t_ = global::Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton(");
 		_ = sb.AppendLine("\t\t\tservices,");
 		_ = sb.AppendLine("\t\t\tnew global::Vexel.Telegram.Handlers.Routing.TelegramRouteContribution(");
@@ -94,7 +102,11 @@ internal static class RouteRegistrationEmitter
 		_ = sb.AppendLine("\t\t\t\tcallbacks,");
 		_ = sb.AppendLine("\t\t\t\tinlineQueries,");
 		_ = sb.AppendLine("\t\t\t\tchosenInlineResults,");
-		_ = sb.AppendLine("\t\t\t\tflowSteps));");
+		_ = sb.AppendLine("\t\t\t\tflowSteps,");
+		_ = sb.AppendLine("\t\t\t\tonMessages,");
+		_ = sb.AppendLine("\t\t\t\tonCallbackQueries,");
+		_ = sb.AppendLine("\t\t\t\tonInlineQueries,");
+		_ = sb.AppendLine("\t\t\t\tonChosenInlineResults));");
 		_ = sb.AppendLine();
 		_ = sb.AppendLine("\t\treturn services;");
 		_ = sb.AppendLine("\t}");
@@ -186,6 +198,34 @@ internal static class RouteRegistrationEmitter
 		// Empty record: ignore payload. Single string: whole payload (possibly empty).
 		var requestArgs = hasStringParameter ? "payload" : string.Empty;
 		EmitResolveAndInvoke(sb, handlerFullyQualifiedName, requestFullyQualifiedName, indent, requestArgs);
+	}
+
+	private static void EmitOnHandlerArray(
+		StringBuilder sb,
+		string variableName,
+		EquatableReadOnlyList<OnHandlerModel> handlers)
+	{
+		_ = sb.Append("\t\tvar ").Append(variableName)
+			.AppendLine(" = new global::Vexel.Telegram.Handlers.Routing.OnHandlerEntry[]");
+		_ = sb.AppendLine("\t\t{");
+
+		foreach (var handler in handlers)
+		{
+			_ = sb.AppendLine("\t\t\tnew global::Vexel.Telegram.Handlers.Routing.OnHandlerEntry(");
+			_ = sb.Append("\t\t\t\t\"").Append(Escape(handler.HandlerFullyQualifiedName)).AppendLine("\",");
+			_ = sb.AppendLine("\t\t\t\tstatic async (scope, payload, cancellationToken) =>");
+			_ = sb.AppendLine("\t\t\t\t{");
+			// On* requests are empty records; payload is ignored.
+			EmitResolveAndInvoke(
+				sb,
+				handler.HandlerFullyQualifiedName,
+				handler.RequestFullyQualifiedName,
+				indent: "\t\t\t\t\t",
+				requestArgs: string.Empty);
+			_ = sb.AppendLine("\t\t\t\t}),");
+		}
+
+		_ = sb.AppendLine("\t\t};");
 	}
 
 	private static void EmitResolveAndInvoke(

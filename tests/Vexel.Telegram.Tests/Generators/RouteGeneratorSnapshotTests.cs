@@ -219,4 +219,77 @@ public sealed class RouteGeneratorSnapshotTests
 		var generated = GeneratorTestHelper.GetVexelGeneratedSource(GeneratorTestHelper.RunGenerators(source));
 		await Verify(generated);
 	}
+
+	[Fact]
+	public async Task On_handlers_emit_sorted_dispatch_arrays()
+	{
+		// Registered out of FQ-name order; emission must sort Alpha before Zed.
+		const string source = """
+			using System.Threading;
+			using System.Threading.Tasks;
+			using Immediate.Handlers.Shared;
+			using Vexel.Telegram.Handlers.Attributes;
+
+			namespace Demo;
+
+			[Handler]
+			[Command("ping")]
+			public static partial class Ping
+			{
+				public sealed record Command;
+
+				private static ValueTask HandleAsync(Command command, CancellationToken token)
+				{
+					_ = command;
+					_ = token;
+					return default;
+				}
+			}
+
+			[Handler]
+			[OnMessage]
+			public static partial class ZedObserver
+			{
+				public sealed record Command;
+
+				private static ValueTask HandleAsync(Command command, CancellationToken token)
+				{
+					_ = command;
+					_ = token;
+					return default;
+				}
+			}
+
+			[Handler]
+			[OnMessage]
+			public static partial class AlphaObserver
+			{
+				public sealed record Command;
+
+				private static ValueTask HandleAsync(Command command, CancellationToken token)
+				{
+					_ = command;
+					_ = token;
+					return default;
+				}
+			}
+
+			[Handler]
+			[OnCallbackQuery]
+			public static partial class CallbackObserver
+			{
+				public sealed record Command;
+
+				private static ValueTask HandleAsync(Command command, CancellationToken token)
+				{
+					_ = command;
+					_ = token;
+					return default;
+				}
+			}
+			""";
+
+		var generated = GeneratorTestHelper.GetVexelGeneratedSource(GeneratorTestHelper.RunGenerators(source));
+		await Verify(generated);
+	}
 }

@@ -4,12 +4,13 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace Vexel.Telegram.Generators;
 
 /// <summary>
-/// Discovers Immediate.Handlers types that also carry a Vexel route attribute and emits
+/// Discovers Immediate.Handlers types that also carry a Vexel route or On* attribute and emits
 /// <c>Add{Assembly}Telegram()</c> registration plus frozen command, callback, inline-query,
-/// chosen-inline-result, and flow step binders.
+/// chosen-inline-result, flow step binders, and ordered On* dispatch arrays.
 /// Flow steps are the pure text steps: a <c>[Handler]</c> with a flow-bindable request shape (empty
-/// or single string) and <em>no</em> route attribute, so <c>Flow.PromptAsync&lt;TRequest&gt;</c> can
+/// or single string) and <em>no</em> route/On* attribute, so <c>Flow.PromptAsync&lt;TRequest&gt;</c> can
 /// resolve them by the request type's <see cref="Type.FullName"/>.
+/// On* observers run after the routed handler, sequential, sorted by fully-qualified metadata name.
 /// </summary>
 [Generator]
 public sealed class RouteGenerator : IIncrementalGenerator
@@ -27,7 +28,11 @@ public sealed class RouteGenerator : IIncrementalGenerator
 				|| pair.Callback is not null
 				|| pair.InlineQuery is not null
 				|| pair.ChosenInlineResult is not null
-				|| pair.FlowStep is not null)
+				|| pair.FlowStep is not null
+				|| pair.OnMessage is not null
+				|| pair.OnCallbackQuery is not null
+				|| pair.OnInlineQuery is not null
+				|| pair.OnChosenInlineResult is not null)
 			.WithTrackingName("VexelRoutes");
 
 		var assemblyIdentifier = context.CompilationProvider
@@ -90,6 +95,12 @@ public sealed class RouteGenerator : IIncrementalGenerator
 					.ThenBy(static s => s.HandlerFullyQualifiedName, StringComparer.Ordinal)
 					.ToArray();
 
+				// D9/N3: On* order is sorted by fully-qualified metadata name (not encounter order).
+				var onMessages = SelectOnHandlers(routes, static r => r.OnMessage);
+				var onCallbackQueries = SelectOnHandlers(routes, static r => r.OnCallbackQuery);
+				var onInlineQueries = SelectOnHandlers(routes, static r => r.OnInlineQuery);
+				var onChosenInlineResults = SelectOnHandlers(routes, static r => r.OnChosenInlineResult);
+
 				return new AssemblyRoutesModel(
 					assemblyIdentifier,
 					rootNamespace,
@@ -97,7 +108,11 @@ public sealed class RouteGenerator : IIncrementalGenerator
 					new EquatableReadOnlyList<CallbackRouteModel>(callbacks),
 					new EquatableReadOnlyList<InlineQueryRouteModel>(inlineQueries),
 					new EquatableReadOnlyList<ChosenInlineResultRouteModel>(chosenInlineResults),
-					new EquatableReadOnlyList<FlowStepModel>(flowSteps));
+					new EquatableReadOnlyList<FlowStepModel>(flowSteps),
+					new EquatableReadOnlyList<OnHandlerModel>(onMessages),
+					new EquatableReadOnlyList<OnHandlerModel>(onCallbackQueries),
+					new EquatableReadOnlyList<OnHandlerModel>(onInlineQueries),
+					new EquatableReadOnlyList<OnHandlerModel>(onChosenInlineResults));
 			})
 			.WithTrackingName("VexelRouteModel");
 
@@ -120,8 +135,24 @@ public sealed class RouteGenerator : IIncrementalGenerator
 			TransformCallback(type, token),
 			TransformInlineQuery(type, token),
 			TransformChosenInlineResult(type, token),
-			TransformFlowStep(type, token));
+			TransformFlowStep(type, token),
+			TransformOnHandler(type, static t => t.GetOnMessageAttribute(), token),
+			TransformOnHandler(type, static t => t.GetOnCallbackQueryAttribute(), token),
+			TransformOnHandler(type, static t => t.GetOnInlineQueryAttribute(), token),
+			TransformOnHandler(type, static t => t.GetOnChosenInlineResultAttribute(), token));
 	}
+
+	private static OnHandlerModel[] SelectOnHandlers(
+		System.Collections.Immutable.ImmutableArray<HandlerRoutes> routes,
+		Func<HandlerRoutes, OnHandlerModel?> selector) =>
+		[
+			..
+			routes
+				.Select(selector)
+				.Where(static h => h is not null)
+				.Select(static h => h!)
+				.OrderBy(static h => h.HandlerFullyQualifiedName, StringComparer.Ordinal),
+		];
 
 	private static CommandRouteModel? TransformCommand(INamedTypeSymbol type, CancellationToken token)
 	{
@@ -320,8 +351,8 @@ public sealed class RouteGenerator : IIncrementalGenerator
 		token.ThrowIfCancellationRequested();
 
 		// Flow steps are pure text steps only: a [Handler] with a flow-bindable request (rule 5) and no
-		// route attribute. A [Command]/[Callback] handler is reached through its own route, so keying it
-		// by request type would make two commands sharing one request record collide for no benefit.
+		// route/On* attribute. A [Command]/[Callback]/[On*] handler is reached through its own path,
+		// so keying it by request type would collide with pure text steps for no benefit.
 		if (type.HasVexelRouteAttribute()
 			|| !TryGetBindableFlowRequest(type, out var requestType, out var hasStringParameter, out _))
 		{
@@ -478,6 +509,64 @@ public sealed class RouteGenerator : IIncrementalGenerator
 			out errorMessage);
 	}
 
+	/// <summary>
+	/// On* observers take an empty request record only; payload access is via injected context.
+	/// </summary>
+	internal static bool TryGetBindableOnRequest(
+		INamedTypeSymbol handlerType,
+		[System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ITypeSymbol? requestType,
+		out string? errorMessage)
+	{
+		if (!TryGetBindableEmptyOrStringRequest(
+			handlerType,
+			routeKind: "On*",
+			ruleText: "empty record (On* observers inject context for payload access)",
+			out requestType,
+			out var hasStringParameter,
+			out errorMessage))
+		{
+			return false;
+		}
+
+		if (hasStringParameter)
+		{
+			errorMessage =
+				$"On* request '{requestType.ToDisplayString()}' on '{handlerType.Name}' must be an empty record "
+				+ "(inject MessageContext/CallbackContext/etc. for payload access).";
+			return false;
+		}
+
+		return true;
+	}
+
+	private static OnHandlerModel? TransformOnHandler(
+		INamedTypeSymbol type,
+		Func<INamedTypeSymbol, AttributeData?> attributeSelector,
+		CancellationToken token)
+	{
+		token.ThrowIfCancellationRequested();
+
+		if (attributeSelector(type) is null)
+		{
+			return null;
+		}
+
+		token.ThrowIfCancellationRequested();
+
+		if (!TryGetBindableOnRequest(type, out var requestType, out _))
+		{
+			// VEX0004 reports; skip emission.
+			return null;
+		}
+
+		token.ThrowIfCancellationRequested();
+
+		return new OnHandlerModel(
+			HandlerFullyQualifiedName: type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+			RequestFullyQualifiedName: requestType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+			AssemblyDisplayName: type.ContainingAssembly.Name);
+	}
+
 	private static bool TryGetBindableEmptyOrStringRequest(
 		INamedTypeSymbol handlerType,
 		string routeKind,
@@ -558,5 +647,9 @@ public sealed class RouteGenerator : IIncrementalGenerator
 		CallbackRouteModel? Callback,
 		InlineQueryRouteModel? InlineQuery,
 		ChosenInlineResultRouteModel? ChosenInlineResult,
-		FlowStepModel? FlowStep);
+		FlowStepModel? FlowStep,
+		OnHandlerModel? OnMessage,
+		OnHandlerModel? OnCallbackQuery,
+		OnHandlerModel? OnInlineQuery,
+		OnHandlerModel? OnChosenInlineResult);
 }

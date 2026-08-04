@@ -36,6 +36,19 @@ public sealed class TelegramRouteContribution
 	/// <em>request</em> type, not of the handler class - a nested request renders as
 	/// <c>Demo.CollectName+Command</c>. Must already use an ordinal comparer.
 	/// </param>
+	/// <param name="onMessages">
+	/// <c>[OnMessage]</c> observers for this assembly, already sorted by handler fully-qualified
+	/// metadata name.
+	/// </param>
+	/// <param name="onCallbackQueries">
+	/// <c>[OnCallbackQuery]</c> observers for this assembly, already sorted by handler FQ name.
+	/// </param>
+	/// <param name="onInlineQueries">
+	/// <c>[OnInlineQuery]</c> observers for this assembly, already sorted by handler FQ name.
+	/// </param>
+	/// <param name="onChosenInlineResults">
+	/// <c>[OnChosenInlineResult]</c> observers for this assembly, already sorted by handler FQ name.
+	/// </param>
 	public TelegramRouteContribution(
 		string assemblyName,
 		IReadOnlyDictionary<string, RouteBinder> commands,
@@ -43,7 +56,11 @@ public sealed class TelegramRouteContribution
 		IReadOnlyDictionary<string, RouteBinder>? callbacks = null,
 		IReadOnlyDictionary<string, RouteBinder>? inlineQueries = null,
 		IReadOnlyDictionary<string, RouteBinder>? chosenInlineResults = null,
-		IReadOnlyDictionary<string, RouteBinder>? flowSteps = null)
+		IReadOnlyDictionary<string, RouteBinder>? flowSteps = null,
+		IReadOnlyList<OnHandlerEntry>? onMessages = null,
+		IReadOnlyList<OnHandlerEntry>? onCallbackQueries = null,
+		IReadOnlyList<OnHandlerEntry>? onInlineQueries = null,
+		IReadOnlyList<OnHandlerEntry>? onChosenInlineResults = null)
 	{
 		ArgumentNullException.ThrowIfNull(assemblyName);
 		ArgumentNullException.ThrowIfNull(commands);
@@ -56,6 +73,10 @@ public sealed class TelegramRouteContribution
 		InlineQueries = inlineQueries ?? new Dictionary<string, RouteBinder>(StringComparer.Ordinal);
 		ChosenInlineResults = chosenInlineResults ?? new Dictionary<string, RouteBinder>(StringComparer.Ordinal);
 		FlowSteps = flowSteps ?? new Dictionary<string, RouteBinder>(StringComparer.Ordinal);
+		OnMessages = onMessages ?? [];
+		OnCallbackQueries = onCallbackQueries ?? [];
+		OnInlineQueries = onInlineQueries ?? [];
+		OnChosenInlineResults = onChosenInlineResults ?? [];
 	}
 
 	/// <summary>Display name of the contributing assembly.</summary>
@@ -78,4 +99,16 @@ public sealed class TelegramRouteContribution
 
 	/// <summary>Flow step map for this assembly (request <see cref="Type.FullName"/> → binder).</summary>
 	public IReadOnlyDictionary<string, RouteBinder> FlowSteps { get; }
+
+	/// <summary><c>[OnMessage]</c> observers for this assembly.</summary>
+	public IReadOnlyList<OnHandlerEntry> OnMessages { get; }
+
+	/// <summary><c>[OnCallbackQuery]</c> observers for this assembly.</summary>
+	public IReadOnlyList<OnHandlerEntry> OnCallbackQueries { get; }
+
+	/// <summary><c>[OnInlineQuery]</c> observers for this assembly.</summary>
+	public IReadOnlyList<OnHandlerEntry> OnInlineQueries { get; }
+
+	/// <summary><c>[OnChosenInlineResult]</c> observers for this assembly.</summary>
+	public IReadOnlyList<OnHandlerEntry> OnChosenInlineResults { get; }
 }
