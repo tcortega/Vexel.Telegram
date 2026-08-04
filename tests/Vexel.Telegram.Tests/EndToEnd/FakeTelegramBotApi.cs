@@ -1,0 +1,222 @@
+using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace Vexel.Telegram.Tests.EndToEnd;
+
+/// <summary>
+/// Minimal in-process stand-in for the Telegram Bot API server: serves <c>getUpdates</c> over HTTP
+/// with real long-poll/offset semantics so the client can be exercised the way a live bot runs.
+/// </summary>
+public sealed class FakeTelegramBotApi : IAsyncDisposable
+{
+	private readonly HttpListener _listener = new();
+	private readonly CancellationTokenSource _cts = new();
+	private readonly List<(int Id, string Json)> _queue = [];
+	private readonly List<string> _requests = [];
+	private readonly Lock _gate = new();
+	private readonly Action<string>? _trace;
+	private Task? _acceptLoop;
+	private int _getUpdatesCalls;
+
+	public FakeTelegramBotApi(Action<string>? trace = null)
+	{
+		_trace = trace;
+		BaseAddress = $"http://127.0.0.1:{FreePort()}";
+		_listener.Prefixes.Add($"{BaseAddress}/");
+	}
+
+	/// <summary>Base address to hand to <c>TelegramBotClientOptions</c>.</summary>
+	public string BaseAddress { get; }
+
+	/// <summary>Number of <c>getUpdates</c> calls served so far.</summary>
+	public int GetUpdatesCalls => Volatile.Read(ref _getUpdatesCalls);
+
+	/// <summary>Request log, one line per served API call.</summary>
+	public IReadOnlyList<string> Requests
+	{
+		get
+		{
+			lock (_gate)
+			{
+				return [.. _requests];
+			}
+		}
+	}
+
+	public void Start()
+	{
+		_listener.Start();
+		_acceptLoop = Task.Run(AcceptLoopAsync);
+	}
+
+	/// <summary>Queues updates so a single poll delivers them as one batch, like the real API.</summary>
+	public void Enqueue(params (int Id, string Json)[] updates)
+	{
+		lock (_gate)
+		{
+			_queue.AddRange(updates);
+		}
+	}
+
+	public async ValueTask DisposeAsync()
+	{
+		await _cts.CancelAsync();
+		_listener.Close();
+
+		if (_acceptLoop is not null)
+		{
+			try
+			{
+				await _acceptLoop;
+			}
+			catch (Exception)
+			{
+				// Listener teardown races are expected.
+			}
+		}
+
+		_cts.Dispose();
+	}
+
+	/// <summary>Builds a text-message update JSON payload.</summary>
+	public static (int Id, string Json) MessageUpdate(int id, long chatId, string text)
+	{
+		var sender = new JsonObject
+		{
+			["id"] = chatId,
+			["is_bot"] = false,
+			["first_name"] = $"chat{chatId}",
+		};
+
+		var update = new JsonObject
+		{
+			["update_id"] = id,
+			["message"] = new JsonObject
+			{
+				["message_id"] = id,
+				["date"] = 1_700_000_000,
+				["chat"] = new JsonObject
+				{
+					["id"] = chatId,
+					["type"] = "private",
+					["first_name"] = $"chat{chatId}",
+				},
+				["from"] = sender,
+				["text"] = text,
+			},
+		};
+
+		return (id, update.ToJsonString());
+	}
+
+	private static int FreePort()
+	{
+		using var probe = new TcpListener(IPAddress.Loopback, 0);
+		probe.Start();
+		var port = ((IPEndPoint)probe.LocalEndpoint).Port;
+		probe.Stop();
+
+		return port;
+	}
+
+	private async Task AcceptLoopAsync()
+	{
+		while (!_cts.IsCancellationRequested)
+		{
+			HttpListenerContext context;
+			try
+			{
+				context = await _listener.GetContextAsync();
+			}
+			catch (Exception) when (_cts.IsCancellationRequested || !_listener.IsListening)
+			{
+				return;
+			}
+
+			try
+			{
+				await ServeAsync(context);
+			}
+			catch (Exception)
+			{
+				// A dropped connection during shutdown must not fail the fake server.
+			}
+		}
+	}
+
+	private async Task ServeAsync(HttpListenerContext context)
+	{
+		var method = context.Request.Url?.Segments[^1].Trim('/') ?? string.Empty;
+
+		using var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8);
+		var body = await reader.ReadToEndAsync();
+
+		var payload = method switch
+		{
+			"getUpdates" => await ServeGetUpdatesAsync(body),
+			"getMe" => /*lang=json,strict*/ """{"ok":true,"result":{"id":424242,"is_bot":true,"first_name":"VexelBot","username":"vexel_bot"}}""",
+			_ => /*lang=json,strict*/ """{"ok":true,"result":true}""",
+		};
+
+		var bytes = Encoding.UTF8.GetBytes(payload);
+		context.Response.StatusCode = 200;
+		context.Response.ContentType = "application/json";
+		context.Response.ContentLength64 = bytes.Length;
+		await context.Response.OutputStream.WriteAsync(bytes);
+		context.Response.Close();
+	}
+
+	private async Task<string> ServeGetUpdatesAsync(string body)
+	{
+		_ = Interlocked.Increment(ref _getUpdatesCalls);
+
+		var offset = ReadOffset(body);
+		List<(int Id, string Json)> batch;
+
+		lock (_gate)
+		{
+			batch = offset switch
+			{
+				// Negative offset is the "skip the backlog" probe: the API returns only the newest
+				// pending update so the caller can advance past everything older.
+				< 0 when _queue.Count > 0 => [_queue[^1]],
+				< 0 => [],
+				_ => [.. _queue.Where(u => u.Id >= offset)],
+			};
+
+			_requests.Add(string.Create(
+				CultureInfo.InvariantCulture,
+				$"getUpdates offset={offset} -> [{string.Join(",", batch.Select(u => u.Id))}]"));
+		}
+
+		_trace?.Invoke(string.Create(
+			CultureInfo.InvariantCulture,
+			$"telegram-api  getUpdates(offset={offset}) -> {(batch.Count == 0 ? "no updates" : string.Join(", ", batch.Select(u => $"update {u.Id}")))}"));
+
+		if (batch.Count == 0)
+		{
+			// Stand in for a real long poll so the receive loop is not spun at full speed.
+			await Task.Delay(100);
+		}
+
+		return $$"""{"ok":true,"result":[{{string.Join(",", batch.Select(u => u.Json))}}]}""";
+	}
+
+	private static int ReadOffset(string body)
+	{
+		if (string.IsNullOrWhiteSpace(body))
+		{
+			return 0;
+		}
+
+		using var document = JsonDocument.Parse(body);
+
+		return document.RootElement.TryGetProperty("offset", out var offset)
+			? offset.GetInt32()
+			: 0;
+	}
+}

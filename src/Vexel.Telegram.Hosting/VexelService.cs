@@ -9,12 +9,48 @@ namespace Vexel.Telegram.Hosting;
 /// </summary>
 public sealed class VexelService(VexelClient client, ILogger<VexelService> logger) : BackgroundService
 {
+	private readonly CancellationTokenSource _shutdownBudgetCts = new();
+
+	/// <inheritdoc />
+	public override async Task StopAsync(CancellationToken cancellationToken)
+	{
+		try
+		{
+			await base.StopAsync(cancellationToken).ConfigureAwait(false);
+		}
+		finally
+		{
+			// Once the host stops waiting its shutdown budget is spent, either because the client
+			// already finished or because the budget expired; wind any remaining drain down.
+			CancelShutdownBudget();
+		}
+	}
+
+	/// <inheritdoc />
+	public override void Dispose()
+	{
+		CancelShutdownBudget();
+		_shutdownBudgetCts.Dispose();
+		base.Dispose();
+	}
+
+	private void CancelShutdownBudget()
+	{
+		try
+		{
+			_shutdownBudgetCts.Cancel();
+		}
+		catch (ObjectDisposedException)
+		{
+		}
+	}
+
 	/// <inheritdoc />
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 	{
 		try
 		{
-			await client.RunAsync(stoppingToken).ConfigureAwait(false);
+			await client.RunAsync(stoppingToken, _shutdownBudgetCts.Token).ConfigureAwait(false);
 		}
 		catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
 		{

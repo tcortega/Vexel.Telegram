@@ -5,7 +5,7 @@ Not a frozen API contract.
 Items below are labeled `agreed`, `proposed`, or `open`.
 Do not treat proposed items as authorization to implement product code.
 
-Last updated: 2026-08-04 (decision log through 32; T1 skeleton landed)
+Last updated: 2026-08-04 (decision log through 32; T1 skeleton and T2 client dispatch landed)
 Branch: `v2` (created to hold this context and future V2 work)
 Repo stays public. Private-repo idea was rejected.
 
@@ -165,7 +165,7 @@ Update
          bind to TRequest
          resolve generated Immediate handler
          await HandleAsync
-    -> optional raw IUpdateHandler<T> / responder list for escape hatches
+    -> raw IRawUpdateHandler escape hatches (always last; cannot suppress routing)
 ```
 
 Hot path: compile-time map, no reflection invoke.
@@ -242,7 +242,8 @@ Exact method names **open**.
 ### Escape hatch
 
 Raw update handlers without Immediate for power users and non-command traffic.
-Exact interface name **open** (`IUpdateHandler<T>`, keep `IResponder<T>`, etc.).
+**Settled in T2:** `IRawUpdateHandler` (non-generic, takes the whole `Update`), registered with
+`AddRawUpdateHandler<THandler>()`; the dispatcher runs raw handlers last, isolated per handler.
 
 ---
 
@@ -372,7 +373,7 @@ Not a substitute for unit tests. Not prod userbots.
 ### Open questions
 
 None tracked here.
-The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton landed).
+The charter is frozen and delivery runs through the numbered T-task plan (T1 skeleton, T2 client dispatch landed).
 
 
 ---
