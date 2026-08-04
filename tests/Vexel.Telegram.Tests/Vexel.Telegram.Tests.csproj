@@ -21,6 +21,7 @@
 			<PrivateAssets>all</PrivateAssets>
 		</PackageReference>
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
+		<PackageReference Include="Microsoft.Extensions.Hosting"/>
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
 		<PackageReference Include="Microsoft.Extensions.Options"/>
 	</ItemGroup>
@@ -31,6 +32,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\src\Vexel.Telegram.Client\Vexel.Telegram.Client.csproj"/>
+		<ProjectReference Include="..\..\src\Vexel.Telegram.Hosting\Vexel.Telegram.Hosting.csproj"/>
 	</ItemGroup>
 
 </Project>
