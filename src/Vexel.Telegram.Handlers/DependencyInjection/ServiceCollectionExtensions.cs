@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Vexel.Telegram.Client;
 using Vexel.Telegram.Client.Dispatch;
 using Vexel.Telegram.Handlers.Contexts;
+using Vexel.Telegram.Handlers.Routing;
 using Vexel.Telegram.Hosting.Extensions;
 
 namespace Vexel.Telegram.Handlers.DependencyInjection;
@@ -13,8 +14,9 @@ namespace Vexel.Telegram.Handlers.DependencyInjection;
 public static class ServiceCollectionExtensions
 {
 	/// <summary>
-	/// Adds the Vexel Telegram client, hosted receive loop, per-update contexts, and
-	/// <see cref="Feedback"/>. Compose with Immediate <c>AddXxxHandlers()</c> and the generated
+	/// Adds the Vexel Telegram client, hosted receive loop, per-update contexts,
+	/// <see cref="Feedback"/>, and the <see cref="TelegramRouter"/>.
+	/// Compose with Immediate <c>AddXxxHandlers()</c> and the generated
 	/// <c>AddXxxTelegram()</c> route registration in the app.
 	/// </summary>
 	/// <param name="services">The service collection.</param>
@@ -31,6 +33,25 @@ public static class ServiceCollectionExtensions
 
 		_ = services.AddTelegramService(tokenFactory, configureClientOptions);
 		_ = services.AddVexelUpdateContexts();
+		_ = services.AddTelegramRouter();
+
+		return services;
+	}
+
+	/// <summary>
+	/// Registers <see cref="TelegramRouter"/> as the routed stage of the update pipeline.
+	/// Used by <see cref="AddTelegramBot"/>; exposed for tests that wire the client manually.
+	/// Call generated <c>AddXxxTelegram()</c> methods to contribute routes before building the provider.
+	/// </summary>
+	/// <param name="services">The service collection.</param>
+	/// <returns>The same service collection.</returns>
+	public static IServiceCollection AddTelegramRouter(this IServiceCollection services)
+	{
+		ArgumentNullException.ThrowIfNull(services);
+
+		// Single shared instance exposed both as IUpdateRouter (pipeline) and TelegramRouter (tests/SetMyCommands).
+		services.TryAddSingleton<IUpdateRouter, TelegramRouter>();
+		services.TryAddSingleton(static sp => (TelegramRouter)sp.GetRequiredService<IUpdateRouter>());
 
 		return services;
 	}

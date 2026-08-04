@@ -23,10 +23,12 @@ public sealed class UpdateDispatcher(
 	IServiceScopeFactory scopeFactory,
 	IServiceProvider rootProvider,
 	RawUpdateHandlerRegistry registry,
+	IEnumerable<IUpdateRouter> routers,
 	IOptions<VexelClientOptions> options,
 	ILogger<UpdateDispatcher> logger) : IUpdateDispatcher, IDisposable, IAsyncDisposable
 {
 	private readonly VexelClientOptions _options = options.Value;
+	private readonly IUpdateRouter[] _routers = routers as IUpdateRouter[] ?? [.. routers];
 	private readonly ConcurrentDictionary<ServiceDescriptor, Lazy<IRawUpdateHandler>> _singletonHandlers = new();
 
 	/// <inheritdoc />
@@ -41,7 +43,14 @@ public sealed class UpdateDispatcher(
 		// Bind write-once update context (and later Feedback defaults) before any handler resolves.
 		InitializeScope(scope.ServiceProvider, update);
 
-		// Routed handler + On* fan-out land in later slices; raw always runs last and cannot suppress routing.
+		// Precedence: routed → On* (later) → raw. Raw always runs last and cannot suppress routing.
+		foreach (var router in _routers)
+		{
+			cancellationToken.ThrowIfCancellationRequested();
+			await InvokeRouterAsync(router, update, scope.ServiceProvider, cancellationToken)
+				.ConfigureAwait(false);
+		}
+
 		foreach (var handlerType in registry.HandlerTypes)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
@@ -258,6 +267,40 @@ public sealed class UpdateDispatcher(
 					resolved.Handler.GetType().FullName,
 					update.Id);
 			}
+		}
+	}
+
+	private async Task InvokeRouterAsync(
+		IUpdateRouter router,
+		Update update,
+		IServiceProvider scope,
+		CancellationToken cancellationToken)
+	{
+		try
+		{
+			if (_options.HandlerTimeout is { } timeout)
+			{
+				using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+				timeoutCts.CancelAfter(timeout);
+				await router.RouteAsync(update, scope, timeoutCts.Token).ConfigureAwait(false);
+			}
+			else
+			{
+				await router.RouteAsync(update, scope, cancellationToken).ConfigureAwait(false);
+			}
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			// Fault isolation: a router fault must not kill the lane or skip remaining stages.
+			logger.LogError(
+				ex,
+				"Update router {RouterType} failed for update {UpdateId}",
+				router.GetType().FullName,
+				update.Id);
 		}
 	}
 
