@@ -53,6 +53,12 @@ public sealed class UpdateDispatcher(
 
 		foreach (var handler in ResolveContainerHandlers(scope.ServiceProvider, update))
 		{
+			// The registry loop already ran this implementation; registering both ways is not two handlers.
+			if (registry.Contains(handler.GetType()))
+			{
+				continue;
+			}
+
 			cancellationToken.ThrowIfCancellationRequested();
 			await InvokeHandlerAsync(handler, update, cancellationToken).ConfigureAwait(false);
 		}

@@ -14,28 +14,35 @@ public sealed class VexelService(VexelClient client, ILogger<VexelService> logge
 	/// <inheritdoc />
 	public override async Task StopAsync(CancellationToken cancellationToken)
 	{
-		// The host's shutdown budget bounds the drain that RunAsync performs on its way out.
-		using var registration = cancellationToken.Register(
-			static state =>
-			{
-				try
-				{
-					((CancellationTokenSource)state!).Cancel();
-				}
-				catch (ObjectDisposedException)
-				{
-				}
-			},
-			_shutdownBudgetCts);
-
-		await base.StopAsync(cancellationToken).ConfigureAwait(false);
+		try
+		{
+			await base.StopAsync(cancellationToken).ConfigureAwait(false);
+		}
+		finally
+		{
+			// Once the host stops waiting its shutdown budget is spent, either because the client
+			// already finished or because the budget expired; wind any remaining drain down.
+			CancelShutdownBudget();
+		}
 	}
 
 	/// <inheritdoc />
 	public override void Dispose()
 	{
+		CancelShutdownBudget();
 		_shutdownBudgetCts.Dispose();
 		base.Dispose();
+	}
+
+	private void CancelShutdownBudget()
+	{
+		try
+		{
+			_shutdownBudgetCts.Cancel();
+		}
+		catch (ObjectDisposedException)
+		{
+		}
 	}
 
 	/// <inheritdoc />

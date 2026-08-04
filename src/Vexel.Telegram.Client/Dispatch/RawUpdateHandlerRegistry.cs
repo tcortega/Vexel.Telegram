@@ -10,15 +10,25 @@ namespace Vexel.Telegram.Client.Dispatch;
 public sealed class RawUpdateHandlerRegistry
 {
 	private readonly List<Type> _handlerTypes = [];
+	private readonly HashSet<Type> _handlerTypeSet = [];
 
 	/// <summary>
 	/// Registered handler implementation types, in registration order.
 	/// </summary>
 	public IReadOnlyList<Type> HandlerTypes => _handlerTypes;
 
+	/// <summary>
+	/// Whether <paramref name="handlerType"/> is dispatched through this registry. Handlers that
+	/// are also registered against <see cref="IRawUpdateHandler"/> run once, not once per
+	/// registration style.
+	/// </summary>
+	/// <param name="handlerType">The handler implementation type.</param>
+	/// <returns><see langword="true"/> when the type is registered here.</returns>
+	public bool Contains(Type handlerType) => _handlerTypeSet.Contains(handlerType);
+
 	internal void Add(Type handlerType)
 	{
-		if (!_handlerTypes.Contains(handlerType))
+		if (_handlerTypeSet.Add(handlerType))
 		{
 			_handlerTypes.Add(handlerType);
 		}

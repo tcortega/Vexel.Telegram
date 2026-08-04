@@ -353,6 +353,23 @@ public sealed class UpdateSchedulerTests
 	}
 
 	[Fact]
+	public async Task Dispatcher_RunsDualRegisteredHandlerOnce()
+	{
+		var tracker = new HandlerTracker();
+		var services = new ServiceCollection();
+		_ = services.AddSingleton(tracker);
+		_ = services.AddScoped<IRawUpdateHandler, TrackedRawHandler>();
+		_ = services.AddRawUpdateHandler<TrackedRawHandler>();
+
+		await using var provider = services.BuildServiceProvider(validateScopes: true);
+		var dispatcher = CreateDispatcher(provider);
+
+		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None);
+
+		Assert.Equal(1, tracker.Handled);
+	}
+
+	[Fact]
 	public async Task StopAsync_WindsDownWhenShutdownBudgetExpires()
 	{
 		var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
