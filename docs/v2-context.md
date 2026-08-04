@@ -377,6 +377,7 @@ Mitigations for dual-attr DX:
 24. Boot DX: `AddTelegramBot(...)` wires client/host/Vexel routes; app still calls Immediate `AddXxxHandlers()`. Sample shows both. No hiding Immediate.
 25. No v1 master inline hotfix parallel track; effort on `v2` only.
 26. Drop Remora.Commands (and Remora.Results) on `v2` entirely.
+    - **Done in T14:** `Vexel.Telegram.{Abstractions,Commands,Interactivity,Extensions}` are deleted from the branch and the Remora/JetBrains `PackageVersion` entries are gone from `Directory.Packages.props`. The v1 source stays readable on `master`.
 27. v1→v2: **breaking major**; sample + short differences doc. No compat shims.
 28. On-update fan-out **kept** (v1 responder usefulness): `[OnMessage]`/`[OnCallback]`/… as Immediate `[Handler]`s; **Vexel gen** emits static multi-cast dispatch. No reflection responder bus. No Immediate.Notifications (N/A). Behaviors apply per handler. **Await** on the per-chat pipeline.
     - **Settled in T8:** 2.0 ships await-only - there is no fire-and-forget opt-in. The attributes carry no options, so a later opt-in stays additive and shape-compatible.

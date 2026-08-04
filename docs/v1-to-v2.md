@@ -24,8 +24,8 @@ Prefer that over this page when the two disagree: the sample compiles.
 | Inline query routing | Broken (routed on Telegram’s opaque query id) | Routes on **query text** |
 | Packages | Client, Commands, Interactivity, Abstractions, Extensions, Hosting, metapackage | Client, Handlers, Hosting, AspNetCore, metapackage (generator ships as an analyzer) |
 
-Legacy v1 projects (`Abstractions`, `Commands`, `Interactivity`, `Extensions`) may still sit on disk on the branch as reference only.
-They are **out of the solution build** and are not part of the v2 API.
+The legacy v1 projects (`Abstractions`, `Commands`, `Interactivity`, `Extensions`) are **deleted from the `v2` branch**.
+Read them on `master` if you need the old source while porting.
 
 ## Handler model
 
