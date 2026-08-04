@@ -311,12 +311,12 @@ Mitigations for dual-attr DX:
 10. Option B (Vexel-owned handler engine, single Telegram attr) is deferred; revisit only if dual-attr cost justifies it. Keep A→B migration door open via stable Vexel attrs and Immediate-compatible handler shape.
 11. Real-user E2E on Telegram **test DC** (user MTProto client + test bot), plus unit fakes in CI. Not prod server userbots.
 12. One handler type per route (Immediate style). No multi-method CommandGroup/InteractionGroup bags.
+13. No Remora.Results. Handlers use ValueTask/ValueTask<T>; errors via exceptions (+ optional behaviors).
 
 ### Proposed (not fully approved)
 
 1. Exact package split and names above.
 2. Drop Remora.Commands entirely on `v2`.
-3. Keep vs drop Remora.Results.
 4. Feedback and context interface shapes.
 5. Callback payload format and size/analyzer rules.
 6. Concurrency defaults (what is ordered per chat vs parallel).
@@ -356,7 +356,6 @@ Not a substitute for unit tests. Not prod userbots.
 2. Public type names: `[Command]` vs `[BotCommand]`, `[Callback]` vs `[CallbackButton]`, etc.?
 4. Webhook vs polling configuration surface for hosting?
 5. Minimum TFMs / Telegram.Bot version floor for V2?
-6. Result type philosophy: `ValueTask`, exceptions, custom result, mix?
 7. How much v1 migration guide is required before calling V2 usable?
 8. Optional v1 inline-query hotfix on master?
 9. Exact generated registration API names and assembly identifier story (mirror ImmediateAssemblyIdentifier?).
