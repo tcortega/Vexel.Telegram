@@ -41,8 +41,27 @@ public sealed class SetMyCommandsInitializer(
 			.ToArray();
 
 		var payload = BotCommandRegistration.BuildPayload(descriptors);
+		if (payload.Count == 0)
+		{
+			// An empty setMyCommands payload deletes the menu; leave whatever Telegram already has alone.
+			logger.LogDebug("SetMyCommands skipped (catalog contributed no commands).");
+			return;
+		}
 
-		await botClient.SetMyCommands(payload, cancellationToken: cancellationToken).ConfigureAwait(false);
+		try
+		{
+			await botClient.SetMyCommands(payload, cancellationToken: cancellationToken).ConfigureAwait(false);
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			// Command metadata is cosmetic: never turn a Telegram-side failure into a failed host start.
+			logger.LogError(ex, "Failed to register {Count} bot command(s) with Telegram (setMyCommands).", payload.Count);
+			return;
+		}
 
 		logger.LogInformation("Registered {Count} bot command(s) with Telegram (setMyCommands).", payload.Count);
 	}

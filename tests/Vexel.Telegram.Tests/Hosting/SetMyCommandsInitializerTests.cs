@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Telegram.Bot;
@@ -89,6 +90,67 @@ public sealed class SetMyCommandsInitializerTests
 		var command = Assert.Single(request.Commands);
 		Assert.Equal("status", command.Command);
 		Assert.Equal("status", command.Description);
+	}
+
+	[Fact]
+	public async Task StartAsync_CatalogWithoutCommands_SkipsSetMyCommands()
+	{
+		var bot = new RecordingTelegramBotClient();
+		var catalog = new StaticCatalog([]);
+
+		var initializer = new SetMyCommandsInitializer(
+			bot,
+			Options.Create(new VexelClientOptions()),
+			[catalog],
+			NullLogger<SetMyCommandsInitializer>.Instance);
+
+		await initializer.StartAsync(CancellationToken.None);
+
+		Assert.Empty(bot.OfType<SetMyCommandsRequest>());
+	}
+
+	[Fact]
+	public async Task StartAsync_ApiFailure_DoesNotAbortHostStart()
+	{
+		var bot = new RecordingTelegramBotClient
+		{
+			FailRequest = static request => request is SetMyCommandsRequest
+				? new InvalidOperationException("429 Too Many Requests")
+				: null,
+		};
+		var logger = new RecordingLogger<SetMyCommandsInitializer>();
+
+		var initializer = new SetMyCommandsInitializer(
+			bot,
+			Options.Create(new VexelClientOptions()),
+			[new StaticCatalog([new BotCommandDescriptor("start", "Start the bot")])],
+			logger);
+
+		await initializer.StartAsync(CancellationToken.None);
+
+		_ = Assert.Single(bot.OfType<SetMyCommandsRequest>());
+		Assert.Contains(logger.Entries, static e => e.Level == LogLevel.Error && e.Exception is not null);
+	}
+
+	[Fact]
+	public async Task StartAsync_CancelledToken_Propagates()
+	{
+		var bot = new RecordingTelegramBotClient
+		{
+			FailRequest = static _ => new OperationCanceledException(),
+		};
+
+		using var cts = new CancellationTokenSource();
+		await cts.CancelAsync();
+
+		var initializer = new SetMyCommandsInitializer(
+			bot,
+			Options.Create(new VexelClientOptions()),
+			[new StaticCatalog([new BotCommandDescriptor("start", "Start the bot")])],
+			NullLogger<SetMyCommandsInitializer>.Instance);
+
+		_ = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+			() => initializer.StartAsync(cts.Token));
 	}
 
 	[Fact]

@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 using Vexel.Telegram.Client;
 using Vexel.Telegram.Client.Webhook;
 
-namespace Vexel.Telegram.Hosting.Extensions;
+namespace Vexel.Telegram.AspNetCore.Extensions;
 
 /// <summary>
 /// Explicit ASP.NET Core endpoint registration for Telegram webhook ingress.
@@ -19,6 +19,13 @@ public static class TelegramWebhookEndpointExtensions
 	/// Maps a POST endpoint that verifies the webhook <c>secret_token</c> header and schedules
 	/// the update. Path defaults to <see cref="WebhookOptions.Path"/> from options.
 	/// </summary>
+	/// <remarks>
+	/// The endpoint is mapped <c>AllowAnonymous</c>: Telegram cannot satisfy an app's
+	/// authentication scheme, and the request authenticates itself
+	/// through the constant-time <c>secret_token</c> header check. Without this, an app-wide
+	/// authorization fallback policy would reject Telegram's deliveries with 401 before the secret
+	/// is ever verified.
+	/// </remarks>
 	/// <param name="endpoints">The endpoint route builder.</param>
 	/// <param name="pattern">
 	/// Optional path override. When <see langword="null"/>, uses the configured webhook path
@@ -53,6 +60,6 @@ public static class TelegramWebhookEndpointExtensions
 				.ConfigureAwait(false);
 
 			httpContext.Response.StatusCode = (int)status;
-		});
+		}).AllowAnonymous();
 	}
 }
