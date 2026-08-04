@@ -1,23 +1,29 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<Description>Metapackage for Vexel.Telegram's various components.</Description>
-		<!-- Publish decision deferred (D14); keep non-packable for the v2 rewrite. -->
-		<IsPackable>false</IsPackable>
+		<TargetFramework>net9.0</TargetFramework>
+		<Description>Metapackage for Vexel.Telegram's various components</Description>
+		<IsPackable>true</IsPackable>
+
+		<!-- No need for build output, since this is a metapackage -->
 		<IncludeBuildOutput>false</IncludeBuildOutput>
-		<NoWarn>$(NoWarn);NU5128</NoWarn>
+		<NoPackageAnalysis>true</NoPackageAnalysis>
 	</PropertyGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\Vexel.Telegram.Abstractions\Vexel.Telegram.Abstractions.csproj"/>
 		<ProjectReference Include="..\Vexel.Telegram.Client\Vexel.Telegram.Client.csproj"/>
-		<ProjectReference Include="..\Vexel.Telegram.Handlers\Vexel.Telegram.Handlers.csproj"/>
+		<ProjectReference Include="..\Vexel.Telegram.Commands\Vexel.Telegram.Commands.csproj"/>
+		<ProjectReference Include="..\Vexel.Telegram.Interactivity\Vexel.Telegram.Interactivity.csproj"/>
+		<ProjectReference Include="..\Vexel.Telegram.Extensions\Vexel.Telegram.Extensions.csproj"/>
 		<ProjectReference Include="..\Vexel.Telegram.Hosting\Vexel.Telegram.Hosting.csproj"/>
 	</ItemGroup>
+
 
 	<PropertyGroup Label="MinVer">
 		<MinVerAutoIncrement>minor</MinVerAutoIncrement>
 		<MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
 		<MinVerTagPrefix>v</MinVerTagPrefix>
 	</PropertyGroup>
-
+	
 </Project>

@@ -1,54 +1,59 @@
+using Vexel.Telegram.Client;
+using Vexel.Telegram.Client.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Vexel.Telegram.Client;
-using Vexel.Telegram.Client.Extensions;
 
 namespace Vexel.Telegram.Hosting.Extensions;
 
 /// <summary>
-/// Host builder extensions for Vexel Telegram.
+/// Defines extension methods for the <see cref="IHostBuilder"/> interface.
 /// </summary>
 public static class HostBuilderExtensions
 {
 	/// <summary>
-	/// Adds Vexel Telegram client services and a hosted <see cref="VexelService"/>.
+	/// Adds the required services for Vexel Telegram and a <see cref="IHostedService"/> implementation to an
+	/// <see cref="IHostBuilder"/>.
 	/// </summary>
 	/// <param name="hostBuilder">The host builder.</param>
-	/// <param name="tokenFactory">Factory that returns the bot token.</param>
-	/// <param name="configureClientOptions">Optional client options configuration.</param>
-	/// <returns>The same host builder.</returns>
-	public static IHostBuilder AddTelegramService(
+	/// <param name="tokenFactory">A factory function to retrieve the bot token.</param>
+	/// <param name="configureClientOptions">A function that retrieves the configured <see cref="VexelClientOptions"/>.</param>
+	/// <returns>The host builder, with the services added.</returns>
+	public static IHostBuilder AddTelegramService
+	(
 		this IHostBuilder hostBuilder,
 		Func<IServiceProvider, string> tokenFactory,
-		Action<VexelClientOptions>? configureClientOptions = null)
+		Action<VexelClientOptions>? configureClientOptions = null
+	)
 	{
-		ArgumentNullException.ThrowIfNull(hostBuilder);
-
-		_ = hostBuilder.ConfigureServices((_, services) =>
-			services.AddTelegramService(tokenFactory, configureClientOptions));
+		_ = hostBuilder.ConfigureServices((_, serviceCollection) =>
+			serviceCollection.AddTelegramService(tokenFactory, configureClientOptions));
 
 		return hostBuilder;
 	}
 
 	/// <summary>
-	/// Adds Vexel Telegram client services and a hosted <see cref="VexelService"/>.
+	/// Adds the required services for Vexel Telegram and a <see cref="IHostedService"/> implementation to an
+	/// <see cref="IServiceCollection"/>.
 	/// </summary>
-	/// <param name="services">The service collection.</param>
-	/// <param name="tokenFactory">Factory that returns the bot token.</param>
-	/// <param name="configureClientOptions">Optional client options configuration.</param>
-	/// <returns>The same service collection.</returns>
-	public static IServiceCollection AddTelegramService(
-		this IServiceCollection services,
+	/// <param name="serviceCollection">The service collection.</param>
+	/// <param name="tokenFactory">A factory function to retrieve the bot token.</param>
+	/// <param name="configureClientOptions">A function that retrieves the configured <see cref="VexelClientOptions"/>.</param>
+	/// <returns>The service collection, with the services added.</returns>
+	public static IServiceCollection AddTelegramService
+	(
+		this IServiceCollection serviceCollection,
 		Func<IServiceProvider, string> tokenFactory,
-		Action<VexelClientOptions>? configureClientOptions = null)
+		Action<VexelClientOptions>? configureClientOptions = null
+	)
 	{
-		ArgumentNullException.ThrowIfNull(services);
+		_ = serviceCollection.AddVexelTelegramClient(tokenFactory, configureClientOptions);
+		serviceCollection.TryAddSingleton<VexelService>();
 
-		_ = services.AddVexelTelegramClient(tokenFactory, configureClientOptions);
-		services.TryAddSingleton<VexelService>();
-		_ = services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<VexelService>());
+		_ = serviceCollection
+			.AddSingleton<IHostedService, VexelService>(serviceProvider =>
+				serviceProvider.GetRequiredService<VexelService>());
 
-		return services;
+		return serviceCollection;
 	}
 }

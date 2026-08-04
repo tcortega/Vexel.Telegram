@@ -5,9 +5,6 @@ on:
   push:
     branches:
       - 'master'
-      - 'v2'
-      - 'v2/**'
-      - 'fm/**'
     paths-ignore:
       - '**/*.md'
   pull_request:
@@ -27,15 +24,9 @@ jobs:
           dotnet-version: |
             8.0.x
             9.0.x
-            10.0.x
-            11.0.x
-          dotnet-quality: preview
 
       - name: Restore dependencies
         run: dotnet restore
-
-      - name: Verify formatting
-        run: dotnet format --verify-no-changes --no-restore
-
+        
       - name: Build
         run: dotnet build -c Release --no-restore
