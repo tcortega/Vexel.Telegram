@@ -318,6 +318,7 @@ Mitigations for dual-attr DX:
 17. `IFeedback` thin high-DX helper (not optional framework sludge): Reply/Edit/AnswerCallback/AnswerInline + send-with-keyboard. Defaults from context (chat, message id, parse mode opt). Power: inject `ITelegramBotClient` anytime. No fat localization/template engine in core.
 18. Concurrency: configurable; **default ordered per chat**, cross-chat parallel. Power can loosen.
 19. Hosting: **polling default**, webhook supported.
+20. Packages (V2.0): **Client + Handlers(+embedded generators/analyzers) + Hosting**. Merge/skip separate Abstractions/Extensions packages initially; builders live with Handlers or Client. Metapackage optional at publish time.
 
 
 
