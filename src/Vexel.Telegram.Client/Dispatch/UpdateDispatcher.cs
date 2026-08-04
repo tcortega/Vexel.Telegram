@@ -8,8 +8,8 @@ namespace Vexel.Telegram.Client.Dispatch;
 
 /// <summary>
 /// Default update dispatcher.
-/// Runs registered <see cref="IUpdateRouter"/>s, then raw handlers; On* fan-out slots between them
-/// in a later slice (precedence: routed → On* → raw).
+/// Precedence within a lane: routed handler → On* fan-out (both inside <see cref="IUpdateRouter"/>s)
+/// → raw handlers → completion hooks.
 /// </summary>
 /// <param name="scopeFactory">Factory for the per-update DI scope.</param>
 /// <param name="rootProvider">
@@ -17,7 +17,7 @@ namespace Vexel.Telegram.Client.Dispatch;
 /// they never capture an update scope and stay subject to the container's scope validation.
 /// </param>
 /// <param name="registry">Raw handler registry.</param>
-/// <param name="routers">Routed-handler stages run before raw handlers, in registration order.</param>
+/// <param name="routers">Routed + On* stages run before raw handlers, in registration order.</param>
 /// <param name="completionHooks">
 /// Post-pipeline hooks (answer obligations, etc.) run after routers and raw handlers, still in-scope.
 /// </param>
@@ -50,7 +50,8 @@ public sealed class UpdateDispatcher(
 		// Bind write-once update context (and later Feedback defaults) before any handler resolves.
 		InitializeScope(scope.ServiceProvider, update);
 
-		// Precedence: routed → On* (later) → raw. Raw always runs last and cannot suppress routing.
+		// Precedence: routed → On* (inside routers) → raw → completion hooks.
+		// Raw always runs after routers and cannot suppress routing.
 		foreach (var router in _routers)
 		{
 			cancellationToken.ThrowIfCancellationRequested();

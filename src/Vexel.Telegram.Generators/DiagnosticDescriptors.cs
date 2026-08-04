@@ -45,7 +45,7 @@ internal static class DiagnosticDescriptors
 		description:
 			"Request records must follow the Vexel binding convention: one public ctor; command params from "
 			+ "string/int/long/bool/decimal/enum; callback/inline/flow params empty or single string; "
-			+ "DI services never bind from payload.");
+			+ "On* params empty only; DI services never bind from payload.");
 
 	public static readonly DiagnosticDescriptor VEX0005DuplicateRouteKey = new(
 		id: "VEX0005",

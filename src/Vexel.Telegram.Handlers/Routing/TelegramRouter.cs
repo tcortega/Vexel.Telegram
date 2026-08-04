@@ -10,16 +10,18 @@ namespace Vexel.Telegram.Handlers.Routing;
 
 /// <summary>
 /// Runtime Telegram router: classify the update, extract a route key per the binding convention,
-/// bind arguments, and await the generated Immediate handler.
+/// bind arguments, await the generated Immediate handler, then run On* observers.
 /// </summary>
 /// <remarks>
 /// Text precedence (D7): leading <c>/</c> commands always win (including <c>/cancel</c> mid-flow),
 /// then an armed flow step, else unrouted. An unknown <c>/foo</c> mid-flow is a command miss and
 /// does not get consumed as flow input (C2).
+/// After the routed path (hit or miss), On* observers for that update kind run sequentially in
+/// fully-qualified metadata name order (D9/N3), always awaited on the same chat lane.
 /// Callback and inline answer obligations (B4) are discharged by
 /// <see cref="CallbackAnswerObligation"/> and <see cref="InlineAnswerObligation"/> after the full
-/// dispatch pipeline so routed handlers, exceptions, unrouted updates, and raw handlers all share
-/// one fail-closed default answer when Feedback did not answer.
+/// dispatch pipeline so routed handlers, On*, exceptions, unrouted updates, and raw handlers all
+/// share one fail-closed default answer when Feedback did not answer.
 /// </remarks>
 public sealed class TelegramRouter : IUpdateRouter
 {
@@ -30,6 +32,10 @@ public sealed class TelegramRouter : IUpdateRouter
 	private readonly FrozenDictionary<string, RouteEntry> _inlineQueries;
 	private readonly FrozenDictionary<string, RouteEntry> _chosenInlineResults;
 	private readonly FrozenDictionary<string, RouteEntry> _flowSteps;
+	private readonly OnHandlerEntry[] _onMessages;
+	private readonly OnHandlerEntry[] _onCallbackQueries;
+	private readonly OnHandlerEntry[] _onInlineQueries;
+	private readonly OnHandlerEntry[] _onChosenInlineResults;
 	private readonly bool _hasUserCancelCommand;
 	private readonly FlowOptions _flowOptions;
 	private string? _botUsername;
@@ -39,7 +45,7 @@ public sealed class TelegramRouter : IUpdateRouter
 	/// <summary>
 	/// Initializes a new router from all registered <see cref="TelegramRouteContribution"/>s.
 	/// Fails fast when two assemblies contribute the same command, callback, inline, chosen, or
-	/// flow step key.
+	/// flow step key, or when one assembly contributes the same On* observer twice.
 	/// </summary>
 	/// <param name="contributions">Per-assembly route contributions.</param>
 	/// <param name="botClient">Bot client used to resolve this bot's username when needed.</param>
@@ -65,6 +71,16 @@ public sealed class TelegramRouter : IUpdateRouter
 		_inlineQueries = ComposeInlineQueries(contributionList);
 		_chosenInlineResults = ComposeChosenInlineResults(contributionList);
 		_flowSteps = ComposeFlowSteps(contributionList);
+		_onMessages = ComposeOnHandlers(contributionList, static c => c.OnMessages, "[OnMessage]");
+		_onCallbackQueries = ComposeOnHandlers(
+			contributionList,
+			static c => c.OnCallbackQueries,
+			"[OnCallbackQuery]");
+		_onInlineQueries = ComposeOnHandlers(contributionList, static c => c.OnInlineQueries, "[OnInlineQuery]");
+		_onChosenInlineResults = ComposeOnHandlers(
+			contributionList,
+			static c => c.OnChosenInlineResults,
+			"[OnChosenInlineResult]");
 		_hasUserCancelCommand = _commands.ContainsKey("cancel");
 	}
 
@@ -111,26 +127,69 @@ public sealed class TelegramRouter : IUpdateRouter
 
 		if (update.CallbackQuery is { } callbackQuery)
 		{
-			await RouteCallbackAsync(callbackQuery, update, scope, cancellationToken).ConfigureAwait(false);
+			await RunRoutedStageAsync(
+				RouteCallbackAsync(callbackQuery, update, scope, cancellationToken),
+				update,
+				cancellationToken).ConfigureAwait(false);
+			await RunOnHandlersAsync(_onCallbackQueries, update, scope, cancellationToken)
+				.ConfigureAwait(false);
 			return;
 		}
 
 		if (update.InlineQuery is { } inlineQuery)
 		{
-			await RouteInlineQueryAsync(inlineQuery, update, scope, cancellationToken).ConfigureAwait(false);
+			await RunRoutedStageAsync(
+				RouteInlineQueryAsync(inlineQuery, update, scope, cancellationToken),
+				update,
+				cancellationToken).ConfigureAwait(false);
+			await RunOnHandlersAsync(_onInlineQueries, update, scope, cancellationToken)
+				.ConfigureAwait(false);
 			return;
 		}
 
 		if (update.ChosenInlineResult is { } chosenInlineResult)
 		{
-			await RouteChosenInlineResultAsync(chosenInlineResult, update, scope, cancellationToken)
+			await RunRoutedStageAsync(
+				RouteChosenInlineResultAsync(chosenInlineResult, update, scope, cancellationToken),
+				update,
+				cancellationToken).ConfigureAwait(false);
+			await RunOnHandlersAsync(_onChosenInlineResults, update, scope, cancellationToken)
 				.ConfigureAwait(false);
 			return;
 		}
 
 		if (update.Message is { } message)
 		{
-			await RouteMessageAsync(message, update, scope, cancellationToken).ConfigureAwait(false);
+			await RunRoutedStageAsync(
+				RouteMessageAsync(message, update, scope, cancellationToken),
+				update,
+				cancellationToken).ConfigureAwait(false);
+			await RunOnHandlersAsync(_onMessages, update, scope, cancellationToken).ConfigureAwait(false);
+		}
+	}
+
+	/// <summary>
+	/// Awaits the routed stage and isolates its faults so the On* fan-out still runs (D9/N3).
+	/// Handler faults are already isolated per binder; this catches the infrastructure faults around
+	/// them (flow store, bot username lookup) that would otherwise skip observers entirely.
+	/// Cancellation still propagates - observers must not run once the lane is shutting down.
+	/// </summary>
+	private async Task RunRoutedStageAsync(Task routed, Update update, CancellationToken cancellationToken)
+	{
+		try
+		{
+			await routed.ConfigureAwait(false);
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(
+				ex,
+				"Routed dispatch failed for update {UpdateId}; continuing with On* observers",
+				update.Id);
 		}
 	}
 
@@ -492,6 +551,40 @@ public sealed class TelegramRouter : IUpdateRouter
 			cancellationToken).ConfigureAwait(false);
 	}
 
+	/// <summary>
+	/// Runs On* observers sequentially in FQ-name order. Each observer is fault-isolated so one
+	/// bad observer cannot skip the rest or kill the lane (P2).
+	/// </summary>
+	private async Task RunOnHandlersAsync(
+		OnHandlerEntry[] handlers,
+		Update update,
+		IServiceProvider scope,
+		CancellationToken cancellationToken)
+	{
+		foreach (var entry in handlers)
+		{
+			cancellationToken.ThrowIfCancellationRequested();
+
+			try
+			{
+				// Payload is unused for On* (empty request records).
+				_ = await entry.Binder(scope, string.Empty, cancellationToken).ConfigureAwait(false);
+			}
+			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(
+					ex,
+					"On* handler {Handler} failed for update {UpdateId}",
+					entry.HandlerFullyQualifiedName,
+					update.Id);
+			}
+		}
+	}
+
 	private async Task InvokeRouteAsync(
 		RouteEntry entry,
 		string payload,
@@ -673,6 +766,41 @@ public sealed class TelegramRouter : IUpdateRouter
 		}
 
 		return map.ToFrozenDictionary(StringComparer.Ordinal);
+	}
+
+	/// <summary>
+	/// Merges On* arrays across assemblies and re-sorts by fully-qualified metadata name so order
+	/// is deterministic regardless of contribution registration order (D9/N3). Fails fast when one
+	/// assembly contributes the same observer twice (double registration would fan out twice); two
+	/// assemblies may legitimately declare distinct handlers that share a display name, so only the
+	/// same-assembly case is a duplicate.
+	/// </summary>
+	private static OnHandlerEntry[] ComposeOnHandlers(
+		IEnumerable<TelegramRouteContribution> contributions,
+		Func<TelegramRouteContribution, IReadOnlyList<OnHandlerEntry>> selector,
+		string kind)
+	{
+		var entries = new List<OnHandlerEntry>();
+		var seen = new HashSet<(string Assembly, string Handler)>();
+
+		foreach (var contribution in contributions)
+		{
+			foreach (var entry in selector(contribution))
+			{
+				if (!seen.Add((contribution.AssemblyName, entry.HandlerFullyQualifiedName)))
+				{
+					throw new InvalidOperationException(
+						$"Assembly '{contribution.AssemblyName}' contributed {kind} observer "
+						+ $"'{entry.HandlerFullyQualifiedName}' more than once. "
+						+ $"Call Add{contribution.AssemblyName}Telegram() exactly once "
+						+ "(a library that already calls it must not be re-registered by the app).");
+				}
+
+				entries.Add(entry);
+			}
+		}
+
+		return [.. entries.OrderBy(static e => e.HandlerFullyQualifiedName, StringComparer.Ordinal)];
 	}
 
 	private readonly record struct RouteEntry(string RouteKey, RouteBinder Binder);

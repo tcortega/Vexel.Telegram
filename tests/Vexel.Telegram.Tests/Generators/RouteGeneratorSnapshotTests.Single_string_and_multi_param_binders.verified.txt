@@ -90,6 +90,22 @@ public static partial class TelegramServiceCollectionExtensions
 		{
 		};
 
+		var onMessages = new global::Vexel.Telegram.Handlers.Routing.OnHandlerEntry[]
+		{
+		};
+
+		var onCallbackQueries = new global::Vexel.Telegram.Handlers.Routing.OnHandlerEntry[]
+		{
+		};
+
+		var onInlineQueries = new global::Vexel.Telegram.Handlers.Routing.OnHandlerEntry[]
+		{
+		};
+
+		var onChosenInlineResults = new global::Vexel.Telegram.Handlers.Routing.OnHandlerEntry[]
+		{
+		};
+
 		_ = global::Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton(
 			services,
 			new global::Vexel.Telegram.Handlers.Routing.TelegramRouteContribution(
@@ -99,7 +115,11 @@ public static partial class TelegramServiceCollectionExtensions
 				callbacks,
 				inlineQueries,
 				chosenInlineResults,
-				flowSteps));
+				flowSteps,
+				onMessages,
+				onCallbackQueries,
+				onInlineQueries,
+				onChosenInlineResults));
 
 		return services;
 	}
