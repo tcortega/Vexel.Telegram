@@ -66,10 +66,18 @@ public sealed class VexelClient(
 
 	private async Task RunPollingAsync(CancellationToken stoppingToken)
 	{
-		// A leftover webhook blocks getUpdates; clear it so polling always owns receive.
-		await botClient
-			.DeleteWebhook(dropPendingUpdates: _options.DropPendingUpdates, cancellationToken: stoppingToken)
-			.ConfigureAwait(false);
+		try
+		{
+			// A leftover webhook blocks getUpdates; clear it so polling always owns receive.
+			await botClient
+				.DeleteWebhook(dropPendingUpdates: _options.DropPendingUpdates, cancellationToken: stoppingToken)
+				.ConfigureAwait(false);
+		}
+		catch (Exception ex) when (IsShutdownCancellation(ex, stoppingToken))
+		{
+			// Stopped before receive ever started.
+			return;
+		}
 
 		// AllowedUpdates stays null: Telegram.Bot then receives every update kind, whereas an
 		// explicit empty list excludes reactions and chat member updates.
@@ -120,11 +128,19 @@ public sealed class VexelClient(
 				webhook.Path);
 		}
 
-		await botClient.SetWebhook(
-			url: webhook.Url!.AbsoluteUri,
-			dropPendingUpdates: _options.DropPendingUpdates,
-			secretToken: webhook.SecretToken,
-			cancellationToken: stoppingToken).ConfigureAwait(false);
+		try
+		{
+			await botClient.SetWebhook(
+				url: webhook.Url!.AbsoluteUri,
+				dropPendingUpdates: _options.DropPendingUpdates,
+				secretToken: webhook.SecretToken,
+				cancellationToken: stoppingToken).ConfigureAwait(false);
+		}
+		catch (Exception ex) when (IsShutdownCancellation(ex, stoppingToken))
+		{
+			// Stopped before the registration finished; there is nothing left to keep alive.
+			return;
+		}
 
 		try
 		{
@@ -136,6 +152,29 @@ public sealed class VexelClient(
 		{
 			// Normal shutdown.
 		}
+	}
+
+	/// <summary>
+	/// True when <paramref name="exception"/> is a Bot API call that lost a race with shutdown.
+	/// Telegram.Bot wraps a cancelled request in <c>RequestException</c>, so without unwrapping, a
+	/// stop landing mid-call reads as a fatal receive error and takes the host down noisily.
+	/// </summary>
+	internal static bool IsShutdownCancellation(Exception exception, CancellationToken stoppingToken)
+	{
+		if (!stoppingToken.IsCancellationRequested)
+		{
+			return false;
+		}
+
+		for (var current = exception; current is not null; current = current.InnerException)
+		{
+			if (current is OperationCanceledException)
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	// Routing matches case-insensitively and ignores surrounding slashes, so neither is a mismatch.
