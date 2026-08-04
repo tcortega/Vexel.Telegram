@@ -11,6 +11,9 @@ namespace Vexel.Telegram.Client.Dispatch;
 /// </summary>
 public sealed class UpdateScheduler : IAsyncDisposable
 {
+	private static readonly TimeSpan s_drainGracePeriod = TimeSpan.FromSeconds(5);
+	private static readonly TimeSpan s_forcedShutdownGracePeriod = TimeSpan.FromSeconds(2);
+
 	private readonly IUpdateDispatcher _dispatcher;
 	private readonly ILogger<UpdateScheduler> _logger;
 	private readonly int _laneCapacity;
@@ -22,7 +25,7 @@ public sealed class UpdateScheduler : IAsyncDisposable
 	private readonly Dictionary<long, Lane> _lanes = [];
 	private readonly CancellationTokenSource _shutdownCts = new();
 	private readonly List<Task> _workers = [];
-	private bool _disposed;
+	private int _disposeState;
 
 	/// <summary>
 	/// Initializes a new scheduler.
@@ -68,6 +71,8 @@ public sealed class UpdateScheduler : IAsyncDisposable
 		}
 	}
 
+	private bool IsDisposed => Volatile.Read(ref _disposeState) != 0;
+
 	/// <summary>
 	/// Enqueues <paramref name="update"/> on its lane.
 	/// Awaits when the lane is at capacity (backpressure); never drops.
@@ -78,7 +83,7 @@ public sealed class UpdateScheduler : IAsyncDisposable
 	public async ValueTask ScheduleAsync(Update update, CancellationToken cancellationToken)
 	{
 		ArgumentNullException.ThrowIfNull(update);
-		ObjectDisposedException.ThrowIf(_disposed, this);
+		ObjectDisposedException.ThrowIf(IsDisposed, this);
 
 		var key = UpdateLaneKey.FromUpdate(update);
 
@@ -106,17 +111,16 @@ public sealed class UpdateScheduler : IAsyncDisposable
 	}
 
 	/// <summary>
-	/// Completes all lanes and waits for in-flight workers to finish.
+	/// Stops accepting new work, completes all lanes, and waits for in-flight workers to finish.
+	/// Buffered updates drain within a bounded grace period; workers are only cancelled if the
+	/// drain does not finish in time.
 	/// </summary>
 	public async ValueTask DisposeAsync()
 	{
-		if (_disposed)
+		if (Interlocked.Exchange(ref _disposeState, 1) != 0)
 		{
 			return;
 		}
-
-		_disposed = true;
-		await _shutdownCts.CancelAsync().ConfigureAwait(false);
 
 		List<Task> workers;
 		lock (_gate)
@@ -130,13 +134,31 @@ public sealed class UpdateScheduler : IAsyncDisposable
 			_lanes.Clear();
 		}
 
+		var drain = Task.WhenAll(workers);
 		try
 		{
-			await Task.WhenAll(workers).ConfigureAwait(false);
+			await drain.WaitAsync(s_drainGracePeriod).ConfigureAwait(false);
+		}
+		catch (TimeoutException)
+		{
+			_logger.LogWarning(
+				"Update lanes did not drain within {GracePeriod}; cancelling in-flight dispatch",
+				s_drainGracePeriod);
+
+			await _shutdownCts.CancelAsync().ConfigureAwait(false);
+
+			try
+			{
+				await drain.WaitAsync(s_forcedShutdownGracePeriod).ConfigureAwait(false);
+			}
+			catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
+			{
+				// Last resort: abandon workers that ignore cancellation.
+			}
 		}
 		catch (OperationCanceledException)
 		{
-			// Expected during shutdown.
+			// A worker observed cancellation from elsewhere; nothing left to drain.
 		}
 
 		_shutdownCts.Dispose();
@@ -146,7 +168,7 @@ public sealed class UpdateScheduler : IAsyncDisposable
 	{
 		lock (_gate)
 		{
-			ObjectDisposedException.ThrowIf(_disposed, this);
+			ObjectDisposedException.ThrowIf(IsDisposed, this);
 
 			if (_lanes.TryGetValue(key, out var existing))
 			{

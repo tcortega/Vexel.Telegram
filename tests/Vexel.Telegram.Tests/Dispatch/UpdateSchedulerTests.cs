@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Telegram.Bot.Types;
@@ -161,8 +162,7 @@ public sealed class UpdateSchedulerTests
 		// Fills the single buffer slot while update 1 is still running.
 		await scheduler.ScheduleAsync(MessageUpdate(2, chatId: 5), CancellationToken.None);
 
-		using var delayCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
-		var third = scheduler.ScheduleAsync(MessageUpdate(3, chatId: 5), delayCts.Token).AsTask();
+		var third = scheduler.ScheduleAsync(MessageUpdate(3, chatId: 5), CancellationToken.None).AsTask();
 
 		// Third schedule must wait on backpressure while capacity is exhausted.
 		var timeout = await Task.WhenAny(third, Task.Delay(TimeSpan.FromMilliseconds(100)));
@@ -186,28 +186,84 @@ public sealed class UpdateSchedulerTests
 	}
 
 	[Fact]
+	public async Task Dispose_DrainsBufferedUpdates()
+	{
+		var processed = 0;
+		var dispatcher = new ScriptedDispatcher(async (update, ct) =>
+		{
+			await Task.Delay(20, ct);
+			_ = Interlocked.Increment(ref processed);
+		});
+
+		var scheduler = CreateScheduler(dispatcher);
+
+		for (var id = 1; id <= 5; id++)
+		{
+			await scheduler.ScheduleAsync(MessageUpdate(id, chatId: 7), CancellationToken.None);
+		}
+
+		await scheduler.DisposeAsync();
+
+		Assert.Equal(5, Volatile.Read(ref processed));
+	}
+
+	[Fact]
+	public async Task Dispose_IsIdempotentAndRejectsFurtherScheduling()
+	{
+		var scheduler = CreateScheduler(new ScriptedDispatcher((_, _) => Task.CompletedTask));
+
+		await Task.WhenAll(
+			scheduler.DisposeAsync().AsTask(),
+			scheduler.DisposeAsync().AsTask());
+
+		_ = await Assert.ThrowsAsync<ObjectDisposedException>(async () =>
+			await scheduler.ScheduleAsync(MessageUpdate(1, chatId: 1), CancellationToken.None));
+	}
+
+	[Fact]
 	public async Task Dispatcher_IsolatesRawHandlerFaults()
 	{
 		var goodRan = false;
-		IRawUpdateHandler[] handlers =
-		[
-			new DelegateRawHandler((_, _) => throw new InvalidOperationException("raw boom")),
-			new DelegateRawHandler((_, _) =>
-			{
-				goodRan = true;
-				return Task.CompletedTask;
-			}),
-		];
+		var services = new ServiceCollection();
+		_ = services.AddSingleton<IRawUpdateHandler>(
+			new DelegateRawHandler((_, _) => throw new InvalidOperationException("raw boom")));
+		_ = services.AddSingleton<IRawUpdateHandler>(new DelegateRawHandler((_, _) =>
+		{
+			goodRan = true;
+			return Task.CompletedTask;
+		}));
 
-		var dispatcher = new UpdateDispatcher(
-			handlers,
-			Options.Create(new VexelClientOptions()),
-			NullLogger<UpdateDispatcher>.Instance);
+		await using var provider = services.BuildServiceProvider();
+		var dispatcher = CreateDispatcher(provider);
 
 		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None);
 
 		Assert.True(goodRan);
 	}
+
+	[Fact]
+	public async Task Dispatcher_ResolvesScopedHandlersPerUpdate()
+	{
+		var tracker = new HandlerTracker();
+		var services = new ServiceCollection();
+		_ = services.AddSingleton(tracker);
+		_ = services.AddScoped<IRawUpdateHandler, TrackedRawHandler>();
+
+		await using var provider = services.BuildServiceProvider(validateScopes: true);
+		var dispatcher = CreateDispatcher(provider);
+
+		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None);
+		await dispatcher.DispatchAsync(MessageUpdate(2, chatId: 1), CancellationToken.None);
+
+		Assert.Equal(2, tracker.Created);
+		Assert.Equal(2, tracker.Disposed);
+	}
+
+	private static UpdateDispatcher CreateDispatcher(IServiceProvider provider) =>
+		new(
+			provider.GetRequiredService<IServiceScopeFactory>(),
+			Options.Create(new VexelClientOptions()),
+			NullLogger<UpdateDispatcher>.Instance);
 
 	private static UpdateScheduler CreateScheduler(IUpdateDispatcher dispatcher, int laneCapacity = 64)
 	{
@@ -253,5 +309,34 @@ public sealed class UpdateSchedulerTests
 	{
 		public Task HandleAsync(Update update, CancellationToken cancellationToken) =>
 			handler(update, cancellationToken);
+	}
+
+	private sealed class HandlerTracker
+	{
+		private int _created;
+		private int _disposed;
+
+		public int Created => Volatile.Read(ref _created);
+
+		public int Disposed => Volatile.Read(ref _disposed);
+
+		public void MarkCreated() => _ = Interlocked.Increment(ref _created);
+
+		public void MarkDisposed() => _ = Interlocked.Increment(ref _disposed);
+	}
+
+	private sealed class TrackedRawHandler : IRawUpdateHandler, IDisposable
+	{
+		private readonly HandlerTracker _tracker;
+
+		public TrackedRawHandler(HandlerTracker tracker)
+		{
+			_tracker = tracker;
+			tracker.MarkCreated();
+		}
+
+		public Task HandleAsync(Update update, CancellationToken cancellationToken) => Task.CompletedTask;
+
+		public void Dispose() => _tracker.MarkDisposed();
 	}
 }

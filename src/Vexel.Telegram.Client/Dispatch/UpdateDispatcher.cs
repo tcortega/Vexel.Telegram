@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Telegram.Bot.Types;
@@ -10,11 +11,10 @@ namespace Vexel.Telegram.Client.Dispatch;
 /// (precedence: routed → On* → raw).
 /// </summary>
 public sealed class UpdateDispatcher(
-	IEnumerable<IRawUpdateHandler> rawHandlers,
+	IServiceScopeFactory scopeFactory,
 	IOptions<VexelClientOptions> options,
 	ILogger<UpdateDispatcher> logger) : IUpdateDispatcher
 {
-	private readonly IRawUpdateHandler[] _rawHandlers = rawHandlers as IRawUpdateHandler[] ?? [.. rawHandlers];
 	private readonly VexelClientOptions _options = options.Value;
 
 	/// <inheritdoc />
@@ -22,8 +22,12 @@ public sealed class UpdateDispatcher(
 	{
 		ArgumentNullException.ThrowIfNull(update);
 
+		// One DI scope per update: scoped handler dependencies must not be captured by this
+		// singleton nor shared concurrently across lanes.
+		await using var scope = scopeFactory.CreateAsyncScope();
+
 		// Routed handler + On* fan-out land in later slices; raw always runs last and cannot suppress routing.
-		foreach (var handler in _rawHandlers)
+		foreach (var handler in scope.ServiceProvider.GetServices<IRawUpdateHandler>())
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 			await InvokeHandlerAsync(handler, update, cancellationToken).ConfigureAwait(false);

@@ -20,6 +20,7 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 			<PrivateAssets>all</PrivateAssets>
 		</PackageReference>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
 		<PackageReference Include="Microsoft.Extensions.Options"/>
 	</ItemGroup>

@@ -14,10 +14,11 @@ public sealed class VexelClient(
 	ILogger<VexelClient> logger,
 	ITelegramBotClient botClient,
 	IOptions<VexelClientOptions> options,
-	UpdateScheduler scheduler) : IAsyncDisposable
+	UpdateScheduler scheduler)
 {
+	private static readonly TimeSpan s_pollingErrorCooldown = TimeSpan.FromSeconds(2);
+
 	private readonly VexelClientOptions _options = options.Value;
-	private int _disposeState;
 
 	/// <summary>
 	/// Runs the polling receive loop until <paramref name="stoppingToken"/> is cancelled.
@@ -26,12 +27,11 @@ public sealed class VexelClient(
 	/// <returns>A task that completes when the client stops.</returns>
 	public async Task RunAsync(CancellationToken stoppingToken)
 	{
+		// AllowedUpdates stays null: Telegram.Bot then receives every update kind, whereas an
+		// explicit empty list excludes reactions and chat member updates.
 		var receiverOptions = new ReceiverOptions
 		{
 			DropPendingUpdates = _options.DropPendingUpdates,
-			// Non-null AllowedUpdates is required when DropPendingUpdates is true;
-			// an empty list means "all update kinds" in Telegram.Bot.
-			AllowedUpdates = [],
 		};
 
 		logger.LogInformation(
@@ -51,23 +51,9 @@ public sealed class VexelClient(
 		{
 			// Normal shutdown.
 		}
-		finally
-		{
-			await scheduler.DisposeAsync().ConfigureAwait(false);
-		}
 
+		// The scheduler is a container-owned singleton; the container drains and disposes it.
 		logger.LogInformation("VexelClient stopped");
-	}
-
-	/// <inheritdoc />
-	public async ValueTask DisposeAsync()
-	{
-		if (Interlocked.Exchange(ref _disposeState, 1) != 0)
-		{
-			return;
-		}
-
-		await scheduler.DisposeAsync().ConfigureAwait(false);
 	}
 
 	private async Task HandleUpdateAsync(ITelegramBotClient _, Update update, CancellationToken cancellationToken)
@@ -88,15 +74,25 @@ public sealed class VexelClient(
 		}
 	}
 
-	private Task HandlePollingErrorAsync(ITelegramBotClient _, Exception exception, CancellationToken cancellationToken)
+	private async Task HandlePollingErrorAsync(ITelegramBotClient _, Exception exception, CancellationToken cancellationToken)
 	{
 		if (cancellationToken.IsCancellationRequested
 			&& exception is OperationCanceledException)
 		{
-			return Task.CompletedTask;
+			return;
 		}
 
 		logger.LogError(exception, "Telegram polling error");
-		return Task.CompletedTask;
+
+		// The receiver re-enters GetUpdates as soon as this returns; cool down so an unreachable
+		// API cannot spin the loop at full speed.
+		try
+		{
+			await Task.Delay(s_pollingErrorCooldown, cancellationToken).ConfigureAwait(false);
+		}
+		catch (OperationCanceledException)
+		{
+			// Shutting down during the cooldown.
+		}
 	}
 }
