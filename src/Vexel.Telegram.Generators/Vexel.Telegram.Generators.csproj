@@ -19,6 +19,13 @@
 		<PackageReference Include="PolySharp" PrivateAssets="all"/>
 	</ItemGroup>
 
+	<ItemGroup>
+		<AdditionalFiles Include="AnalyzerReleases.Shipped.md"/>
+		<AdditionalFiles Include="AnalyzerReleases.Unshipped.md"/>
+	</ItemGroup>
+
 	<!-- No MinVer - not published standalone; packed into Handlers. -->
+
+	<!-- Code fix for VEX0001 lives post-T3 in a separate assembly (RS1038 forbids Workspaces in generator/analyzer assemblies). -->
 
 </Project>

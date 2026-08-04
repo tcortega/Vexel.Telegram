@@ -20,6 +20,9 @@ public sealed class RecordingTelegramBotClient : ITelegramBotClient
 	/// <summary>Optional hook that fails a recorded request instead of returning a response.</summary>
 	public Func<object, Exception?>? FailRequest { get; set; }
 
+	/// <summary>Username returned by GetMe; used by router tests.</summary>
+	public string? Username { get; set; } = "TestBot";
+
 	/// <inheritdoc />
 	public bool LocalBotServer => false;
 
@@ -75,6 +78,18 @@ public sealed class RecordingTelegramBotClient : ITelegramBotClient
 		if (typeof(TResponse) == typeof(bool))
 		{
 			return Task.FromResult((TResponse)(object)true);
+		}
+
+		if (typeof(TResponse) == typeof(User))
+		{
+			var user = new User
+			{
+				Id = BotId,
+				IsBot = true,
+				FirstName = "Test",
+				Username = Username,
+			};
+			return Task.FromResult((TResponse)(object)user);
 		}
 
 		return Task.FromResult(default(TResponse)!);
