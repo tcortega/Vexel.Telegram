@@ -27,11 +27,50 @@ public static class ServiceCollectionExtensions
 
 		_ = services.Configure(configureOptions ?? (static _ => { }));
 
+		_ = GetOrAddRawHandlerRegistry(services);
 		services.TryAddSingleton<ITelegramBotClient>(sp => new TelegramBotClient(tokenFactory(sp)));
 		services.TryAddSingleton<IUpdateDispatcher, UpdateDispatcher>();
 		services.TryAddSingleton<UpdateScheduler>();
 		services.TryAddSingleton<VexelClient>();
 
 		return services;
+	}
+
+	/// <summary>
+	/// Adds a raw update handler that is resolved independently of every other raw handler, so a
+	/// construction or dependency failure in one handler cannot stop the others from running.
+	/// </summary>
+	/// <typeparam name="THandler">The handler implementation type.</typeparam>
+	/// <param name="services">The service collection.</param>
+	/// <param name="lifetime">Handler lifetime; scoped by default, one instance per update.</param>
+	/// <returns>The same service collection.</returns>
+	public static IServiceCollection AddRawUpdateHandler<THandler>(
+		this IServiceCollection services,
+		ServiceLifetime lifetime = ServiceLifetime.Scoped)
+		where THandler : class, IRawUpdateHandler
+	{
+		ArgumentNullException.ThrowIfNull(services);
+
+		services.TryAdd(new ServiceDescriptor(typeof(THandler), typeof(THandler), lifetime));
+		GetOrAddRawHandlerRegistry(services).Add(typeof(THandler));
+
+		return services;
+	}
+
+	private static RawUpdateHandlerRegistry GetOrAddRawHandlerRegistry(IServiceCollection services)
+	{
+		foreach (var descriptor in services)
+		{
+			if (descriptor.ServiceType == typeof(RawUpdateHandlerRegistry)
+				&& descriptor.ImplementationInstance is RawUpdateHandlerRegistry existing)
+			{
+				return existing;
+			}
+		}
+
+		var registry = new RawUpdateHandlerRegistry();
+		_ = services.AddSingleton(registry);
+
+		return registry;
 	}
 }

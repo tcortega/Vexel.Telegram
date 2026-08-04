@@ -21,11 +21,24 @@ public sealed class VexelClient(
 	private readonly VexelClientOptions _options = options.Value;
 
 	/// <summary>
-	/// Runs the polling receive loop until <paramref name="stoppingToken"/> is cancelled.
+	/// Runs the polling receive loop until <paramref name="stoppingToken"/> is cancelled, then
+	/// drains buffered updates without a shutdown budget.
 	/// </summary>
 	/// <param name="stoppingToken">Token that signals the client should stop.</param>
 	/// <returns>A task that completes when the client stops.</returns>
-	public async Task RunAsync(CancellationToken stoppingToken)
+	public Task RunAsync(CancellationToken stoppingToken) =>
+		RunAsync(stoppingToken, CancellationToken.None);
+
+	/// <summary>
+	/// Runs the polling receive loop until <paramref name="stoppingToken"/> is cancelled.
+	/// </summary>
+	/// <param name="stoppingToken">Token that signals the client should stop.</param>
+	/// <param name="drainToken">
+	/// Bounds the post-stop drain of buffered updates to the caller's shutdown budget, so the
+	/// drain cannot outlive the container that its handlers resolve from.
+	/// </param>
+	/// <returns>A task that completes when the client stops.</returns>
+	public async Task RunAsync(CancellationToken stoppingToken, CancellationToken drainToken)
 	{
 		// AllowedUpdates stays null: Telegram.Bot then receives every update kind, whereas an
 		// explicit empty list excludes reactions and chat member updates.
@@ -55,7 +68,7 @@ public sealed class VexelClient(
 		{
 			// Drain here, while the container and every handler dependency are still alive.
 			// Disposal of the scheduler singleton itself stays with the container.
-			await scheduler.StopAsync().ConfigureAwait(false);
+			await scheduler.StopAsync(drainToken).ConfigureAwait(false);
 		}
 
 		logger.LogInformation("VexelClient stopped");

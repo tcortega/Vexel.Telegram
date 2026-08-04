@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Telegram.Bot.Types;
 using Vexel.Telegram.Client;
 using Vexel.Telegram.Client.Dispatch;
+using Vexel.Telegram.Client.Extensions;
 
 namespace Vexel.Telegram.Tests.Dispatch;
 
@@ -246,6 +247,7 @@ public sealed class UpdateSchedulerTests
 			return Task.CompletedTask;
 		}));
 		_ = services.AddSingleton(Options.Create(new VexelClientOptions()));
+		_ = services.AddSingleton(new RawUpdateHandlerRegistry());
 		_ = services.AddSingleton<ILogger<UpdateDispatcher>>(NullLogger<UpdateDispatcher>.Instance);
 		_ = services.AddSingleton<ILogger<UpdateScheduler>>(NullLogger<UpdateScheduler>.Instance);
 		_ = services.AddSingleton<IUpdateDispatcher, UpdateDispatcher>();
@@ -331,9 +333,61 @@ public sealed class UpdateSchedulerTests
 		Assert.Null(exception);
 	}
 
+	[Fact]
+	public async Task Dispatcher_RunsHealthyHandlerWhenAnotherFailsToConstruct()
+	{
+		var tracker = new HandlerTracker();
+		var services = new ServiceCollection();
+		_ = services.AddSingleton(tracker);
+		_ = services.AddRawUpdateHandler<ThrowingConstructorRawHandler>();
+		_ = services.AddRawUpdateHandler<TrackedRawHandler>();
+
+		await using var provider = services.BuildServiceProvider(validateScopes: true);
+		var dispatcher = CreateDispatcher(provider);
+
+		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None);
+
+		Assert.Equal(1, tracker.Created);
+		Assert.Equal(1, tracker.Handled);
+		Assert.Equal(1, tracker.Disposed);
+	}
+
+	[Fact]
+	public async Task StopAsync_WindsDownWhenShutdownBudgetExpires()
+	{
+		var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+		var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+		var dispatcher = new ScriptedDispatcher(async (update, ct) =>
+		{
+			_ = entered.TrySetResult();
+			try
+			{
+				await Task.Delay(Timeout.Infinite, ct);
+			}
+			catch (OperationCanceledException)
+			{
+				_ = cancelled.TrySetResult();
+				throw;
+			}
+		});
+
+		await using var scheduler = CreateScheduler(dispatcher);
+
+		await scheduler.ScheduleAsync(MessageUpdate(1, chatId: 3), CancellationToken.None);
+		await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+		using var budget = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+		var stop = scheduler.StopAsync(budget.Token);
+
+		await stop.WaitAsync(TimeSpan.FromSeconds(5));
+		await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+	}
+
 	private static UpdateDispatcher CreateDispatcher(IServiceProvider provider) =>
 		new(
 			provider.GetRequiredService<IServiceScopeFactory>(),
+			provider.GetService<RawUpdateHandlerRegistry>() ?? new RawUpdateHandlerRegistry(),
 			Options.Create(new VexelClientOptions()),
 			NullLogger<UpdateDispatcher>.Instance);
 
@@ -394,13 +448,18 @@ public sealed class UpdateSchedulerTests
 	private sealed class HandlerTracker
 	{
 		private int _created;
+		private int _handled;
 		private int _disposed;
 
 		public int Created => Volatile.Read(ref _created);
 
+		public int Handled => Volatile.Read(ref _handled);
+
 		public int Disposed => Volatile.Read(ref _disposed);
 
 		public void MarkCreated() => _ = Interlocked.Increment(ref _created);
+
+		public void MarkHandled() => _ = Interlocked.Increment(ref _handled);
 
 		public void MarkDisposed() => _ = Interlocked.Increment(ref _disposed);
 	}
@@ -415,7 +474,11 @@ public sealed class UpdateSchedulerTests
 			tracker.MarkCreated();
 		}
 
-		public Task HandleAsync(Update update, CancellationToken cancellationToken) => Task.CompletedTask;
+		public Task HandleAsync(Update update, CancellationToken cancellationToken)
+		{
+			_tracker.MarkHandled();
+			return Task.CompletedTask;
+		}
 
 		public void Dispose() => _tracker.MarkDisposed();
 	}

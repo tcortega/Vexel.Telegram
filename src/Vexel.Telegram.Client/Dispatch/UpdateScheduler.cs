@@ -112,10 +112,16 @@ public sealed class UpdateScheduler : IAsyncDisposable
 
 	/// <summary>
 	/// Completes all lanes and waits for in-flight workers to finish, so buffered updates are
-	/// dispatched while their dependencies are still alive. Workers are only cancelled if the
-	/// drain does not finish within the grace period. The scheduler stays usable afterwards.
+	/// dispatched while their dependencies are still alive. Workers are cancelled once
+	/// <paramref name="cancellationToken"/> fires or the grace period elapses, whichever comes
+	/// first. The scheduler stays usable afterwards.
 	/// </summary>
-	public Task StopAsync() => DrainAsync(disposing: false);
+	/// <param name="cancellationToken">
+	/// Bounds the drain to the caller's shutdown budget. When it cannot be cancelled the grace
+	/// periods are the only bound.
+	/// </param>
+	public Task StopAsync(CancellationToken cancellationToken = default) =>
+		DrainAsync(disposing: false, cancellationToken);
 
 	/// <summary>
 	/// Drains like <see cref="StopAsync"/> and then releases the scheduler. Callers hosted in a
@@ -128,10 +134,10 @@ public sealed class UpdateScheduler : IAsyncDisposable
 			return;
 		}
 
-		await DrainAsync(disposing: true).ConfigureAwait(false);
+		await DrainAsync(disposing: true, CancellationToken.None).ConfigureAwait(false);
 	}
 
-	private async Task DrainAsync(bool disposing)
+	private async Task DrainAsync(bool disposing, CancellationToken cancellationToken)
 	{
 		List<Task> workers;
 		CancellationTokenSource shutdownCts;
@@ -151,7 +157,14 @@ public sealed class UpdateScheduler : IAsyncDisposable
 		var workersAbandoned = false;
 		try
 		{
-			await drain.WaitAsync(s_drainGracePeriod).ConfigureAwait(false);
+			await drain.WaitAsync(s_drainGracePeriod, cancellationToken).ConfigureAwait(false);
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			_logger.LogWarning("Shutdown budget expired before update lanes drained; cancelling in-flight dispatch");
+
+			await TryCancelAsync(shutdownCts).ConfigureAwait(false);
+			workersAbandoned = !drain.IsCompleted;
 		}
 		catch (TimeoutException)
 		{
@@ -159,11 +172,11 @@ public sealed class UpdateScheduler : IAsyncDisposable
 				"Update lanes did not drain within {GracePeriod}; cancelling in-flight dispatch",
 				s_drainGracePeriod);
 
-			await shutdownCts.CancelAsync().ConfigureAwait(false);
+			await TryCancelAsync(shutdownCts).ConfigureAwait(false);
 
 			try
 			{
-				await drain.WaitAsync(s_forcedShutdownGracePeriod).ConfigureAwait(false);
+				await drain.WaitAsync(s_forcedShutdownGracePeriod, cancellationToken).ConfigureAwait(false);
 			}
 			catch (TimeoutException)
 			{
@@ -172,6 +185,7 @@ public sealed class UpdateScheduler : IAsyncDisposable
 			}
 			catch (OperationCanceledException)
 			{
+				workersAbandoned = !drain.IsCompleted;
 			}
 		}
 		catch (OperationCanceledException)
@@ -194,6 +208,18 @@ public sealed class UpdateScheduler : IAsyncDisposable
 		if (!workersAbandoned && (disposing || retired))
 		{
 			shutdownCts.Dispose();
+		}
+	}
+
+	private static async Task TryCancelAsync(CancellationTokenSource shutdownCts)
+	{
+		try
+		{
+			await shutdownCts.CancelAsync().ConfigureAwait(false);
+		}
+		catch (ObjectDisposedException)
+		{
+			// A concurrent drain already retired this source.
 		}
 	}
 

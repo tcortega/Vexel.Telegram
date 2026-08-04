@@ -12,6 +12,7 @@ namespace Vexel.Telegram.Client.Dispatch;
 /// </summary>
 public sealed class UpdateDispatcher(
 	IServiceScopeFactory scopeFactory,
+	RawUpdateHandlerRegistry registry,
 	IOptions<VexelClientOptions> options,
 	ILogger<UpdateDispatcher> logger) : IUpdateDispatcher
 {
@@ -26,23 +27,48 @@ public sealed class UpdateDispatcher(
 		// singleton nor shared concurrently across lanes.
 		await using var scope = scopeFactory.CreateAsyncScope();
 
-		IRawUpdateHandler[] handlers;
-		try
+		// Routed handler + On* fan-out land in later slices; raw always runs last and cannot suppress routing.
+		foreach (var handlerType in registry.HandlerTypes)
 		{
-			handlers = [.. scope.ServiceProvider.GetServices<IRawUpdateHandler>()];
-		}
-		catch (Exception ex)
-		{
-			// A handler constructor or one of its dependencies faulted; keep it inside this update.
-			logger.LogError(ex, "Failed to resolve raw update handlers for update {UpdateId}", update.Id);
-			return;
+			cancellationToken.ThrowIfCancellationRequested();
+
+			// Resolved one at a time so a faulty handler only costs itself.
+			IRawUpdateHandler handler;
+			try
+			{
+				handler = (IRawUpdateHandler)scope.ServiceProvider.GetRequiredService(handlerType);
+			}
+			catch (Exception ex)
+			{
+				logger.LogError(
+					ex,
+					"Failed to resolve raw update handler {HandlerType} for update {UpdateId}",
+					handlerType.FullName,
+					update.Id);
+				continue;
+			}
+
+			await InvokeHandlerAsync(handler, update, cancellationToken).ConfigureAwait(false);
 		}
 
-		// Routed handler + On* fan-out land in later slices; raw always runs last and cannot suppress routing.
-		foreach (var handler in handlers)
+		foreach (var handler in ResolveContainerHandlers(scope.ServiceProvider, update))
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 			await InvokeHandlerAsync(handler, update, cancellationToken).ConfigureAwait(false);
+		}
+	}
+
+	private IRawUpdateHandler[] ResolveContainerHandlers(IServiceProvider provider, Update update)
+	{
+		try
+		{
+			return [.. provider.GetServices<IRawUpdateHandler>()];
+		}
+		catch (Exception ex)
+		{
+			// The container builds this set as a unit, so one faulty handler fails all of them.
+			logger.LogError(ex, "Failed to resolve raw update handlers for update {UpdateId}", update.Id);
+			return [];
 		}
 	}
 
