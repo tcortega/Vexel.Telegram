@@ -326,6 +326,7 @@ Mitigations for dual-attr DX:
 25. No v1 master inline hotfix parallel track; effort on `v2` only.
 26. Drop Remora.Commands (and Remora.Results) on `v2` entirely.
 27. v1→v2: **breaking major**; sample + short differences doc. No compat shims.
+28. On-update fan-out **kept** (v1 responder usefulness): `[OnMessage]`/`[OnCallback]`/… as Immediate `[Handler]`s; **Vexel gen** emits static multi-cast dispatch. No reflection responder bus. No Immediate.Notifications (N/A). Behaviors apply per handler. Default **await** on per-chat pipeline; fire-and-forget opt-in only.
 
 
 
@@ -369,13 +370,12 @@ Not a substitute for unit tests. Not prod userbots.
 
 ### Open questions
 
-1. Approve remaining architecture details as implementation charter, or keep grilling API names/binding first?
-2. Public type names: `[Command]` vs `[BotCommand]`, `[Callback]` vs `[CallbackButton]`, etc.?
-4. Webhook vs polling configuration surface for hosting?
-5. Minimum TFMs / Telegram.Bot version floor for V2?
-7. How much v1 migration guide is required before calling V2 usable?
-8. Optional v1 inline-query hotfix on master?
-9. Exact generated registration API names and assembly identifier story (mirror ImmediateAssemblyIdentifier?).
+1. Exact on-update attr names (`[OnMessage]` vs `[Message]`).
+2. Order: on-update handlers vs routed command/callback/flow (before/after/parallel policy).
+3. Context interface names (`IMessageContext` etc.) - bikeshed only.
+4. E2E harness layout in repo (project name, secret injection).
+5. Ready to freeze charter and run PlanScout?
+
 
 ---
 
