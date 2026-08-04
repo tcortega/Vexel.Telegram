@@ -12,6 +12,7 @@
 > The `v2` branch is an in-progress rewrite on top of
 > [Immediate.Handlers](https://github.com/ImmediatePlatform/Immediate.Handlers), and its API is not published yet.
 > The v1 commands, interactivity, and responder projects documented below are not part of the v2 build.
+> Migrating from v1 to v2: see **[docs/v1-to-v2.md](./docs/v1-to-v2.md)**.
 > Design notes and decision log live in [docs/v2-context.md](./docs/v2-context.md).
 
 Vexel.Telegram is a C# library for building Telegram bots using
@@ -24,6 +25,7 @@ many of its design principles and philosophies.
 #### Examples
 
 * [Vexel.Telegram.Sample](./samples/Vexel.Telegram.Sample) - on `v2` this is the Immediate.Handlers rewrite (see the sample README). The v1 sample lived here on `master`.
+* [v1 → v2 differences](./docs/v1-to-v2.md) - short migration notes for the rewrite.
 
 ## Installing Vexel.Telegram
 
