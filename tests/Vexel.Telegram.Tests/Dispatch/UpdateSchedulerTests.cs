@@ -17,7 +17,7 @@ public sealed class UpdateSchedulerTests
 	{
 		using var gate = new SemaphoreSlim(0, 1);
 		var events = new ConcurrentQueue<string>();
-		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
+		async Task dispatcher(Update update, CancellationToken ct)
 		{
 			events.Enqueue($"start:{update.Id}");
 			if (update.Id == 1)
@@ -28,7 +28,7 @@ public sealed class UpdateSchedulerTests
 
 			await Task.Delay(20, ct);
 			events.Enqueue($"end:{update.Id}");
-		};
+		}
 
 		await using var scheduler = CreateScheduler(dispatcher);
 
@@ -56,7 +56,7 @@ public sealed class UpdateSchedulerTests
 		var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 		var started = 0;
 
-		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
+		async Task dispatcher(Update update, CancellationToken ct)
 		{
 			if (Interlocked.Increment(ref started) == 2)
 			{
@@ -64,7 +64,7 @@ public sealed class UpdateSchedulerTests
 			}
 
 			await release.Task.WaitAsync(ct);
-		};
+		}
 
 		await using var scheduler = CreateScheduler(dispatcher);
 
@@ -82,7 +82,7 @@ public sealed class UpdateSchedulerTests
 	public async Task FaultIsolation_ExceptionDoesNotKillLaneOrOtherChats()
 	{
 		var events = new ConcurrentQueue<string>();
-		Func<Update, CancellationToken, Task> dispatcher = (update, _) =>
+		Task dispatcher(Update update, CancellationToken _)
 		{
 			events.Enqueue($"run:{update.Id}");
 			if (update.Id == 1)
@@ -91,7 +91,7 @@ public sealed class UpdateSchedulerTests
 			}
 
 			return Task.CompletedTask;
-		};
+		}
 
 		await using var scheduler = CreateScheduler(dispatcher);
 
@@ -113,7 +113,7 @@ public sealed class UpdateSchedulerTests
 		var releaseSlow = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 		var fastDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
+		async Task dispatcher(Update update, CancellationToken ct)
 		{
 			if (update.Message!.Chat.Id == 1)
 			{
@@ -123,7 +123,7 @@ public sealed class UpdateSchedulerTests
 			}
 
 			_ = fastDone.TrySetResult();
-		};
+		}
 
 		await using var scheduler = CreateScheduler(dispatcher);
 
@@ -147,14 +147,14 @@ public sealed class UpdateSchedulerTests
 		var inHandler = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 		var processed = 0;
 
-		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
+		async Task dispatcher(Update update, CancellationToken ct)
 		{
 			if (Interlocked.Increment(ref processed) == 1)
 			{
 				_ = inHandler.TrySetResult();
 				await blockFirst.Task.WaitAsync(ct);
 			}
-		};
+		}
 
 		await using var scheduler = CreateScheduler(dispatcher, laneCapacity: 1);
 
@@ -180,7 +180,7 @@ public sealed class UpdateSchedulerTests
 	[Fact]
 	public async Task IdleLanes_AreEvicted()
 	{
-		Func<Update, CancellationToken, Task> dispatcher = (_, _) => Task.CompletedTask;
+		static Task dispatcher(Update _1, CancellationToken _2) => Task.CompletedTask;
 		await using var scheduler = CreateScheduler(dispatcher);
 
 		await scheduler.ScheduleAsync(MessageUpdate(1, chatId: 99), CancellationToken.None);
@@ -191,11 +191,11 @@ public sealed class UpdateSchedulerTests
 	public async Task Dispose_DrainsBufferedUpdates()
 	{
 		var processed = 0;
-		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
+		async Task dispatcher(Update update, CancellationToken ct)
 		{
 			await Task.Delay(20, ct);
 			_ = Interlocked.Increment(ref processed);
-		};
+		}
 
 		var scheduler = CreateScheduler(dispatcher);
 
@@ -213,11 +213,11 @@ public sealed class UpdateSchedulerTests
 	public async Task StopAsync_DrainsBufferedUpdatesAndLeavesSchedulerUsable()
 	{
 		var processed = new ConcurrentQueue<int>();
-		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
+		async Task dispatcher(Update update, CancellationToken ct)
 		{
 			await Task.Delay(20, ct);
 			processed.Enqueue(update.Id);
-		};
+		}
 
 		await using var scheduler = CreateScheduler(dispatcher);
 
@@ -287,14 +287,14 @@ public sealed class UpdateSchedulerTests
 		// Property-minded: for every chat, completion order equals schedule order even when
 		// many chats are interleaved and handlers yield.
 		var perChat = new ConcurrentDictionary<long, ConcurrentQueue<int>>();
-		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
+		async Task dispatcher(Update update, CancellationToken ct)
 		{
 			_ = ct;
 			await Task.Yield();
 			var chatId = update.Message!.Chat.Id;
 			var queue = perChat.GetOrAdd(chatId, static _ => new ConcurrentQueue<int>());
 			queue.Enqueue(update.Id);
-		};
+		}
 
 		await using var scheduler = CreateScheduler(dispatcher);
 
@@ -400,12 +400,31 @@ public sealed class UpdateSchedulerTests
 	}
 
 	[Fact]
+	public async Task Dispatcher_IgnoresContainerRegisteredRawHandlers()
+	{
+		// The container-set path is gone: AddRawUpdateHandler<T> is the only registration that
+		// makes a raw handler run, so a hand-rolled IRawUpdateHandler service is never dispatched.
+		var tracker = new HandlerTracker();
+		var services = new ServiceCollection();
+		_ = services.AddSingleton(tracker);
+		_ = services.AddScoped<IRawUpdateHandler, TrackedRawHandler>();
+		_ = services.AddSingleton<IRawUpdateHandler, TrackedRawHandler>();
+
+		await using var provider = services.BuildServiceProvider(validateScopes: true);
+		var dispatcher = CreateDispatcher(provider);
+
+		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None);
+
+		Assert.Equal(0, tracker.Handled);
+	}
+
+	[Fact]
 	public async Task StopAsync_WindsDownWhenShutdownBudgetExpires()
 	{
 		var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 		var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
+		async Task dispatcher(Update update, CancellationToken ct)
 		{
 			_ = entered.TrySetResult();
 			try
@@ -417,7 +436,7 @@ public sealed class UpdateSchedulerTests
 				_ = cancelled.TrySetResult();
 				throw;
 			}
-		};
+		}
 
 		await using var scheduler = CreateScheduler(dispatcher);
 

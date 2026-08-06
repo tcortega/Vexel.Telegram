@@ -273,6 +273,9 @@ builder.Services.AddXxxTelegram();                      // Vexel generated route
 **Settled in T4, narrowed in the debloat pass:** `AddTelegramBot(...)` is the single public composition
 entry point; the per-piece helpers (`AddVexelUpdateContexts()`, `AddTelegramFlow(...)`, `AddTelegramRouter()`)
 are `internal` and are not a manual-wiring seam for consumers.
+The pipeline resolves exactly one `IUpdateRouter` and one optional `IBotCommandCatalog`: composition happens
+inside `TelegramRouter` over the generated contributions, so neither is an additive multi-registration seam,
+and a second `IUpdateRouter` fails fast instead of silently replacing routing.
 **Settled in T3/T5/T6/T7/T8:** the generator emits `Add{Assembly}Telegram()`, which registers that assembly's
 `TelegramRouteContribution` (route maps plus the four `[On*]` dispatch arrays); `TelegramRouter` composes all
 contributions and fails fast on duplicate route keys (command, callback, inline query, chosen inline result,
@@ -288,7 +291,8 @@ generated `[Command]` catalog (`IBotCommandCatalog`) at host start; opt out with
 
 Raw update handlers without Immediate for power users and non-command traffic.
 **Settled in T2:** `IRawUpdateHandler` (non-generic, takes the whole `Update`), registered with
-`AddRawUpdateHandler<THandler>()`; the dispatcher runs raw handlers last, isolated per handler.
+`AddRawUpdateHandler<THandler>()` (the only registration path); the dispatcher runs raw handlers last,
+isolated per handler.
 
 ---
 

@@ -29,10 +29,7 @@ public sealed class TelegramRouterRegistrationTests
 	[Fact]
 	public void Telegram_router_is_the_single_IUpdateRouter()
 	{
-		using var provider = BuildProvider(static services =>
-		{
-			_ = services.AddTelegramRouter();
-		});
+		using var provider = BuildProvider(static services => _ = services.AddTelegramRouter());
 
 		Assert.IsType<TelegramRouter>(provider.GetRequiredService<IUpdateRouter>());
 		Assert.Same(

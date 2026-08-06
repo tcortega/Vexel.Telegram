@@ -7,11 +7,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Telegram.Bot;
+using Vexel.Telegram.Client;
 using Vexel.Telegram.Handlers.DependencyInjection;
 using Vexel.Telegram.Handlers.Routing;
 using Vexel.Telegram.Tests.Generators;
 using Xunit.Abstractions;
-using Vexel.Telegram.Client;
 
 namespace Vexel.Telegram.Tests.EndToEnd;
 

@@ -102,7 +102,7 @@ Route attributes:
 * `[ChosenInlineResult("key")]` - `ResultId` prefix up to `|`
 * `[OnMessage]` / `[OnCallbackQuery]` / `[OnInlineQuery]` / `[OnChosenInlineResult]` - observers that run after routing (empty request; inject a context for the payload)
 
-Anything outside those four update kinds (edited messages, channel posts, chat members, payments, polls, …) is reachable through `IRawUpdateHandler`.
+Anything outside those four update kinds (edited messages, channel posts, chat members, payments, polls, …) is reachable through `IRawUpdateHandler`, registered with `AddRawUpdateHandler<THandler>()`.
 `[Command]` metadata is pushed to Telegram via `SetMyCommands` at host start; opt out with `VexelClientOptions.RegisterBotCommands = false`.
 
 Multi-turn conversations use `Flow`: a `[Handler]` type with no route or `[On*]` attribute is a flow step, armed by request type.
