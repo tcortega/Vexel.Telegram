@@ -7,9 +7,9 @@ using Vexel.Telegram.Client.Extensions;
 namespace Vexel.Telegram.Hosting.Extensions;
 
 /// <summary>
-/// Host builder extensions for Vexel Telegram.
+/// DI registration helpers for the Vexel Telegram hosted receive loop.
 /// </summary>
-public static class HostBuilderExtensions
+public static class ServiceCollectionExtensions
 {
 	/// <summary>
 	/// Adds Vexel Telegram client services, automatic SetMyCommands registration, and a hosted

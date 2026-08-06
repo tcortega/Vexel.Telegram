@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Telegram.Bot;
+using Telegram.Bot.Types;
 using Vexel.Telegram.Client;
 using Vexel.Telegram.Client.Dispatch;
+using Vexel.Telegram.Client.Extensions;
 using Vexel.Telegram.Handlers.DependencyInjection;
 using Vexel.Telegram.Handlers.Routing;
 using Vexel.Telegram.Tests.Fakes;
@@ -36,6 +38,42 @@ public sealed class TelegramRouterRegistrationTests
 		Assert.Same(
 			provider.GetRequiredService<TelegramRouter>(),
 			provider.GetRequiredService<IUpdateRouter>());
+	}
+
+	[Fact]
+	public void Foreign_router_registered_before_the_router_fails_fast()
+	{
+		var services = new ServiceCollection();
+		_ = services.AddSingleton<IUpdateRouter, ForeignRouter>();
+
+		var ex = Assert.Throws<InvalidOperationException>(() =>
+		{
+			_ = services.AddTelegramRouter();
+		});
+		Assert.Contains("IUpdateRouter is already registered", ex.Message, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public void Foreign_router_registered_after_the_router_fails_the_dispatcher_resolve()
+	{
+		using var provider = BuildProvider(static services =>
+		{
+			_ = services.AddVexelTelegramClient(static _ => "token");
+			_ = services.AddTelegramRouter();
+			_ = services.AddSingleton<IUpdateRouter, ForeignRouter>();
+		});
+
+		var ex = Assert.Throws<InvalidOperationException>(() =>
+		{
+			_ = provider.GetRequiredService<UpdateDispatcher>();
+		});
+		Assert.Contains("Multiple IUpdateRouter services are registered", ex.Message, StringComparison.Ordinal);
+	}
+
+	private sealed class ForeignRouter : IUpdateRouter
+	{
+		public Task RouteAsync(Update update, IServiceProvider scope, CancellationToken cancellationToken) =>
+			Task.CompletedTask;
 	}
 
 	private static ServiceProvider BuildProvider(Action<IServiceCollection> configure)

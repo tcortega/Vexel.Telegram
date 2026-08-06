@@ -38,7 +38,7 @@ public static class ServiceCollectionExtensions
 			sp.GetServices<IUpdateCompletionHook>(),
 			sp.GetRequiredService<IOptions<VexelClientOptions>>(),
 			sp.GetRequiredService<ILogger<UpdateDispatcher>>(),
-			sp.GetService<IUpdateRouter>()));
+			ResolveRouter(sp)));
 		services.TryAddSingleton<UpdateScheduler>();
 		services.TryAddSingleton<WebhookUpdateReceiver>();
 		services.TryAddSingleton<VexelClient>();
@@ -65,6 +65,24 @@ public static class ServiceCollectionExtensions
 		GetOrAddRawHandlerRegistry(services).Add(typeof(THandler));
 
 		return services;
+	}
+
+	private static IUpdateRouter? ResolveRouter(IServiceProvider provider)
+	{
+		IUpdateRouter[] routers = [.. provider.GetServices<IUpdateRouter>()];
+
+		return routers.Length switch
+		{
+			0 => null,
+			1 => routers[0],
+			_ => throw new InvalidOperationException(
+				"Multiple IUpdateRouter services are registered ("
+				+ string.Join(", ", routers.Select(static r => r.GetType().FullName))
+				+ "). Vexel dispatches through a single router: an app-registered IUpdateRouter replaces "
+				+ "TelegramRouter and silently disables every [Command], [Callback], [InlineQuery], "
+				+ "[ChosenInlineResult], [On*], and flow-step route. Contribute routes with the generated "
+				+ "Add{Assembly}Telegram() instead of registering IUpdateRouter."),
+		};
 	}
 
 	private static RawUpdateHandlerRegistry GetOrAddRawHandlerRegistry(IServiceCollection services)

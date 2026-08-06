@@ -127,6 +127,10 @@ Per chat lane, every update runs:
 2. **`[On*]`** observers for that kind: always, sequential, ordered by handler fully-qualified metadata name, each fault-isolated
 3. **`IRawUpdateHandler`** instances registered via `AddRawUpdateHandler<T>`: always last; cannot suppress routing
 
+Step 1 is a single `IUpdateRouter` (`TelegramRouter`), not a composed chain: routes come from the generated
+`Add{Assembly}Telegram()` contributions, and registering your own `IUpdateRouter` throws instead of silently
+taking routing away from `TelegramRouter`.
+
 Handler faults are isolated per update/handler.
 They do not kill the chat lane or the receive loop.
 Fatal receive/config errors still stop the host (no zombie process).

@@ -53,6 +53,19 @@ public static class ServiceCollectionExtensions
 	{
 		ArgumentNullException.ThrowIfNull(services);
 
+		// A foreign IUpdateRouter registered before this call would win the TryAdd below and silently
+		// take routing away from TelegramRouter, so refuse it here instead of dispatching nothing.
+		if (!services.Any(static d => d.ServiceType == typeof(TelegramRouter))
+			&& services.Any(static d => d.ServiceType == typeof(IUpdateRouter)))
+		{
+			throw new InvalidOperationException(
+				"An IUpdateRouter is already registered. Vexel dispatches through the single "
+				+ "TelegramRouter: an app-registered IUpdateRouter replaces it and silently disables every "
+				+ "[Command], [Callback], [InlineQuery], [ChosenInlineResult], [On*], and flow-step route. "
+				+ "Contribute routes with the generated Add{Assembly}Telegram() instead of registering "
+				+ "IUpdateRouter.");
+		}
+
 		// Single shared instance exposed as IUpdateRouter (pipeline), TelegramRouter (tests), and
 		// IBotCommandCatalog (SetMyCommands).
 		services.TryAddSingleton<TelegramRouter>();

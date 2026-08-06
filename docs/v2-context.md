@@ -270,8 +270,9 @@ builder.Services.AddXxxHandlers();                      // Immediate
 builder.Services.AddXxxTelegram();                      // Vexel generated routes
 ```
 
-**Settled in T4:** `AddTelegramBot(...)` ships (with `AddVexelUpdateContexts()` as the contexts-only
-seam for manual wiring).
+**Settled in T4, narrowed in the debloat pass:** `AddTelegramBot(...)` is the single public composition
+entry point; the per-piece helpers (`AddVexelUpdateContexts()`, `AddTelegramFlow(...)`, `AddTelegramRouter()`)
+are `internal` and are not a manual-wiring seam for consumers.
 **Settled in T3/T5/T6/T7/T8:** the generator emits `Add{Assembly}Telegram()`, which registers that assembly's
 `TelegramRouteContribution` (route maps plus the four `[On*]` dispatch arrays); `TelegramRouter` composes all
 contributions and fails fast on duplicate route keys (command, callback, inline query, chosen inline result,
