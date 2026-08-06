@@ -90,9 +90,11 @@ public sealed class WebhookUpdateReceiverTests
 				SecretToken = Secret,
 			},
 		}));
-		_ = services.AddSingleton<IUpdateDispatcher>(new CallbackDispatcher(onUpdate));
+		Func<Update, CancellationToken, Task> dispatch = onUpdate is null
+			? static (_, _) => Task.CompletedTask
+			: (update, _) => onUpdate(update);
 		_ = services.AddSingleton(sp => new UpdateScheduler(
-			sp.GetRequiredService<IUpdateDispatcher>(),
+			dispatch,
 			sp.GetRequiredService<IOptions<VexelClientOptions>>(),
 			NullLogger<UpdateScheduler>.Instance));
 		_ = services.AddSingleton(sp => new WebhookUpdateReceiver(
@@ -107,9 +109,4 @@ public sealed class WebhookUpdateReceiverTests
 	private static MemoryStream Body(string json) =>
 		new(Encoding.UTF8.GetBytes(json));
 
-	private sealed class CallbackDispatcher(Func<Update, Task>? onUpdate) : IUpdateDispatcher
-	{
-		public Task DispatchAsync(Update update, CancellationToken cancellationToken) =>
-			onUpdate?.Invoke(update) ?? Task.CompletedTask;
-	}
 }

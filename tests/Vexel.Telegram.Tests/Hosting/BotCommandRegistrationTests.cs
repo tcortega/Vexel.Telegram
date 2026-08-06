@@ -1,5 +1,5 @@
-using Telegram.Bot.Types;
 using Vexel.Telegram.Client;
+using Vexel.Telegram.Hosting;
 
 namespace Vexel.Telegram.Tests.Hosting;
 
@@ -8,7 +8,7 @@ public sealed class BotCommandRegistrationTests
 	[Fact]
 	public void BuildPayload_MapsNameAndDescription()
 	{
-		var payload = BotCommandRegistration.BuildPayload(
+		var payload = SetMyCommandsInitializer.BuildPayload(
 		[
 			new BotCommandDescriptor("start", "Start the bot"),
 			new BotCommandDescriptor("ping", "Ping pong"),
@@ -24,7 +24,7 @@ public sealed class BotCommandRegistrationTests
 	[Fact]
 	public void BuildPayload_EmptyDescription_FallsBackToCommandName()
 	{
-		var payload = BotCommandRegistration.BuildPayload(
+		var payload = SetMyCommandsInitializer.BuildPayload(
 		[
 			new BotCommandDescriptor("help", ""),
 			new BotCommandDescriptor("about", "   "),
@@ -40,6 +40,6 @@ public sealed class BotCommandRegistrationTests
 	public void BuildPayload_RejectsBlankName()
 	{
 		_ = Assert.ThrowsAny<ArgumentException>(() =>
-			BotCommandRegistration.BuildPayload([new BotCommandDescriptor("  ", "x")]));
+			SetMyCommandsInitializer.BuildPayload([new BotCommandDescriptor("  ", "x")]));
 	}
 }

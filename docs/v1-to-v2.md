@@ -112,8 +112,9 @@ For webhook bots, reference `Vexel.Telegram.AspNetCore` and map the endpoint you
 app.MapTelegramWebhook(); // nothing is auto-mapped; secret_token is the auth
 ```
 
-`AddTelegramService` is not gone: it is still the `Vexel.Telegram.Hosting` primitive (client + hosted receive loop + `SetMyCommands`).
+`IServiceCollection.AddTelegramService` is still the `Vexel.Telegram.Hosting` primitive (client + hosted receive loop + `SetMyCommands`).
 `AddTelegramBot` calls it for you and adds contexts, `Feedback`, `Flow`, and the router, so app code should call `AddTelegramBot`.
+There is no `IHostBuilder` overload.
 
 Receive mode is exclusive: polling (default) **or** webhook, validated at host start.
 `SetMyCommands` runs automatically from `[Command]` metadata; opt out with `VexelClientOptions.RegisterBotCommands = false`.
@@ -124,7 +125,7 @@ Per chat lane, every update runs:
 
 1. **Routed** handler (command / callback / inline / chosen / armed flow step), if any
 2. **`[On*]`** observers for that kind: always, sequential, ordered by handler fully-qualified metadata name, each fault-isolated
-3. **`IRawUpdateHandler`** instances: always last; cannot suppress routing
+3. **`IRawUpdateHandler`** instances registered via `AddRawUpdateHandler<T>`: always last; cannot suppress routing
 
 Handler faults are isolated per update/handler.
 They do not kill the chat lane or the receive loop.

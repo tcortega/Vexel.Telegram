@@ -11,6 +11,7 @@ using Vexel.Telegram.Handlers.DependencyInjection;
 using Vexel.Telegram.Handlers.Routing;
 using Vexel.Telegram.Tests.Generators;
 using Xunit.Abstractions;
+using Vexel.Telegram.Client;
 
 namespace Vexel.Telegram.Tests.EndToEnd;
 
@@ -491,7 +492,7 @@ public sealed class SampleBotEndToEndTests(ITestOutputHelper output)
 		IReadOnlyList<string> observerLines,
 		Transcript transcript,
 		IReadOnlyList<string> outboundCalls,
-		IReadOnlyList<CommandRouteMetadata> commandMetadata)
+		IReadOnlyList<BotCommandDescriptor> commandMetadata)
 	{
 		var writer = new StringBuilder();
 

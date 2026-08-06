@@ -305,7 +305,7 @@ public sealed class InlineRouterTests
 	[Fact]
 	public async Task Already_answered_rejection_of_default_answer_is_not_a_warning()
 	{
-		var logger = new RecordingLogger<InlineAnswerObligation>();
+		var logger = new RecordingLogger<AnswerObligation>();
 		var bot = new RecordingTelegramBotClient
 		{
 			FailRequest = static request => request is AnswerInlineQueryRequest
@@ -314,7 +314,7 @@ public sealed class InlineRouterTests
 					400)
 				: null,
 		};
-		var obligation = new InlineAnswerObligation(bot, logger);
+		var obligation = new AnswerObligation(bot, logger);
 
 		var services = new ServiceCollection();
 		_ = services.AddSingleton<ITelegramBotClient>(bot);
@@ -403,11 +403,11 @@ public sealed class InlineRouterTests
 	private static async Task UsingPipelineAsync(
 		IEnumerable<TelegramRouteContribution> contributions,
 		Update update,
-		Func<TelegramRouter, InlineAnswerObligation, RecordingTelegramBotClient, IServiceProvider, Update, Task> body)
+		Func<TelegramRouter, AnswerObligation, RecordingTelegramBotClient, IServiceProvider, Update, Task> body)
 	{
 		var bot = new RecordingTelegramBotClient();
 		var router = new TelegramRouter(contributions, bot, NullLogger<TelegramRouter>.Instance);
-		var obligation = new InlineAnswerObligation(bot, NullLogger<InlineAnswerObligation>.Instance);
+		var obligation = new AnswerObligation(bot, NullLogger<AnswerObligation>.Instance);
 
 		var services = new ServiceCollection();
 		_ = services.AddSingleton<ITelegramBotClient>(bot);

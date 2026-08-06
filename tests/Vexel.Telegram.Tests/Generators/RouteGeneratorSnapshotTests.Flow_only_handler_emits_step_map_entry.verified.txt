@@ -20,7 +20,7 @@ public static partial class TelegramServiceCollectionExtensions
 		{
 		};
 
-		var metadata = new global::Vexel.Telegram.Handlers.Routing.CommandRouteMetadata[]
+		var metadata = new global::Vexel.Telegram.Client.BotCommandDescriptor[]
 		{
 		};
 

@@ -7,7 +7,7 @@ namespace Vexel.Telegram.Handlers.Routing;
 /// <summary>
 /// Extracts a command key and argument payload from a message per the V2 binding convention.
 /// </summary>
-public static class CommandKeyExtractor
+internal static class CommandKeyExtractor
 {
 	/// <summary>
 	/// Tries to read a bot command from <paramref name="message"/>.

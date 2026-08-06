@@ -17,7 +17,7 @@ public sealed class UpdateSchedulerTests
 	{
 		using var gate = new SemaphoreSlim(0, 1);
 		var events = new ConcurrentQueue<string>();
-		var dispatcher = new ScriptedDispatcher(async (update, ct) =>
+		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
 		{
 			events.Enqueue($"start:{update.Id}");
 			if (update.Id == 1)
@@ -28,7 +28,7 @@ public sealed class UpdateSchedulerTests
 
 			await Task.Delay(20, ct);
 			events.Enqueue($"end:{update.Id}");
-		});
+		};
 
 		await using var scheduler = CreateScheduler(dispatcher);
 
@@ -56,7 +56,7 @@ public sealed class UpdateSchedulerTests
 		var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 		var started = 0;
 
-		var dispatcher = new ScriptedDispatcher(async (update, ct) =>
+		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
 		{
 			if (Interlocked.Increment(ref started) == 2)
 			{
@@ -64,7 +64,7 @@ public sealed class UpdateSchedulerTests
 			}
 
 			await release.Task.WaitAsync(ct);
-		});
+		};
 
 		await using var scheduler = CreateScheduler(dispatcher);
 
@@ -82,7 +82,7 @@ public sealed class UpdateSchedulerTests
 	public async Task FaultIsolation_ExceptionDoesNotKillLaneOrOtherChats()
 	{
 		var events = new ConcurrentQueue<string>();
-		var dispatcher = new ScriptedDispatcher((update, _) =>
+		Func<Update, CancellationToken, Task> dispatcher = (update, _) =>
 		{
 			events.Enqueue($"run:{update.Id}");
 			if (update.Id == 1)
@@ -91,7 +91,7 @@ public sealed class UpdateSchedulerTests
 			}
 
 			return Task.CompletedTask;
-		});
+		};
 
 		await using var scheduler = CreateScheduler(dispatcher);
 
@@ -113,7 +113,7 @@ public sealed class UpdateSchedulerTests
 		var releaseSlow = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 		var fastDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-		var dispatcher = new ScriptedDispatcher(async (update, ct) =>
+		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
 		{
 			if (update.Message!.Chat.Id == 1)
 			{
@@ -123,7 +123,7 @@ public sealed class UpdateSchedulerTests
 			}
 
 			_ = fastDone.TrySetResult();
-		});
+		};
 
 		await using var scheduler = CreateScheduler(dispatcher);
 
@@ -147,14 +147,14 @@ public sealed class UpdateSchedulerTests
 		var inHandler = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 		var processed = 0;
 
-		var dispatcher = new ScriptedDispatcher(async (update, ct) =>
+		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
 		{
 			if (Interlocked.Increment(ref processed) == 1)
 			{
 				_ = inHandler.TrySetResult();
 				await blockFirst.Task.WaitAsync(ct);
 			}
-		});
+		};
 
 		await using var scheduler = CreateScheduler(dispatcher, laneCapacity: 1);
 
@@ -180,7 +180,7 @@ public sealed class UpdateSchedulerTests
 	[Fact]
 	public async Task IdleLanes_AreEvicted()
 	{
-		var dispatcher = new ScriptedDispatcher((_, _) => Task.CompletedTask);
+		Func<Update, CancellationToken, Task> dispatcher = (_, _) => Task.CompletedTask;
 		await using var scheduler = CreateScheduler(dispatcher);
 
 		await scheduler.ScheduleAsync(MessageUpdate(1, chatId: 99), CancellationToken.None);
@@ -191,11 +191,11 @@ public sealed class UpdateSchedulerTests
 	public async Task Dispose_DrainsBufferedUpdates()
 	{
 		var processed = 0;
-		var dispatcher = new ScriptedDispatcher(async (update, ct) =>
+		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
 		{
 			await Task.Delay(20, ct);
 			_ = Interlocked.Increment(ref processed);
-		});
+		};
 
 		var scheduler = CreateScheduler(dispatcher);
 
@@ -213,11 +213,11 @@ public sealed class UpdateSchedulerTests
 	public async Task StopAsync_DrainsBufferedUpdatesAndLeavesSchedulerUsable()
 	{
 		var processed = new ConcurrentQueue<int>();
-		var dispatcher = new ScriptedDispatcher(async (update, ct) =>
+		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
 		{
 			await Task.Delay(20, ct);
 			processed.Enqueue(update.Id);
-		});
+		};
 
 		await using var scheduler = CreateScheduler(dispatcher);
 
@@ -241,16 +241,18 @@ public sealed class UpdateSchedulerTests
 	{
 		var handled = new ConcurrentQueue<int>();
 		var services = new ServiceCollection();
-		_ = services.AddSingleton<IRawUpdateHandler>(new DelegateRawHandler((update, _) =>
-		{
-			handled.Enqueue(update.Id);
-			return Task.CompletedTask;
-		}));
+		_ = services.AddSingleton(handled);
 		_ = services.AddSingleton(Options.Create(new VexelClientOptions()));
-		_ = services.AddSingleton(new RawUpdateHandlerRegistry());
 		_ = services.AddSingleton<ILogger<UpdateDispatcher>>(NullLogger<UpdateDispatcher>.Instance);
 		_ = services.AddSingleton<ILogger<UpdateScheduler>>(NullLogger<UpdateScheduler>.Instance);
-		_ = services.AddSingleton<IUpdateDispatcher, UpdateDispatcher>();
+		_ = services.AddRawUpdateHandler<QueueingRawHandler>();
+		_ = services.AddSingleton(static sp => new UpdateDispatcher(
+			sp.GetRequiredService<IServiceScopeFactory>(),
+			sp.GetRequiredService<RawUpdateHandlerRegistry>(),
+			sp.GetServices<IUpdateCompletionHook>(),
+			sp.GetRequiredService<IOptions<VexelClientOptions>>(),
+			sp.GetRequiredService<ILogger<UpdateDispatcher>>(),
+			sp.GetService<IUpdateRouter>()));
 		_ = services.AddSingleton<UpdateScheduler>();
 
 		await using var provider = services.BuildServiceProvider();
@@ -269,7 +271,7 @@ public sealed class UpdateSchedulerTests
 	[Fact]
 	public async Task Dispose_IsIdempotentAndRejectsFurtherScheduling()
 	{
-		var scheduler = CreateScheduler(new ScriptedDispatcher((_, _) => Task.CompletedTask));
+		var scheduler = CreateScheduler((_, _) => Task.CompletedTask);
 
 		await Task.WhenAll(
 			scheduler.DisposeAsync().AsTask(),
@@ -285,14 +287,14 @@ public sealed class UpdateSchedulerTests
 		// Property-minded: for every chat, completion order equals schedule order even when
 		// many chats are interleaved and handlers yield.
 		var perChat = new ConcurrentDictionary<long, ConcurrentQueue<int>>();
-		var dispatcher = new ScriptedDispatcher(async (update, ct) =>
+		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
 		{
 			_ = ct;
 			await Task.Yield();
 			var chatId = update.Message!.Chat.Id;
 			var queue = perChat.GetOrAdd(chatId, static _ => new ConcurrentQueue<int>());
 			queue.Enqueue(update.Id);
-		});
+		};
 
 		await using var scheduler = CreateScheduler(dispatcher);
 
@@ -331,22 +333,18 @@ public sealed class UpdateSchedulerTests
 	[Fact]
 	public async Task Dispatcher_IsolatesRawHandlerFaults()
 	{
-		var goodRan = false;
+		var tracker = new HandlerTracker();
 		var services = new ServiceCollection();
-		_ = services.AddSingleton<IRawUpdateHandler>(
-			new DelegateRawHandler((_, _) => throw new InvalidOperationException("raw boom")));
-		_ = services.AddSingleton<IRawUpdateHandler>(new DelegateRawHandler((_, _) =>
-		{
-			goodRan = true;
-			return Task.CompletedTask;
-		}));
+		_ = services.AddSingleton(tracker);
+		_ = services.AddRawUpdateHandler<ThrowingRawHandler>();
+		_ = services.AddRawUpdateHandler<TrackedRawHandler>();
 
-		await using var provider = services.BuildServiceProvider();
-		await using var dispatcher = CreateDispatcher(provider);
+		await using var provider = services.BuildServiceProvider(validateScopes: true);
+		var dispatcher = CreateDispatcher(provider);
 
 		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None);
 
-		Assert.True(goodRan);
+		Assert.Equal(1, tracker.Handled);
 	}
 
 	[Fact]
@@ -355,10 +353,10 @@ public sealed class UpdateSchedulerTests
 		var tracker = new HandlerTracker();
 		var services = new ServiceCollection();
 		_ = services.AddSingleton(tracker);
-		_ = services.AddScoped<IRawUpdateHandler, TrackedRawHandler>();
+		_ = services.AddRawUpdateHandler<TrackedRawHandler>();
 
 		await using var provider = services.BuildServiceProvider(validateScopes: true);
-		await using var dispatcher = CreateDispatcher(provider);
+		var dispatcher = CreateDispatcher(provider);
 
 		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None);
 		await dispatcher.DispatchAsync(MessageUpdate(2, chatId: 1), CancellationToken.None);
@@ -371,10 +369,10 @@ public sealed class UpdateSchedulerTests
 	public async Task Dispatcher_IsolatesHandlerResolutionFaults()
 	{
 		var services = new ServiceCollection();
-		_ = services.AddScoped<IRawUpdateHandler, ThrowingConstructorRawHandler>();
+		_ = services.AddRawUpdateHandler<ThrowingConstructorRawHandler>();
 
 		await using var provider = services.BuildServiceProvider(validateScopes: true);
-		await using var dispatcher = CreateDispatcher(provider);
+		var dispatcher = CreateDispatcher(provider);
 
 		var exception = await Record.ExceptionAsync(() =>
 			dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None));
@@ -392,7 +390,7 @@ public sealed class UpdateSchedulerTests
 		_ = services.AddRawUpdateHandler<TrackedRawHandler>();
 
 		await using var provider = services.BuildServiceProvider(validateScopes: true);
-		await using var dispatcher = CreateDispatcher(provider);
+		var dispatcher = CreateDispatcher(provider);
 
 		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None);
 
@@ -402,29 +400,12 @@ public sealed class UpdateSchedulerTests
 	}
 
 	[Fact]
-	public async Task Dispatcher_RunsDualRegisteredHandlerOnce()
-	{
-		var tracker = new HandlerTracker();
-		var services = new ServiceCollection();
-		_ = services.AddSingleton(tracker);
-		_ = services.AddScoped<IRawUpdateHandler, TrackedRawHandler>();
-		_ = services.AddRawUpdateHandler<TrackedRawHandler>();
-
-		await using var provider = services.BuildServiceProvider(validateScopes: true);
-		await using var dispatcher = CreateDispatcher(provider);
-
-		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 1), CancellationToken.None);
-
-		Assert.Equal(1, tracker.Handled);
-	}
-
-	[Fact]
 	public async Task StopAsync_WindsDownWhenShutdownBudgetExpires()
 	{
 		var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 		var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-		var dispatcher = new ScriptedDispatcher(async (update, ct) =>
+		Func<Update, CancellationToken, Task> dispatcher = async (update, ct) =>
 		{
 			_ = entered.TrySetResult();
 			try
@@ -436,7 +417,7 @@ public sealed class UpdateSchedulerTests
 				_ = cancelled.TrySetResult();
 				throw;
 			}
-		});
+		};
 
 		await using var scheduler = CreateScheduler(dispatcher);
 
@@ -453,17 +434,18 @@ public sealed class UpdateSchedulerTests
 	private static UpdateDispatcher CreateDispatcher(IServiceProvider provider) =>
 		new(
 			provider.GetRequiredService<IServiceScopeFactory>(),
-			provider,
 			provider.GetService<RawUpdateHandlerRegistry>() ?? new RawUpdateHandlerRegistry(),
-			provider.GetServices<IUpdateRouter>(),
 			provider.GetServices<IUpdateCompletionHook>(),
 			Options.Create(new VexelClientOptions()),
-			NullLogger<UpdateDispatcher>.Instance);
+			NullLogger<UpdateDispatcher>.Instance,
+			provider.GetService<IUpdateRouter>());
 
-	private static UpdateScheduler CreateScheduler(IUpdateDispatcher dispatcher, int laneCapacity = 64)
+	private static UpdateScheduler CreateScheduler(
+		Func<Update, CancellationToken, Task> dispatch,
+		int laneCapacity = 64)
 	{
 		var options = Options.Create(new VexelClientOptions { LaneCapacity = laneCapacity });
-		return new UpdateScheduler(dispatcher, options, NullLogger<UpdateScheduler>.Instance);
+		return new UpdateScheduler(dispatch, options, NullLogger<UpdateScheduler>.Instance);
 	}
 
 	private static Update MessageUpdate(int id, long chatId) =>
@@ -494,16 +476,19 @@ public sealed class UpdateSchedulerTests
 		}
 	}
 
-	private sealed class ScriptedDispatcher(Func<Update, CancellationToken, Task> handler) : IUpdateDispatcher
+	private sealed class QueueingRawHandler(ConcurrentQueue<int> handled) : IRawUpdateHandler
 	{
-		public Task DispatchAsync(Update update, CancellationToken cancellationToken) =>
-			handler(update, cancellationToken);
+		public Task HandleAsync(Update update, CancellationToken cancellationToken)
+		{
+			handled.Enqueue(update.Id);
+			return Task.CompletedTask;
+		}
 	}
 
-	private sealed class DelegateRawHandler(Func<Update, CancellationToken, Task> handler) : IRawUpdateHandler
+	private sealed class ThrowingRawHandler : IRawUpdateHandler
 	{
 		public Task HandleAsync(Update update, CancellationToken cancellationToken) =>
-			handler(update, cancellationToken);
+			throw new InvalidOperationException("raw boom");
 	}
 
 	private sealed class ThrowingConstructorRawHandler : IRawUpdateHandler

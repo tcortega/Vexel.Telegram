@@ -27,8 +27,8 @@ public sealed class SetMyCommandsInitializerTests
 		var initializer = new SetMyCommandsInitializer(
 			bot,
 			Options.Create(new VexelClientOptions()),
-			[catalog],
-			NullLogger<SetMyCommandsInitializer>.Instance);
+			NullLogger<SetMyCommandsInitializer>.Instance,
+			catalog);
 
 		await initializer.StartAsync(CancellationToken.None);
 
@@ -48,8 +48,8 @@ public sealed class SetMyCommandsInitializerTests
 		var initializer = new SetMyCommandsInitializer(
 			bot,
 			Options.Create(new VexelClientOptions { RegisterBotCommands = false }),
-			[catalog],
-			NullLogger<SetMyCommandsInitializer>.Instance);
+			NullLogger<SetMyCommandsInitializer>.Instance,
+			catalog);
 
 		await initializer.StartAsync(CancellationToken.None);
 
@@ -64,7 +64,6 @@ public sealed class SetMyCommandsInitializerTests
 		var initializer = new SetMyCommandsInitializer(
 			bot,
 			Options.Create(new VexelClientOptions()),
-			[],
 			NullLogger<SetMyCommandsInitializer>.Instance);
 
 		await initializer.StartAsync(CancellationToken.None);
@@ -81,8 +80,8 @@ public sealed class SetMyCommandsInitializerTests
 		var initializer = new SetMyCommandsInitializer(
 			bot,
 			Options.Create(new VexelClientOptions()),
-			[catalog],
-			NullLogger<SetMyCommandsInitializer>.Instance);
+			NullLogger<SetMyCommandsInitializer>.Instance,
+			catalog);
 
 		await initializer.StartAsync(CancellationToken.None);
 
@@ -101,8 +100,8 @@ public sealed class SetMyCommandsInitializerTests
 		var initializer = new SetMyCommandsInitializer(
 			bot,
 			Options.Create(new VexelClientOptions()),
-			[catalog],
-			NullLogger<SetMyCommandsInitializer>.Instance);
+			NullLogger<SetMyCommandsInitializer>.Instance,
+			catalog);
 
 		await initializer.StartAsync(CancellationToken.None);
 
@@ -123,8 +122,8 @@ public sealed class SetMyCommandsInitializerTests
 		var initializer = new SetMyCommandsInitializer(
 			bot,
 			Options.Create(new VexelClientOptions()),
-			[new StaticCatalog([new BotCommandDescriptor("start", "Start the bot")])],
-			logger);
+			logger,
+			new StaticCatalog([new BotCommandDescriptor("start", "Start the bot")]));
 
 		await initializer.StartAsync(CancellationToken.None);
 
@@ -141,8 +140,8 @@ public sealed class SetMyCommandsInitializerTests
 		var initializer = new SetMyCommandsInitializer(
 			bot,
 			Options.Create(new VexelClientOptions()),
-			[new StaticCatalog([new BotCommandDescriptor("  ", "Blank name")])],
-			logger);
+			logger,
+			new StaticCatalog([new BotCommandDescriptor("  ", "Blank name")]));
 
 		await initializer.StartAsync(CancellationToken.None);
 
@@ -159,8 +158,8 @@ public sealed class SetMyCommandsInitializerTests
 		var initializer = new SetMyCommandsInitializer(
 			bot,
 			Options.Create(new VexelClientOptions()),
-			[new ThrowingCatalog()],
-			logger);
+			logger,
+			new ThrowingCatalog());
 
 		await initializer.StartAsync(CancellationToken.None);
 
@@ -182,8 +181,8 @@ public sealed class SetMyCommandsInitializerTests
 		var initializer = new SetMyCommandsInitializer(
 			bot,
 			Options.Create(new VexelClientOptions()),
-			[new StaticCatalog([new BotCommandDescriptor("start", "Start the bot")])],
-			NullLogger<SetMyCommandsInitializer>.Instance);
+			NullLogger<SetMyCommandsInitializer>.Instance,
+			new StaticCatalog([new BotCommandDescriptor("start", "Start the bot")]));
 
 		_ = await Assert.ThrowsAnyAsync<OperationCanceledException>(
 			() => initializer.StartAsync(cts.Token));

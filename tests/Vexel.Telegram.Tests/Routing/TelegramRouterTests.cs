@@ -7,6 +7,7 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Vexel.Telegram.Handlers.Routing;
 using Vexel.Telegram.Tests.Fakes;
+using Vexel.Telegram.Client;
 
 namespace Vexel.Telegram.Tests.Routing;
 
@@ -28,7 +29,7 @@ public sealed class TelegramRouterTests
 					return ValueTask.FromResult(true);
 				},
 			},
-			[new CommandRouteMetadata("ping", "Ping")]);
+			[new BotCommandDescriptor("ping", "Ping")]);
 
 		var bot = new RecordingTelegramBotClient { Username = "TestBot" };
 		var router = new TelegramRouter([contribution], bot, NullLogger<TelegramRouter>.Instance);
@@ -434,8 +435,8 @@ public sealed class TelegramRouterTests
 				["alpha"] = static (_, _, _) => ValueTask.FromResult(true),
 			},
 			[
-				new CommandRouteMetadata("zeta", "Z"),
-				new CommandRouteMetadata("alpha", "A"),
+				new BotCommandDescriptor("zeta", "Z"),
+				new BotCommandDescriptor("alpha", "A"),
 			]);
 
 		var router = new TelegramRouter(

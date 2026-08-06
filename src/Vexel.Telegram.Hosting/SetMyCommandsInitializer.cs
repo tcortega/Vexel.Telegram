@@ -2,6 +2,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Telegram.Bot;
+using Telegram.Bot.Types;
 using Vexel.Telegram.Client;
 
 namespace Vexel.Telegram.Hosting;
@@ -13,8 +14,8 @@ namespace Vexel.Telegram.Hosting;
 public sealed class SetMyCommandsInitializer(
 	ITelegramBotClient botClient,
 	IOptions<VexelClientOptions> options,
-	IEnumerable<IBotCommandCatalog> catalogs,
-	ILogger<SetMyCommandsInitializer> logger) : IHostedService
+	ILogger<SetMyCommandsInitializer> logger,
+	IBotCommandCatalog? catalog = null) : IHostedService
 {
 	/// <inheritdoc />
 	public async Task StartAsync(CancellationToken cancellationToken)
@@ -25,8 +26,7 @@ public sealed class SetMyCommandsInitializer(
 			return;
 		}
 
-		var catalogList = catalogs as IList<IBotCommandCatalog> ?? [.. catalogs];
-		if (catalogList.Count == 0)
+		if (catalog is null)
 		{
 			// Client-only wiring (no router): leave whatever Telegram already has alone.
 			logger.LogDebug("SetMyCommands skipped (no IBotCommandCatalog registered).");
@@ -35,14 +35,7 @@ public sealed class SetMyCommandsInitializer(
 
 		try
 		{
-			var descriptors = catalogList
-				.SelectMany(static c => c.Commands)
-				.GroupBy(static c => c.Name, StringComparer.OrdinalIgnoreCase)
-				.Select(static g => g.First())
-				.OrderBy(static c => c.Name, StringComparer.Ordinal)
-				.ToArray();
-
-			var payload = BotCommandRegistration.BuildPayload(descriptors);
+			var payload = BuildPayload(catalog.Commands);
 			if (payload.Count == 0)
 			{
 				// An empty setMyCommands payload deletes the menu; leave whatever Telegram already has alone.
@@ -68,4 +61,33 @@ public sealed class SetMyCommandsInitializer(
 
 	/// <inheritdoc />
 	public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+	/// <summary>
+	/// Converts catalog descriptors into Telegram <see cref="BotCommand"/> values.
+	/// Empty descriptions fall back to the command name so the API's non-empty description
+	/// rule is always satisfied (names are already 1-32 chars by generator validation).
+	/// </summary>
+	internal static IReadOnlyList<BotCommand> BuildPayload(IEnumerable<BotCommandDescriptor> commands)
+	{
+		ArgumentNullException.ThrowIfNull(commands);
+
+		var payload = new List<BotCommand>();
+		foreach (var command in commands)
+		{
+			ArgumentNullException.ThrowIfNull(command);
+			ArgumentException.ThrowIfNullOrWhiteSpace(command.Name);
+
+			var description = string.IsNullOrWhiteSpace(command.Description)
+				? command.Name
+				: command.Description.Trim();
+
+			payload.Add(new BotCommand
+			{
+				Command = command.Name,
+				Description = description,
+			});
+		}
+
+		return payload;
+	}
 }

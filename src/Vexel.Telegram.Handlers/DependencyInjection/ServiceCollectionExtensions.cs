@@ -49,28 +49,20 @@ public static class ServiceCollectionExtensions
 	/// </summary>
 	/// <param name="services">The service collection.</param>
 	/// <returns>The same service collection.</returns>
-	public static IServiceCollection AddTelegramRouter(this IServiceCollection services)
+	internal static IServiceCollection AddTelegramRouter(this IServiceCollection services)
 	{
 		ArgumentNullException.ThrowIfNull(services);
 
 		// Single shared instance exposed as IUpdateRouter (pipeline), TelegramRouter (tests), and
-		// IBotCommandCatalog (SetMyCommands). IUpdateRouter is a multi-registration seam, so the
-		// pipeline entry must be additive: app-registered routers must neither suppress this one nor
-		// be mistaken for it when TelegramRouter is resolved.
+		// IBotCommandCatalog (SetMyCommands).
 		services.TryAddSingleton<TelegramRouter>();
-		services.TryAddEnumerable(
-			ServiceDescriptor.Singleton<IUpdateRouter, TelegramRouter>(
-				static sp => sp.GetRequiredService<TelegramRouter>()));
-		services.TryAddEnumerable(
-			ServiceDescriptor.Singleton<IBotCommandCatalog, TelegramRouter>(
-				static sp => sp.GetRequiredService<TelegramRouter>()));
+		services.TryAddSingleton<IUpdateRouter>(static sp => sp.GetRequiredService<TelegramRouter>());
+		services.TryAddSingleton<IBotCommandCatalog>(static sp => sp.GetRequiredService<TelegramRouter>());
 
 		// B4: discharge default answerCallbackQuery / answerInlineQuery after the full pipeline
 		// when Feedback did not answer.
 		services.TryAddEnumerable(
-			ServiceDescriptor.Singleton<IUpdateCompletionHook, CallbackAnswerObligation>());
-		services.TryAddEnumerable(
-			ServiceDescriptor.Singleton<IUpdateCompletionHook, InlineAnswerObligation>());
+			ServiceDescriptor.Singleton<IUpdateCompletionHook, AnswerObligation>());
 
 		return services;
 	}
@@ -82,7 +74,7 @@ public static class ServiceCollectionExtensions
 	/// <param name="services">The service collection.</param>
 	/// <param name="configure">Optional flow options configuration.</param>
 	/// <returns>The same service collection.</returns>
-	public static IServiceCollection AddTelegramFlow(
+	internal static IServiceCollection AddTelegramFlow(
 		this IServiceCollection services,
 		Action<FlowOptions>? configure = null)
 	{
@@ -111,15 +103,14 @@ public static class ServiceCollectionExtensions
 	/// </summary>
 	/// <param name="services">The service collection.</param>
 	/// <returns>The same service collection.</returns>
-	public static IServiceCollection AddVexelUpdateContexts(this IServiceCollection services)
+	internal static IServiceCollection AddVexelUpdateContexts(this IServiceCollection services)
 	{
 		ArgumentNullException.ThrowIfNull(services);
 
 		services.TryAddScoped<UpdateContextHolder>();
 		services.TryAddScoped<Feedback>();
 
-		// The dispatcher runs every IUpdateScopeInitializer, so this must compose with app-registered
-		// initializers instead of being skipped when one is already present.
+		// Package seam: Client dispatches through IUpdateScopeInitializer without referencing Handlers.
 		services.TryAddEnumerable(
 			ServiceDescriptor.Scoped<IUpdateScopeInitializer, UpdateContextScopeInitializer>());
 

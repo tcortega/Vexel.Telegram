@@ -136,7 +136,7 @@ public sealed class ReceiveModeValidationTests
 			},
 		}));
 		_ = services.AddSingleton(sp => new UpdateScheduler(
-			new NoopDispatcher(),
+			static (_, _) => Task.CompletedTask,
 			sp.GetRequiredService<IOptions<VexelClientOptions>>(),
 			NullLogger<UpdateScheduler>.Instance));
 		_ = services.AddSingleton<VexelClient>();
@@ -174,7 +174,7 @@ public sealed class ReceiveModeValidationTests
 		});
 
 		await using var scheduler = new UpdateScheduler(
-			new NoopDispatcher(),
+			static (_, _) => Task.CompletedTask,
 			options,
 			NullLogger<UpdateScheduler>.Instance);
 		var bot = new RecordingTelegramBotClient();
@@ -208,7 +208,7 @@ public sealed class ReceiveModeValidationTests
 		});
 
 		await using var scheduler = new UpdateScheduler(
-			new NoopDispatcher(),
+			static (_, _) => Task.CompletedTask,
 			options,
 			NullLogger<UpdateScheduler>.Instance);
 		var client = new VexelClient(logger, new RecordingTelegramBotClient(), options, scheduler);
@@ -241,7 +241,7 @@ public sealed class ReceiveModeValidationTests
 		});
 
 		await using var scheduler = new UpdateScheduler(
-			new NoopDispatcher(),
+			static (_, _) => Task.CompletedTask,
 			options,
 			NullLogger<UpdateScheduler>.Instance);
 		var bot = new RecordingTelegramBotClient
@@ -269,7 +269,7 @@ public sealed class ReceiveModeValidationTests
 		var options = Options.Create(new VexelClientOptions());
 
 		await using var scheduler = new UpdateScheduler(
-			new NoopDispatcher(),
+			static (_, _) => Task.CompletedTask,
 			options,
 			NullLogger<UpdateScheduler>.Instance);
 		var bot = new RecordingTelegramBotClient
@@ -297,7 +297,7 @@ public sealed class ReceiveModeValidationTests
 		var options = Options.Create(new VexelClientOptions());
 
 		await using var scheduler = new UpdateScheduler(
-			new NoopDispatcher(),
+			static (_, _) => Task.CompletedTask,
 			options,
 			NullLogger<UpdateScheduler>.Instance);
 		var bot = new RecordingTelegramBotClient
@@ -314,9 +314,4 @@ public sealed class ReceiveModeValidationTests
 		_ = await Assert.ThrowsAsync<RequestException>(() => client.RunAsync(cts.Token));
 	}
 
-	private sealed class NoopDispatcher : IUpdateDispatcher
-	{
-		public Task DispatchAsync(Update update, CancellationToken cancellationToken) =>
-			Task.CompletedTask;
-	}
 }
