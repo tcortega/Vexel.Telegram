@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Telegram.Bot;
+using Vexel.Telegram.Client;
 using Vexel.Telegram.Handlers.DependencyInjection;
 using Vexel.Telegram.Handlers.Routing;
 using Vexel.Telegram.Tests.Generators;
@@ -491,7 +492,7 @@ public sealed class SampleBotEndToEndTests(ITestOutputHelper output)
 		IReadOnlyList<string> observerLines,
 		Transcript transcript,
 		IReadOnlyList<string> outboundCalls,
-		IReadOnlyList<CommandRouteMetadata> commandMetadata)
+		IReadOnlyList<BotCommandDescriptor> commandMetadata)
 	{
 		var writer = new StringBuilder();
 

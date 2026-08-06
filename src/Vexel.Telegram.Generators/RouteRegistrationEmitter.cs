@@ -47,13 +47,13 @@ internal static class RouteRegistrationEmitter
 
 		_ = sb.AppendLine("\t\t};");
 		_ = sb.AppendLine();
-		_ = sb.AppendLine("\t\tvar metadata = new global::Vexel.Telegram.Handlers.Routing.CommandRouteMetadata[]");
+		_ = sb.AppendLine("\t\tvar metadata = new global::Vexel.Telegram.Client.BotCommandDescriptor[]");
 		_ = sb.AppendLine("\t\t{");
 
 		foreach (var command in model.Commands.OrderBy(static c => c.CommandName, StringComparer.Ordinal))
 		{
 			var description = command.Description ?? string.Empty;
-			_ = sb.Append("\t\t\tnew global::Vexel.Telegram.Handlers.Routing.CommandRouteMetadata(\"")
+			_ = sb.Append("\t\t\tnew global::Vexel.Telegram.Client.BotCommandDescriptor(\"")
 				.Append(Escape(command.CommandName))
 				.Append("\", \"")
 				.Append(Escape(description))

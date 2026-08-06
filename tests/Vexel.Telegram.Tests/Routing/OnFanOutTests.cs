@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Vexel.Telegram.Client;
 using Vexel.Telegram.Handlers;
 using Vexel.Telegram.Handlers.Routing;
 using Vexel.Telegram.Tests.Fakes;
@@ -28,7 +29,7 @@ public sealed class OnFanOutTests
 					return ValueTask.FromResult(true);
 				},
 			},
-			commandMetadata: [new CommandRouteMetadata("ping", "Ping")],
+			commandMetadata: [new BotCommandDescriptor("ping", "Ping")],
 			onMessages:
 			[
 				new OnHandlerEntry(

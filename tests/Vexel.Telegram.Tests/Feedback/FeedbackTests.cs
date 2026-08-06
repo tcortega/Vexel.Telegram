@@ -183,7 +183,7 @@ public sealed class FeedbackTests
 		_ = services.AddRawUpdateHandler<IsolationRawHandler>();
 
 		await using var provider = services.BuildServiceProvider(validateScopes: true);
-		var dispatcher = provider.GetRequiredService<IUpdateDispatcher>();
+		var dispatcher = provider.GetRequiredService<UpdateDispatcher>();
 
 		var dispatch1 = dispatcher.DispatchAsync(MessageUpdate(1, chatId: 100), CancellationToken.None);
 		var dispatch2 = dispatcher.DispatchAsync(MessageUpdate(2, chatId: 200), CancellationToken.None);
@@ -249,7 +249,7 @@ public sealed class FeedbackTests
 		_ = services.AddRawUpdateHandler<AnyUpdateRawHandler>();
 
 		await using var provider = services.BuildServiceProvider(validateScopes: true);
-		var dispatcher = provider.GetRequiredService<IUpdateDispatcher>();
+		var dispatcher = provider.GetRequiredService<UpdateDispatcher>();
 
 		_ = await Assert.ThrowsAsync<InvalidOperationException>(
 			() => dispatcher.DispatchAsync(MessageUpdate(1, chatId: 9), CancellationToken.None));
@@ -258,7 +258,7 @@ public sealed class FeedbackTests
 	}
 
 	[Fact]
-	public async Task ContainerHandlers_WrongKindContext_DoesNotSkipSiblingHandlers()
+	public async Task RawHandlers_WrongKindContext_DoesNotSkipSiblingHandlers()
 	{
 		var ran = new ConcurrentBag<string>();
 		var services = new ServiceCollection();
@@ -267,11 +267,11 @@ public sealed class FeedbackTests
 		_ = services.AddLogging(static b => b.ClearProviders());
 		_ = services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 		_ = services.AddTelegramBot(static _ => "test-token");
-		_ = services.AddScoped<IRawUpdateHandler, CallbackOnlyRawHandler>();
-		_ = services.AddScoped<IRawUpdateHandler, AnyUpdateRawHandler>();
+		_ = services.AddRawUpdateHandler<CallbackOnlyRawHandler>();
+		_ = services.AddRawUpdateHandler<AnyUpdateRawHandler>();
 
 		await using var provider = services.BuildServiceProvider(validateScopes: true);
-		var dispatcher = provider.GetRequiredService<IUpdateDispatcher>();
+		var dispatcher = provider.GetRequiredService<UpdateDispatcher>();
 
 		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 7), CancellationToken.None);
 
@@ -279,7 +279,7 @@ public sealed class FeedbackTests
 	}
 
 	[Fact]
-	public async Task ContainerHandlers_DegradedResolution_RunsHealthySiblingOnceAndDisposesEveryBuild()
+	public async Task RawHandlers_RunsHealthySiblingWhenAnotherFailsToResolve()
 	{
 		var tracker = new HandlerLifetimeTracker();
 		var services = new ServiceCollection();
@@ -289,11 +289,11 @@ public sealed class FeedbackTests
 		_ = services.AddLogging(static b => b.ClearProviders());
 		_ = services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 		_ = services.AddTelegramBot(static _ => "test-token");
-		_ = services.AddScoped<IRawUpdateHandler, LifetimeTrackedRawHandler>();
-		_ = services.AddScoped<IRawUpdateHandler, CallbackOnlyRawHandler>();
+		_ = services.AddRawUpdateHandler<LifetimeTrackedRawHandler>();
+		_ = services.AddRawUpdateHandler<CallbackOnlyRawHandler>();
 
 		await using var provider = services.BuildServiceProvider(validateScopes: true);
-		var dispatcher = provider.GetRequiredService<IUpdateDispatcher>();
+		var dispatcher = provider.GetRequiredService<UpdateDispatcher>();
 
 		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 7), CancellationToken.None);
 
@@ -302,7 +302,7 @@ public sealed class FeedbackTests
 	}
 
 	[Fact]
-	public async Task ContainerHandlers_SingletonRegistration_IsNotRebuiltPerUpdate()
+	public async Task RawHandlers_SingletonRegistration_IsNotRebuiltPerUpdate()
 	{
 		var tracker = new HandlerLifetimeTracker();
 		var services = new ServiceCollection();
@@ -312,13 +312,13 @@ public sealed class FeedbackTests
 		_ = services.AddLogging(static b => b.ClearProviders());
 		_ = services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 		_ = services.AddTelegramBot(static _ => "test-token");
-		_ = services.AddSingleton<IRawUpdateHandler, LifetimeTrackedRawHandler>();
-		_ = services.AddScoped<IRawUpdateHandler, CallbackOnlyRawHandler>();
+		_ = services.AddRawUpdateHandler<LifetimeTrackedRawHandler>(ServiceLifetime.Singleton);
+		_ = services.AddRawUpdateHandler<CallbackOnlyRawHandler>();
 
 		var provider = services.BuildServiceProvider(validateScopes: true);
 		await using (provider.ConfigureAwait(false))
 		{
-			var dispatcher = provider.GetRequiredService<IUpdateDispatcher>();
+			var dispatcher = provider.GetRequiredService<UpdateDispatcher>();
 
 			await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 7), CancellationToken.None);
 			var createdAfterFirstUpdate = tracker.Created;
@@ -335,7 +335,7 @@ public sealed class FeedbackTests
 	}
 
 	[Fact]
-	public async Task ContainerHandlers_SingletonWithScopedDependency_NeverCapturesAnUpdateScope()
+	public async Task RawHandlers_SingletonWithScopedDependency_FailsResolution()
 	{
 		var chatIds = new ConcurrentBag<long>();
 		var services = new ServiceCollection();
@@ -344,10 +344,10 @@ public sealed class FeedbackTests
 		_ = services.AddLogging(static b => b.ClearProviders());
 		_ = services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 		_ = services.AddTelegramBot(static _ => "test-token");
-		_ = services.AddSingleton<IRawUpdateHandler, MessageBoundSingletonRawHandler>();
+		_ = services.AddRawUpdateHandler<MessageBoundSingletonRawHandler>(ServiceLifetime.Singleton);
 
 		await using var provider = services.BuildServiceProvider(validateScopes: true);
-		var dispatcher = provider.GetRequiredService<IUpdateDispatcher>();
+		var dispatcher = provider.GetRequiredService<UpdateDispatcher>();
 
 		await dispatcher.DispatchAsync(MessageUpdate(1, chatId: 100), CancellationToken.None);
 		await dispatcher.DispatchAsync(MessageUpdate(2, chatId: 200), CancellationToken.None);

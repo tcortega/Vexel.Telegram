@@ -1,3 +1,5 @@
+using Vexel.Telegram.Client;
+
 namespace Vexel.Telegram.Handlers.Routing;
 
 /// <summary>
@@ -52,7 +54,7 @@ public sealed class TelegramRouteContribution
 	public TelegramRouteContribution(
 		string assemblyName,
 		IReadOnlyDictionary<string, RouteBinder> commands,
-		IReadOnlyList<CommandRouteMetadata> commandMetadata,
+		IReadOnlyList<BotCommandDescriptor> commandMetadata,
 		IReadOnlyDictionary<string, RouteBinder>? callbacks = null,
 		IReadOnlyDictionary<string, RouteBinder>? inlineQueries = null,
 		IReadOnlyDictionary<string, RouteBinder>? chosenInlineResults = null,
@@ -86,7 +88,7 @@ public sealed class TelegramRouteContribution
 	public IReadOnlyDictionary<string, RouteBinder> Commands { get; }
 
 	/// <summary>SetMyCommands metadata for this assembly.</summary>
-	public IReadOnlyList<CommandRouteMetadata> CommandMetadata { get; }
+	public IReadOnlyList<BotCommandDescriptor> CommandMetadata { get; }
 
 	/// <summary>Callback route map for this assembly.</summary>
 	public IReadOnlyDictionary<string, RouteBinder> Callbacks { get; }

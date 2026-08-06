@@ -4,7 +4,7 @@ namespace Vexel.Telegram.Handlers.Routing;
 /// Extracts the first whitespace token and remainder from an inline query string for trigger
 /// matching (binding convention rule 4 / D8). Never consults <c>InlineQuery.Id</c>.
 /// </summary>
-public static class InlineQueryKeyExtractor
+internal static class InlineQueryKeyExtractor
 {
 	/// <summary>
 	/// Splits <paramref name="query"/> into a leading trigger token and the trimmed remainder.

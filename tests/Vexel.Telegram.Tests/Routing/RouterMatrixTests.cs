@@ -108,8 +108,7 @@ public sealed class RouterMatrixTests
 			[callbackContribution, inlineContribution],
 			bot,
 			NullLogger<TelegramRouter>.Instance);
-		var callbackHook = new CallbackAnswerObligation(bot, NullLogger<CallbackAnswerObligation>.Instance);
-		var inlineHook = new InlineAnswerObligation(bot, NullLogger<InlineAnswerObligation>.Instance);
+		var answerHook = new AnswerObligation(bot, NullLogger<AnswerObligation>.Instance);
 
 		await using var provider = BuildFeedbackProvider(bot);
 
@@ -118,7 +117,7 @@ public sealed class RouterMatrixTests
 		{
 			scope.ServiceProvider.GetRequiredService<UpdateContextHolder>().Set(callbackUpdate);
 			await router.RouteAsync(callbackUpdate, scope.ServiceProvider, CancellationToken.None);
-			await callbackHook.CompleteAsync(callbackUpdate, scope.ServiceProvider, CancellationToken.None);
+			await answerHook.CompleteAsync(callbackUpdate, scope.ServiceProvider, CancellationToken.None);
 		}
 
 		var inlineUpdate = InlineUpdate("ghost query");
@@ -126,7 +125,7 @@ public sealed class RouterMatrixTests
 		{
 			scope.ServiceProvider.GetRequiredService<UpdateContextHolder>().Set(inlineUpdate);
 			await router.RouteAsync(inlineUpdate, scope.ServiceProvider, CancellationToken.None);
-			await inlineHook.CompleteAsync(inlineUpdate, scope.ServiceProvider, CancellationToken.None);
+			await answerHook.CompleteAsync(inlineUpdate, scope.ServiceProvider, CancellationToken.None);
 		}
 
 		_ = Assert.Single(bot.OfType<AnswerCallbackQueryRequest>());

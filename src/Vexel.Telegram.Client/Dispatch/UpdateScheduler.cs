@@ -14,7 +14,7 @@ public sealed class UpdateScheduler : IAsyncDisposable
 	private static readonly TimeSpan s_drainGracePeriod = TimeSpan.FromSeconds(5);
 	private static readonly TimeSpan s_forcedShutdownGracePeriod = TimeSpan.FromSeconds(2);
 
-	private readonly IUpdateDispatcher _dispatcher;
+	private readonly Func<Update, CancellationToken, Task> _dispatch;
 	private readonly ILogger<UpdateScheduler> _logger;
 	private readonly int _laneCapacity;
 #if NET9_0_OR_GREATER
@@ -34,15 +34,29 @@ public sealed class UpdateScheduler : IAsyncDisposable
 	/// <param name="options">Client options (lane capacity, timeouts).</param>
 	/// <param name="logger">Logger for dispatch faults.</param>
 	public UpdateScheduler(
-		IUpdateDispatcher dispatcher,
+		UpdateDispatcher dispatcher,
+		IOptions<VexelClientOptions> options,
+		ILogger<UpdateScheduler> logger)
+		: this(
+			(dispatcher ?? throw new ArgumentNullException(nameof(dispatcher))).DispatchAsync,
+			options,
+			logger)
+	{
+	}
+
+	/// <summary>
+	/// Test constructor: injects a dispatch delegate without standing up a full <see cref="UpdateDispatcher"/>.
+	/// </summary>
+	internal UpdateScheduler(
+		Func<Update, CancellationToken, Task> dispatch,
 		IOptions<VexelClientOptions> options,
 		ILogger<UpdateScheduler> logger)
 	{
-		ArgumentNullException.ThrowIfNull(dispatcher);
+		ArgumentNullException.ThrowIfNull(dispatch);
 		ArgumentNullException.ThrowIfNull(options);
 		ArgumentNullException.ThrowIfNull(logger);
 
-		_dispatcher = dispatcher;
+		_dispatch = dispatch;
 		_logger = logger;
 
 		var capacity = options.Value.LaneCapacity;
@@ -323,7 +337,7 @@ public sealed class UpdateScheduler : IAsyncDisposable
 	{
 		try
 		{
-			await _dispatcher.DispatchAsync(update, cancellationToken).ConfigureAwait(false);
+			await _dispatch(update, cancellationToken).ConfigureAwait(false);
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 		{

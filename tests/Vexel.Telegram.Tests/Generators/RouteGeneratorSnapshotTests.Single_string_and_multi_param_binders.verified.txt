@@ -63,11 +63,11 @@ public static partial class TelegramServiceCollectionExtensions
 			},
 		};
 
-		var metadata = new global::Vexel.Telegram.Handlers.Routing.CommandRouteMetadata[]
+		var metadata = new global::Vexel.Telegram.Client.BotCommandDescriptor[]
 		{
-			new global::Vexel.Telegram.Handlers.Routing.CommandRouteMetadata("add", ""),
-			new global::Vexel.Telegram.Handlers.Routing.CommandRouteMetadata("echo", ""),
-			new global::Vexel.Telegram.Handlers.Routing.CommandRouteMetadata("say", ""),
+			new global::Vexel.Telegram.Client.BotCommandDescriptor("add", ""),
+			new global::Vexel.Telegram.Client.BotCommandDescriptor("echo", ""),
+			new global::Vexel.Telegram.Client.BotCommandDescriptor("say", ""),
 		};
 
 		var callbacks = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(

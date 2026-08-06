@@ -7,7 +7,7 @@ namespace Vexel.Telegram.Handlers.Routing;
 /// per the binding convention: key is everything up to the first <c>|</c>; suffix is
 /// everything after (may itself contain <c>|</c>). Absent data yields no route.
 /// </summary>
-public static class CallbackKeyExtractor
+internal static class CallbackKeyExtractor
 {
 	/// <summary>
 	/// Tries to split <paramref name="data"/> into route key and suffix.

@@ -26,9 +26,9 @@ public static partial class TelegramServiceCollectionExtensions
 			},
 		};
 
-		var metadata = new global::Vexel.Telegram.Handlers.Routing.CommandRouteMetadata[]
+		var metadata = new global::Vexel.Telegram.Client.BotCommandDescriptor[]
 		{
-			new global::Vexel.Telegram.Handlers.Routing.CommandRouteMetadata("ping", ""),
+			new global::Vexel.Telegram.Client.BotCommandDescriptor("ping", ""),
 		};
 
 		var callbacks = new global::System.Collections.Generic.Dictionary<string, global::Vexel.Telegram.Handlers.Routing.RouteBinder>(

@@ -20,9 +20,9 @@ namespace Vexel.Telegram.Handlers.Routing;
 /// After the routed path (hit or miss), On* observers for that update kind run sequentially in
 /// fully-qualified metadata name order (D9/N3), always awaited on the same chat lane.
 /// Callback and inline answer obligations (B4) are discharged by
-/// <see cref="CallbackAnswerObligation"/> and <see cref="InlineAnswerObligation"/> after the full
-/// dispatch pipeline so routed handlers, On*, exceptions, unrouted updates, and raw handlers all
-/// share one fail-closed default answer when Feedback did not answer.
+/// <see cref="AnswerObligation"/> after the full dispatch pipeline so routed handlers, On*,
+/// exceptions, unrouted updates, and raw handlers all share one fail-closed default answer when
+/// Feedback did not answer.
 /// </remarks>
 public sealed class TelegramRouter : IUpdateRouter, IBotCommandCatalog
 {
@@ -107,11 +107,10 @@ public sealed class TelegramRouter : IUpdateRouter, IBotCommandCatalog
 	public TimeSpan BotUsernameRetryBackoff { get; set; } = TimeSpan.FromSeconds(30);
 
 	/// <summary>Composed command metadata across all contributions (for SetMyCommands).</summary>
-	public IReadOnlyList<CommandRouteMetadata> CommandMetadata { get; private set; } = [];
+	public IReadOnlyList<BotCommandDescriptor> CommandMetadata { get; private set; } = [];
 
 	/// <inheritdoc />
-	IReadOnlyList<BotCommandDescriptor> IBotCommandCatalog.Commands =>
-		[.. CommandMetadata.Select(static m => new BotCommandDescriptor(m.Name, m.Description))];
+	IReadOnlyList<BotCommandDescriptor> IBotCommandCatalog.Commands => CommandMetadata;
 
 	/// <summary>
 	/// Returns <see langword="true"/> when <paramref name="stepKey"/> is a registered flow step.
@@ -432,7 +431,7 @@ public sealed class TelegramRouter : IUpdateRouter, IBotCommandCatalog
 		IServiceProvider scope,
 		CancellationToken cancellationToken)
 	{
-		// Answer obligation (B4) is discharged by CallbackAnswerObligation after the full pipeline
+		// Answer obligation (B4) is discharged by AnswerObligation after the full pipeline
 		// so raw handlers can still answer unrouted callbacks first. Apps that handle callbacks
 		// only through raw handlers are a supported shape, so a miss is not a warning.
 		if (_callbacks.Count == 0)
@@ -475,7 +474,7 @@ public sealed class TelegramRouter : IUpdateRouter, IBotCommandCatalog
 		CancellationToken cancellationToken)
 	{
 		// Routing keys off query text only - never InlineQuery.Id (opaque Telegram server id).
-		// Answer obligation (B4) is discharged by InlineAnswerObligation after the full pipeline.
+		// Answer obligation (B4) is discharged by AnswerObligation after the full pipeline.
 		if (_inlineQueries.Count == 0)
 		{
 			return;
@@ -672,7 +671,7 @@ public sealed class TelegramRouter : IUpdateRouter, IBotCommandCatalog
 	{
 		var map = new Dictionary<string, RouteEntry>(StringComparer.OrdinalIgnoreCase);
 		var owners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-		var metadata = new List<CommandRouteMetadata>();
+		var metadata = new List<BotCommandDescriptor>();
 
 		foreach (var contribution in contributions)
 		{

@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Telegram.Bot;
 using Vexel.Telegram.Client.Dispatch;
 using Vexel.Telegram.Client.Webhook;
@@ -30,7 +32,13 @@ public static class ServiceCollectionExtensions
 
 		_ = GetOrAddRawHandlerRegistry(services);
 		services.TryAddSingleton<ITelegramBotClient>(sp => new TelegramBotClient(tokenFactory(sp)));
-		services.TryAddSingleton<IUpdateDispatcher, UpdateDispatcher>();
+		services.TryAddSingleton(static sp => new UpdateDispatcher(
+			sp.GetRequiredService<IServiceScopeFactory>(),
+			sp.GetRequiredService<RawUpdateHandlerRegistry>(),
+			sp.GetServices<IUpdateCompletionHook>(),
+			sp.GetRequiredService<IOptions<VexelClientOptions>>(),
+			sp.GetRequiredService<ILogger<UpdateDispatcher>>(),
+			ResolveRouter(sp)));
 		services.TryAddSingleton<UpdateScheduler>();
 		services.TryAddSingleton<WebhookUpdateReceiver>();
 		services.TryAddSingleton<VexelClient>();
@@ -41,10 +49,6 @@ public static class ServiceCollectionExtensions
 	/// <summary>
 	/// Adds a raw update handler that is resolved independently of every other raw handler, so a
 	/// construction or dependency failure in one handler cannot stop the others from running.
-	/// This is the preferred way to register a raw handler: registering directly against
-	/// <see cref="IRawUpdateHandler"/> makes the container materialize every such handler as one
-	/// unit, which the dispatcher can only recover from by degrading to per-registration
-	/// construction (singleton handlers are then rebuilt per update and scope disposal is lost).
 	/// </summary>
 	/// <typeparam name="THandler">The handler implementation type.</typeparam>
 	/// <param name="services">The service collection.</param>
@@ -63,6 +67,24 @@ public static class ServiceCollectionExtensions
 		return services;
 	}
 
+	private static IUpdateRouter? ResolveRouter(IServiceProvider provider)
+	{
+		IUpdateRouter[] routers = [.. provider.GetServices<IUpdateRouter>()];
+
+		return routers.Length switch
+		{
+			0 => null,
+			1 => routers[0],
+			_ => throw new InvalidOperationException(
+				"Multiple IUpdateRouter services are registered ("
+				+ string.Join(", ", routers.Select(static r => r.GetType().FullName))
+				+ "). Vexel dispatches through a single router: an app-registered IUpdateRouter replaces "
+				+ "TelegramRouter and silently disables every [Command], [Callback], [InlineQuery], "
+				+ "[ChosenInlineResult], [On*], and flow-step route. Contribute routes with the generated "
+				+ "Add{Assembly}Telegram() instead of registering IUpdateRouter."),
+		};
+	}
+
 	private static RawUpdateHandlerRegistry GetOrAddRawHandlerRegistry(IServiceCollection services)
 	{
 		foreach (var descriptor in services)
@@ -75,7 +97,6 @@ public static class ServiceCollectionExtensions
 		}
 
 		var registry = new RawUpdateHandlerRegistry();
-		registry.AttachServices(services);
 		_ = services.AddSingleton(registry);
 
 		return registry;

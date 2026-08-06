@@ -1,8 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using Vexel.Telegram.Client;
 using Vexel.Telegram.Client.Dispatch;
+using Vexel.Telegram.Client.Extensions;
 using Vexel.Telegram.Handlers.DependencyInjection;
 using Vexel.Telegram.Handlers.Routing;
 using Vexel.Telegram.Tests.Fakes;
@@ -20,39 +21,56 @@ public sealed class TelegramRouterRegistrationTests
 			_ = services.AddTelegramRouter();
 		});
 
-		var routers = provider.GetServices<IUpdateRouter>();
-
-		_ = Assert.Single(routers);
-		Assert.Same(provider.GetRequiredService<TelegramRouter>(), Assert.Single(routers));
+		var router = provider.GetRequiredService<IUpdateRouter>();
+		Assert.Same(provider.GetRequiredService<TelegramRouter>(), router);
+		Assert.Same(router, provider.GetRequiredService<IBotCommandCatalog>());
 	}
 
 	[Fact]
-	public void App_registered_router_does_not_suppress_the_Telegram_router()
+	public void Telegram_router_is_the_single_IUpdateRouter()
 	{
-		using var provider = BuildProvider(static services =>
-		{
-			_ = services.AddSingleton<IUpdateRouter, NoopRouter>();
-			_ = services.AddTelegramRouter();
-		});
+		using var provider = BuildProvider(static services => _ = services.AddTelegramRouter());
 
-		var routers = provider.GetServices<IUpdateRouter>();
-
-		Assert.Contains(routers, static r => r is NoopRouter);
-		Assert.Contains(routers, static r => r is TelegramRouter);
+		Assert.IsType<TelegramRouter>(provider.GetRequiredService<IUpdateRouter>());
+		Assert.Same(
+			provider.GetRequiredService<TelegramRouter>(),
+			provider.GetRequiredService<IUpdateRouter>());
 	}
 
 	[Fact]
-	public void Telegram_router_resolves_when_an_app_router_is_registered_last()
+	public void Foreign_router_registered_before_the_router_fails_fast()
+	{
+		var services = new ServiceCollection();
+		_ = services.AddSingleton<IUpdateRouter, ForeignRouter>();
+
+		var ex = Assert.Throws<InvalidOperationException>(() =>
+		{
+			_ = services.AddTelegramRouter();
+		});
+		Assert.Contains("IUpdateRouter is already registered", ex.Message, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public void Foreign_router_registered_after_the_router_fails_the_dispatcher_resolve()
 	{
 		using var provider = BuildProvider(static services =>
 		{
+			_ = services.AddVexelTelegramClient(static _ => "token");
 			_ = services.AddTelegramRouter();
-			_ = services.AddSingleton<IUpdateRouter, NoopRouter>();
+			_ = services.AddSingleton<IUpdateRouter, ForeignRouter>();
 		});
 
-		var router = provider.GetRequiredService<TelegramRouter>();
+		var ex = Assert.Throws<InvalidOperationException>(() =>
+		{
+			_ = provider.GetRequiredService<UpdateDispatcher>();
+		});
+		Assert.Contains("Multiple IUpdateRouter services are registered", ex.Message, StringComparison.Ordinal);
+	}
 
-		Assert.Contains(provider.GetServices<IUpdateRouter>(), router1 => ReferenceEquals(router1, router));
+	private sealed class ForeignRouter : IUpdateRouter
+	{
+		public Task RouteAsync(Update update, IServiceProvider scope, CancellationToken cancellationToken) =>
+			Task.CompletedTask;
 	}
 
 	private static ServiceProvider BuildProvider(Action<IServiceCollection> configure)
@@ -62,11 +80,5 @@ public sealed class TelegramRouterRegistrationTests
 		_ = services.AddSingleton<ITelegramBotClient>(new RecordingTelegramBotClient());
 		configure(services);
 		return services.BuildServiceProvider(validateScopes: true);
-	}
-
-	private sealed class NoopRouter : IUpdateRouter
-	{
-		public Task RouteAsync(Update update, IServiceProvider scope, CancellationToken cancellationToken) =>
-			Task.CompletedTask;
 	}
 }
